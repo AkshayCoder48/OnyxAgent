@@ -1,14 +1,12 @@
-<p align="center"><img src="https://github.com/user-attachments/assets/eca9a9ec-8534-4615-9e0f-96c5ac1d10a3" alt="OnyxAgent" width="420" /></p>
-
 <p align="center">
-  <a href="https://github.com/zhayujie/OnyxAgent/releases/latest"><img src="https://img.shields.io/github/v/release/zhayujie/OnyxAgent?cacheSeconds=3600" alt="Latest release"></a>
-  <a href="https://github.com/zhayujie/OnyxAgent/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
-  <a href="https://github.com/zhayujie/OnyxAgent"><img src="https://img.shields.io/github/stars/zhayujie/OnyxAgent?style=flat-square&cacheSeconds=3600" alt="Stars"></a>
-  <a href="https://docs.onyxagent.ai/"><img src="https://img.shields.io/badge/Docs-onyxagent.ai-blue?style=flat&logo=readthedocs&logoColor=white" alt="Docs"></a>
+  <img src="docs/images/onyxagent-logo.svg" alt="OnyxAgent" width="480" />
 </p>
 
 <p align="center">
-  <a href="https://trendshift.io/repositories/25763" target="_blank"><img src="https://trendshift.io/api/badge/repositories/25763" alt="zhayujie%2FOnyxAgent | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+  <a href="https://github.com/AkshayCoder48/OnyxAgent/releases/latest"><img src="https://img.shields.io/github/v/release/AkshayCoder48/OnyxAgent?cacheSeconds=3600" alt="Latest release"></a>
+  <a href="https://github.com/AkshayCoder48/OnyxAgent/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-rose.svg" alt="License: MIT"></a>
+  <a href="https://github.com/AkshayCoder48/OnyxAgent"><img src="https://img.shields.io/github/stars/AkshayCoder48/OnyxAgent?style=flat-square&cacheSeconds=3600" alt="Stars"></a>
+  <img src="https://img.shields.io/badge/Fork-CowAgent-rose?style=flat&logo=github" alt="Fork of CowAgent">
 </p>
 
 <p align="center">
