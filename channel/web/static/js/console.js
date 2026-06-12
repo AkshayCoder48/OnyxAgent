@@ -1,5 +1,5 @@
 /* =====================================================================
-   CowAgent Console - Main Application Script
+   OnyxAgent Console - Main Application Script
    ===================================================================== */
 
 // =====================================================================
@@ -444,10 +444,10 @@ const I18N = {
 };
 
 // Resolve language by priority: user choice (localStorage) -> backend-detected
-// (cow_lang) -> browser language -> 'zh'. Shares __cowResolveLang__ defined in
+// (onyx_lang) -> browser language -> 'zh'. Shares __onyxResolveLang__ defined in
 // chat.html; falls back to a local resolver if loaded standalone.
-let currentLang = (typeof window.__cowResolveLang__ === 'function')
-    ? window.__cowResolveLang__()
+let currentLang = (typeof window.__onyxResolveLang__ === 'function')
+    ? window.__onyxResolveLang__()
     : (function () {
         const norm = (raw) => {
             if (!raw) return '';
@@ -457,8 +457,8 @@ let currentLang = (typeof window.__cowResolveLang__ === 'function')
             if (v.indexOf('en') === 0) return 'en';
             return '';
         };
-        return norm(localStorage.getItem('cow_lang'))
-            || norm(window.__COW_DEFAULT_LANG__)
+        return norm(localStorage.getItem('onyx_lang'))
+            || norm(window.__ONYX_DEFAULT_LANG__)
             || norm(navigator.language)
             || 'zh';
     })();
@@ -494,12 +494,12 @@ function applyI18n() {
     if (langLabel) langLabel.textContent = currentLang === 'zh' ? '中文' : 'EN';
     // Point the docs link to the locale-specific documentation site.
     const docsLink = document.getElementById('docs-link');
-    if (docsLink) docsLink.href = currentLang === 'zh' ? 'https://docs.cowagent.ai/zh' : 'https://docs.cowagent.ai';
+    if (docsLink) docsLink.href = currentLang === 'zh' ? 'https://docs.onyxagent.ai/zh' : 'https://docs.onyxagent.ai';
 }
 
 // Single entry point for switching language. Updates the in-memory language,
 // persists the user choice locally, re-renders the UI, and binds the choice to
-// the backend `cow_lang` config so logs / agent replies / CLI follow suit.
+// the backend `onyx_lang` config so logs / agent replies / CLI follow suit.
 function setLanguage(lang) {
     const next = (lang === 'en') ? 'en' : 'zh';
     if (next === currentLang) {
@@ -508,7 +508,7 @@ function setLanguage(lang) {
         return;
     }
     currentLang = next;
-    localStorage.setItem('cow_lang', currentLang);
+    localStorage.setItem('onyx_lang', currentLang);
     applyI18n();
     _applyInputTooltips();
     // Re-render views whose DOM is built in JS (data-i18n alone does not
@@ -519,14 +519,14 @@ function setLanguage(lang) {
     syncLanguageToBackend(currentLang);
 }
 
-// Persist the language to the backend `cow_lang` config (best-effort; the UI
+// Persist the language to the backend `onyx_lang` config (best-effort; the UI
 // has already switched locally, so a network failure is non-blocking).
 function syncLanguageToBackend(lang) {
     try {
         fetch('/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ updates: { cow_lang: lang } })
+            body: JSON.stringify({ updates: { onyx_lang: lang } })
         }).catch(() => {});
     } catch (e) {}
 }
@@ -613,7 +613,7 @@ function installCfgTipPortal() {
 // =====================================================================
 // Theme
 // =====================================================================
-let currentTheme = localStorage.getItem('cow_theme') || 'dark';
+let currentTheme = localStorage.getItem('onyx_theme') || 'dark';
 
 function applyTheme() {
     const root = document.documentElement;
@@ -632,7 +632,7 @@ function applyTheme() {
 
 function toggleTheme() {
     currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('cow_theme', currentTheme);
+    localStorage.setItem('onyx_theme', currentTheme);
     applyTheme();
 }
 
@@ -780,20 +780,20 @@ function _buildVideoHtml(url) {
 }
 
 function _openImageLightbox(src) {
-    let overlay = document.getElementById('cow-lightbox');
+    let overlay = document.getElementById('onyx-lightbox');
     if (!overlay) {
         overlay = document.createElement('div');
-        overlay.id = 'cow-lightbox';
+        overlay.id = 'onyx-lightbox';
         overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;cursor:zoom-out;opacity:0;transition:opacity .2s';
         overlay.onclick = () => { overlay.style.opacity = '0'; setTimeout(() => overlay.style.display = 'none', 200); };
         const img = document.createElement('img');
-        img.id = 'cow-lightbox-img';
+        img.id = 'onyx-lightbox-img';
         img.style.cssText = 'max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.5);object-fit:contain;';
         img.onclick = (e) => e.stopPropagation();
         overlay.appendChild(img);
         document.body.appendChild(overlay);
     }
-    overlay.querySelector('#cow-lightbox-img').src = src;
+    overlay.querySelector('#onyx-lightbox-img').src = src;
     overlay.style.display = 'flex';
     requestAnimationFrame(() => overlay.style.opacity = '1');
 }
@@ -933,9 +933,9 @@ function updateEditButtonsState() {
 }
 let streamBuffers = {};   // request_id -> { items: [event...], timestamp } for re-attach replay
 let isComposing = false;
-let appConfig = { use_agent: false, title: 'CowAgent', subtitle: '', providers: {}, api_bases: {} };
+let appConfig = { use_agent: false, title: 'OnyxAgent', subtitle: '', providers: {}, api_bases: {} };
 
-const SESSION_ID_KEY = 'cow_session_id';
+const SESSION_ID_KEY = 'onyx_session_id';
 
 function generateSessionId() {
     return 'session_' + ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
@@ -963,7 +963,7 @@ let historyLoading = false;
 fetch('/config').then(r => r.json()).then(data => {
     if (data.status === 'success') {
         appConfig = data;
-        const title = data.title || 'CowAgent';
+        const title = data.title || 'OnyxAgent';
         document.getElementById('welcome-title').textContent = title;
         initConfigView(data);
     }
@@ -2335,7 +2335,7 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
         // Regenerate button starts hidden; it's revealed in the "done"
         // event handler once seq metadata arrives from the backend.
         botEl.innerHTML = `
-            <img src="assets/logo.jpg" alt="CowAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
+            <img src="assets/logo.jpg" alt="OnyxAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
             <div class="min-w-0 flex-1 max-w-[85%]">
                 <div class="bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content text-slate-700 dark:text-slate-200">
                     <div class="agent-steps"></div>
@@ -2576,7 +2576,7 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                 scrollChatToBottom();
 
             } else if (item.type === 'phase') {
-                // Coarse progress (e.g. cow install-browser); must not close SSE (unlike "done")
+                // Coarse progress (e.g. onyx install-browser); must not close SSE (unlike "done")
                 ensureBotEl();
                 const wrap = document.createElement('div');
                 wrap.className = 'text-xs sm:text-sm text-slate-600 dark:text-slate-400 border-l-2 border-primary-400 pl-2 py-1 my-0.5';
@@ -3077,7 +3077,7 @@ function createBotMessageEl(content, timestamp, requestId, msg) {
         : '';
 
     el.innerHTML = `
-        <img src="assets/logo.jpg" alt="CowAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
+        <img src="assets/logo.jpg" alt="OnyxAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
         <div class="min-w-0 flex-1 max-w-[85%]">
             <div class="bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content text-slate-700 dark:text-slate-200">
                 ${evolutionBadge}
@@ -3373,7 +3373,7 @@ function addLoadingIndicator() {
     const el = document.createElement('div');
     el.className = 'flex gap-3 px-4 sm:px-6 py-3';
     el.innerHTML = `
-        <img src="assets/logo.jpg" alt="CowAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
+        <img src="assets/logo.jpg" alt="OnyxAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
         <div class="bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3">
             <div class="flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-primary-400 animate-pulse-dot" style="animation-delay: 0s"></span>
@@ -3403,8 +3403,8 @@ function newChat(optimistic = true) {
     ws.className = 'flex flex-col items-center justify-center h-full px-6 pb-16';
     ws.style.paddingTop = '6vh';
     ws.innerHTML = `
-        <img src="assets/logo.jpg" alt="CowAgent" class="w-16 h-16 rounded-2xl mb-6 shadow-lg shadow-primary-500/20">
-        <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-3">${appConfig.title || 'CowAgent'}</h1>
+        <img src="assets/logo.jpg" alt="OnyxAgent" class="w-16 h-16 rounded-2xl mb-6 shadow-lg shadow-primary-500/20">
+        <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-3">${appConfig.title || 'OnyxAgent'}</h1>
         <p class="text-slate-500 dark:text-slate-400 text-center max-w-lg mb-10 leading-relaxed" data-i18n="welcome_subtitle">${t('welcome_subtitle')}</p>
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-2xl">
             <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4 cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
@@ -3427,8 +3427,8 @@ function newChat(optimistic = true) {
             </div>
             <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4 cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
                 <div class="flex items-center gap-2 mb-2">
-                    <div class="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
-                        <i class="fas fa-code text-emerald-500 text-xs"></i>
+                    <div class="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
+                        <i class="fas fa-code text-rose-500 text-xs"></i>
                     </div>
                     <span class="font-medium text-sm text-slate-700 dark:text-slate-200" data-i18n="example_code_title">${t('example_code_title')}</span>
                 </div>
@@ -3507,7 +3507,7 @@ function newChat(optimistic = true) {
 // Session Panel
 // =====================================================================
 
-const SESSION_PANEL_KEY = 'cow_session_panel_open';
+const SESSION_PANEL_KEY = 'onyx_session_panel_open';
 let sessionPanelOpen = localStorage.getItem(SESSION_PANEL_KEY) === '1';
 
 function _persistPanelState() {
@@ -4618,7 +4618,7 @@ function loadMemoryView(page) {
             const emptyIcon = emptyEl.querySelector('i');
             const emptyTitle = emptyEl.querySelector('p');
             if (memoryCategory === 'evolution') {
-                emptyIcon.className = 'fas fa-seedling text-emerald-400 text-xl';
+                emptyIcon.className = 'fas fa-seedling text-rose-400 text-xl';
                 emptyTitle.textContent = currentLang === 'zh' ? '暂无进化记录' : 'No evolution records yet';
             } else {
                 emptyIcon.className = 'fas fa-brain text-purple-400 text-xl';
@@ -4644,7 +4644,7 @@ function loadMemoryView(page) {
             if (f.type === 'global') {
                 typeLabel = '<span class="px-2 py-0.5 rounded-full text-xs bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400">Global</span>';
             } else if (f.type === 'evolution') {
-                typeLabel = '<span class="px-2 py-0.5 rounded-full text-xs bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">Evolution</span>';
+                typeLabel = '<span class="px-2 py-0.5 rounded-full text-xs bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400">Evolution</span>';
             } else if (f.type === 'dream') {
                 typeLabel = '<span class="px-2 py-0.5 rounded-full text-xs bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400">Dream</span>';
             } else {
@@ -5068,8 +5068,8 @@ function _renderSearchSummary(body, cap) {
             <button type="button" data-search-edit-provider="${p.id}"
                     title="${t('models_search_edit_hint')}"
                     class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md cursor-pointer
-                           bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400
-                           hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors">
+                           bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400
+                           hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors">
                 <i class="fas fa-check text-[10px]"></i>${escapeHtml(localizedLabel(p.label))}
             </button>
         `).join('');
@@ -6472,7 +6472,7 @@ function renderActiveChannels() {
             ${wecomNeedsCreds ? `<div id="wecom-active-auth" class="flex flex-col items-center py-2">
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-3">${t('wecom_scan_desc')}</p>
                 <button onclick="startWecomBotAuthInCard()"
-                    class="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium
+                    class="px-5 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium
                            cursor-pointer transition-colors duration-150">
                     <i class="fas fa-qrcode mr-2"></i>${t('wecom_scan_btn')}
                 </button>
@@ -6961,7 +6961,7 @@ function connectWeixinAfterQr() {
 // "WeCom Bot" channel QR-login flow, so the rest of the console works
 // fully offline.
 const WECOM_BOT_SDK_URL = 'https://wwcdn.weixin.qq.com/node/wework/js/wecom-aibot-sdk@0.1.0.min.js';
-const WECOM_BOT_SOURCE = 'cowagent';
+const WECOM_BOT_SOURCE = 'onyxagent';
 let _wecomSdkLoaded = false;
 
 function ensureWecomSdkLoaded() {
@@ -7027,7 +7027,7 @@ function switchWecomBotMode(mode) {
             <div class="flex flex-col items-center py-4">
                 <p class="text-sm text-slate-600 dark:text-slate-300 mb-2">${t('wecom_scan_desc')}</p>
                 <button onclick="startWecomBotAuth()"
-                    class="mt-3 px-6 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium
+                    class="mt-3 px-6 py-2.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium
                            cursor-pointer transition-colors duration-150">
                     <i class="fas fa-qrcode mr-2"></i>${t('wecom_scan_btn')}
                 </button>
@@ -7052,10 +7052,10 @@ function startWecomBotAuth() {
                 if (statusEl) {
                     statusEl.innerHTML = `
                         <div class="flex flex-col items-center py-2">
-                            <div class="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center mb-2">
-                                <i class="fas fa-check text-emerald-500 text-lg"></i>
+                            <div class="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center mb-2">
+                                <i class="fas fa-check text-rose-500 text-lg"></i>
                             </div>
-                            <p class="text-sm font-medium text-emerald-600 dark:text-emerald-400">${t('wecom_scan_success')}</p>
+                            <p class="text-sm font-medium text-rose-600 dark:text-rose-400">${t('wecom_scan_success')}</p>
                         </div>`;
                 }
                 connectWecomBotAfterAuth(bot.botid, bot.secret);
@@ -7109,10 +7109,10 @@ function startWecomBotAuthInCard() {
                 if (statusEl) {
                     statusEl.innerHTML = `
                         <div class="flex flex-col items-center py-2">
-                            <div class="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center mb-2">
-                                <i class="fas fa-check text-emerald-500 text-lg"></i>
+                            <div class="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center mb-2">
+                                <i class="fas fa-check text-rose-500 text-lg"></i>
                             </div>
-                            <p class="text-sm font-medium text-emerald-600 dark:text-emerald-400">${t('wecom_scan_success')}</p>
+                            <p class="text-sm font-medium text-rose-600 dark:text-rose-400">${t('wecom_scan_success')}</p>
                         </div>`;
                 }
                 connectWecomBotAfterAuth(bot.botid, bot.secret);
@@ -7211,7 +7211,7 @@ function switchFeishuMode(mode) {
             <div id="feishu-scan-panel" class="flex flex-col items-center py-4">
                 <p class="text-sm text-slate-600 dark:text-slate-300 mb-3 text-center">${desc}</p>
                 <button onclick="startFeishuRegister()"
-                    class="mt-2 px-6 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium
+                    class="mt-2 px-6 py-2.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium
                            cursor-pointer transition-colors duration-150">
                     <i class="fas fa-qrcode mr-2"></i>${t('feishu_scan_btn')}
                 </button>
@@ -7323,10 +7323,10 @@ function pollFeishuRegisterStatus(statusId) {
                 if (statusEl) {
                     statusEl.innerHTML = `
                         <div class="flex flex-col items-center py-2">
-                            <div class="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center mb-2">
-                                <i class="fas fa-check text-emerald-500 text-lg"></i>
+                            <div class="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center mb-2">
+                                <i class="fas fa-check text-rose-500 text-lg"></i>
                             </div>
-                            <p class="text-sm font-medium text-emerald-600 dark:text-emerald-400">${t('feishu_scan_success')}</p>
+                            <p class="text-sm font-medium text-rose-600 dark:text-rose-400">${t('feishu_scan_success')}</p>
                         </div>`;
                 }
                 connectFeishuAfterRegister(data.app_id, data.app_secret);
@@ -8123,9 +8123,9 @@ function initApp() {
 
     fetch('/api/version').then(r => r.json()).then(data => {
         APP_VERSION = `v${data.version}`;
-        document.getElementById('sidebar-version').textContent = `CowAgent ${APP_VERSION}`;
+        document.getElementById('sidebar-version').textContent = `OnyxAgent ${APP_VERSION}`;
     }).catch(() => {
-        document.getElementById('sidebar-version').textContent = 'CowAgent';
+        document.getElementById('sidebar-version').textContent = 'OnyxAgent';
     });
     chatInput.focus();
 }

@@ -66,8 +66,8 @@ class EnvConfig(BaseTool):
     
     def __init__(self, config: dict = None):
         self.config = config or {}
-        # Store env config in ~/.cow directory (outside workspace for security)
-        self.env_dir = expand_path("~/.cow")
+        # Store env config in ~/.onyx directory (outside workspace for security)
+        self.env_dir = expand_path("~/.onyx")
         self.env_path = os.path.join(self.env_dir, '.env')
         self.agent_bridge = self.config.get("agent_bridge")  # Reference to AgentBridge for hot reload
         # Don't create .env file in __init__ to avoid issues during tool discovery
@@ -75,7 +75,7 @@ class EnvConfig(BaseTool):
     
     def _ensure_env_file(self):
         """Ensure the .env file exists"""
-        # Create ~/.cow directory if it doesn't exist
+        # Create ~/.onyx directory if it doesn't exist
         os.makedirs(self.env_dir, exist_ok=True)
         
         if not os.path.exists(self.env_path):

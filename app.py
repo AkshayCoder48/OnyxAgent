@@ -306,7 +306,7 @@ def _sync_builtin_skills():
     """Sync builtin skills from project skills/ to workspace skills/ on startup."""
     import shutil
     try:
-        workspace = conf().get("agent_workspace", "~/cow")
+        workspace = conf().get("agent_workspace", "~/onyx")
         workspace = os.path.expanduser(workspace)
         project_root = os.path.dirname(os.path.abspath(__file__))
         builtin_dir = os.path.join(project_root, "skills")

@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "CowAgent",
-  "description": "CowAgent - AI Super Assistant powered by LLMs, with autonomous task planning, long-term memory, skills system, and multi-channel deployment.",
+  "name": "OnyxAgent",
+  "description": "OnyxAgent - AI Super Assistant powered by LLMs, with autonomous task planning, long-term memory, skills system, and multi-channel deployment.",
   "theme": "mint",
   "appearance": {
     "default": "light"
@@ -20,17 +20,17 @@
     "links": [
       {
         "label": "官网",
-        "href": "https://cowagent.ai/"
+        "href": "https://onyxagent.ai/"
       },
       {
         "label": "GitHub",
-        "href": "https://github.com/zhayujie/CowAgent"
+        "href": "https://github.com/zhayujie/OnyxAgent"
       }
     ]
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/zhayujie/CowAgent"
+      "github": "https://github.com/zhayujie/OnyxAgent"
     }
   },
   "redirects": [
@@ -49,11 +49,11 @@
           "links": [
             {
               "label": "Website",
-              "href": "https://cowagent.ai/"
+              "href": "https://onyxagent.ai/"
             },
             {
               "label": "GitHub",
-              "href": "https://github.com/zhayujie/CowAgent"
+              "href": "https://github.com/zhayujie/OnyxAgent"
             }
           ]
         },
@@ -265,11 +265,11 @@
           "links": [
             {
               "label": "官网",
-              "href": "https://cowagent.ai/?lang=zh"
+              "href": "https://onyxagent.ai/?lang=zh"
             },
             {
               "label": "GitHub",
-              "href": "https://github.com/zhayujie/CowAgent"
+              "href": "https://github.com/zhayujie/OnyxAgent"
             }
           ]
         },
@@ -481,11 +481,11 @@
           "links": [
             {
               "label": "ウェブサイト",
-              "href": "https://cowagent.ai/"
+              "href": "https://onyxagent.ai/"
             },
             {
               "label": "GitHub",
-              "href": "https://github.com/zhayujie/CowAgent"
+              "href": "https://github.com/zhayujie/OnyxAgent"
             }
           ]
         },

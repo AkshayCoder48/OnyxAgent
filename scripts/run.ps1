@@ -1,13 +1,13 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    CowAgent installer & management script for Windows.
+    OnyxAgent installer & management script for Windows.
 .DESCRIPTION
     One-liner install:
-      irm https://cdn.link-ai.tech/code/cow/run.ps1 | iex
+      irm https://cdn.link-ai.tech/cod./onyx/run.ps1 | iex
     Or from a local clone:
       .\scripts\run.ps1              # install / configure
-      .\scripts\run.ps1 start        # start service  (delegates to cow CLI)
+      .\scripts\run.ps1 start        # start service  (delegates to onyx CLI)
       .\scripts\run.ps1 stop|restart|status|logs|config|update|help
 #>
 
@@ -71,7 +71,7 @@ public static class ConsoleQuickEdit {
 } catch {}
 
 # ── colours ──────────────────────────────────────────────────────
-function Write-Cow   { param([string]$M) Write-Host $M -ForegroundColor Green  }
+function Write-Onyx   { param([string]$M) Write-Host $M -ForegroundColor Green  }
 function Write-Warn  { param([string]$M) Write-Host $M -ForegroundColor Yellow }
 function Write-Err   { param([string]$M) Write-Host $M -ForegroundColor Red    }
 function Write-Info  { param([string]$M) Write-Host $M -ForegroundColor Cyan   }
@@ -111,7 +111,7 @@ if (-not $IsProjectDir) {
     $IsProjectDir = (Test-Path "$BaseDir\app.py") -and (Test-Path "$BaseDir\config-template.json")
 }
 
-# Initialize $UiLang for management commands: prefer cow_lang from an existing
+# Initialize $UiLang for management commands: prefer onyx_lang from an existing
 # config.json, otherwise fall back to environment detection.
 function Initialize-UiLang {
     if ($script:UiLang) { return }
@@ -119,7 +119,7 @@ function Initialize-UiLang {
     if (Test-Path "$BaseDir\config.json") {
         try {
             $cfg = Get-Content "$BaseDir\config.json" -Raw | ConvertFrom-Json
-            if ($cfg.cow_lang) { $cfgLang = "$($cfg.cow_lang)" }
+            if ($cfg.onyx_lang) { $cfgLang = "$($cfg.onyx_lang)" }
         } catch {}
     }
     switch ($cfgLang) {
@@ -274,16 +274,16 @@ function Assert-Python {
         Read-Host (T "按回车退出" "Press Enter to exit")
         exit 1
     }
-    Write-Cow ((T "找到 Python" "Found Python") + ": $PythonCmd")
+    Write-Onyx ((T "找到 Python" "Found Python") + ": $PythonCmd")
 }
 
 # ── clone project ────────────────────────────────────────────────
 function Install-Project {
-    if (Test-Path "CowAgent") {
+    if (Test-Path "OnyxAgent") {
         # Auto-backup the existing directory without prompting.
-        $backup = "CowAgent_backup_$(Get-Date -Format 'yyyyMMddHHmmss')"
-        Rename-Item "CowAgent" $backup
-        Write-Warn ((T "已存在 CowAgent 目录，已自动备份为" "Existing 'CowAgent' directory backed up to") + " '$backup'")
+        $backup = "OnyxAgent_backup_$(Get-Date -Format 'yyyyMMddHHmmss')"
+        Rename-Item "OnyxAgent" $backup
+        Write-Warn ((T "已存在 OnyxAgent 目录，已自动备份为" "Existing 'OnyxAgent' directory backed up to") + " '$backup'")
     }
 
     $gitBin = Get-Command git -ErrorAction SilentlyContinue
@@ -293,44 +293,44 @@ function Install-Project {
         exit 1
     }
 
-    Write-Cow (T "正在克隆 CowAgent 项目..." "Cloning CowAgent project...")
+    Write-Onyx (T "正在克隆 OnyxAgent 项目..." "Cloning OnyxAgent project...")
     $cloneOk = $false
 
     # Test GitHub connectivity before attempting clone
     try {
         $null = Invoke-WebRequest -Uri "https://github.com" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
-        Write-Cow (T "GitHub 可达，正在从 GitHub 克隆..." "GitHub is reachable, cloning from GitHub...")
+        Write-Onyx (T "GitHub 可达，正在从 GitHub 克隆..." "GitHub is reachable, cloning from GitHub...")
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-        git clone --depth 10 --progress "https://github.com/zhayujie/CowAgent.git" 2>&1 | ForEach-Object { Write-Host $_ }
+        git clone --depth 10 --progress "https://github.com/zhayujie/OnyxAgent.git" 2>&1 | ForEach-Object { Write-Host $_ }
         if ($LASTEXITCODE -eq 0) { $cloneOk = $true }
         $ErrorActionPreference = $prevEAP
         if (-not $cloneOk) {
-            if (Test-Path "CowAgent") { Remove-Item -Recurse -Force "CowAgent" }
+            if (Test-Path "OnyxAgent") { Remove-Item -Recurse -Force "OnyxAgent" }
         }
     } catch {}
 
     if (-not $cloneOk) {
         Write-Warn (T "GitHub 克隆失败或超时，切换到 Gitee 镜像..." "GitHub clone failed or timed out, switching to Gitee mirror...")
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-        git clone --depth 10 --progress "https://gitee.com/zhayujie/CowAgent.git" 2>&1 | ForEach-Object { Write-Host $_ }
+        git clone --depth 10 --progress "https://gitee.com/zhayujie/OnyxAgent.git" 2>&1 | ForEach-Object { Write-Host $_ }
         if ($LASTEXITCODE -eq 0) { $cloneOk = $true }
         $ErrorActionPreference = $prevEAP
         if (-not $cloneOk) {
-            if (Test-Path "CowAgent") { Remove-Item -Recurse -Force "CowAgent" }
+            if (Test-Path "OnyxAgent") { Remove-Item -Recurse -Force "OnyxAgent" }
         }
     }
 
     if (-not $cloneOk) {
         Write-Err (T "GitHub 和 Gitee 均克隆失败，请检查网络连接。" "Clone failed from both GitHub and Gitee. Please check your network connection.")
-        Write-Err (T "你也可以手动克隆: git clone https://gitee.com/zhayujie/CowAgent.git" "You can also manually clone: git clone https://gitee.com/zhayujie/CowAgent.git")
+        Write-Err (T "你也可以手动克隆: git clone https://gitee.com/zhayujie/OnyxAgent.git" "You can also manually clone: git clone https://gitee.com/zhayujie/OnyxAgent.git")
         Read-Host (T "按回车退出" "Press Enter to exit")
         exit 1
     }
 
-    Set-Location "CowAgent"
+    Set-Location "OnyxAgent"
     $script:BaseDir = $PWD.Path
     $script:IsProjectDir = $true
-    Write-Cow ((T "项目已克隆" "Project cloned") + ": $BaseDir")
+    Write-Onyx ((T "项目已克隆" "Project cloned") + ": $BaseDir")
 }
 
 # Test whether a URL is reachable within a short timeout. Uses a HEAD request
@@ -372,7 +372,7 @@ function Get-PipMirrorArgs {
 
 # ── install dependencies ─────────────────────────────────────────
 function Install-Dependencies {
-    Write-Cow (T "正在安装依赖..." "Installing dependencies...")
+    Write-Onyx (T "正在安装依赖..." "Installing dependencies...")
 
     # Probe the mirror first (with progress hidden so the slow IWR call doesn't
     # leave the screen blank for too long).
@@ -395,7 +395,7 @@ function Install-Dependencies {
         Write-Warn (T "部分依赖可能有问题，但继续安装..." "Some dependencies may have issues, but continuing...")
     }
 
-    Write-Cow (T "正在注册 cow CLI..." "Registering cow CLI...")
+    Write-Onyx (T "正在注册 onyx CLI..." "Registering onyx CLI...")
     $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
     & $PythonCmd -m pip install -e $BaseDir @pipMirror 2>&1 | Out-Null
     $ErrorActionPreference = $prevEAP
@@ -408,11 +408,11 @@ function Install-Dependencies {
         }
     }
 
-    $cowBin = Get-Command cow -ErrorAction SilentlyContinue
-    if ($cowBin) {
-        Write-Cow ((T "cow CLI 注册成功" "cow CLI registered") + ": $($cowBin.Source)")
+    $onyxBin = Get-Command onyx -ErrorAction SilentlyContinue
+    if ($onyxBin) {
+        Write-Onyx ((T "onyx CLI 注册成功" "onyx CLI registered") + ": $($onyxBin.Source)")
     } else {
-        Write-Warn ((T "cow CLI 不在 PATH 中，你可以使用" "cow CLI not in PATH. You can use") + ": $PythonCmd -m cli.cli")
+        Write-Warn ((T "onyx CLI 不在 PATH 中，你可以使用" "onyx CLI not in PATH. You can use") + ": $PythonCmd -m cli.cli")
         Write-Warn (T "如需永久修复，请将 Python Scripts 目录加入系统 PATH。" "To fix permanently, add Python Scripts directory to your system PATH.")
     }
 }
@@ -473,7 +473,7 @@ function Configure-Model {
     }
 
     $m = $ModelChoices[$script:ModelChoice]
-    Write-Cow ((T "正在配置" "Configuring") + " $($m.Provider)...")
+    Write-Onyx ((T "正在配置" "Configuring") + " $($m.Provider)...")
     # Show where to obtain a LinkAI key.
     if ($m.Linkai) {
         Write-Info ((T "获取 LinkAI Key" "Get your LinkAI Key") + ": https://link-ai.tech/console/interface")
@@ -542,7 +542,7 @@ function Configure-Channel {
         }
         "feishu" {
             $script:ChannelType = "feishu"
-            Write-Cow (T "配置飞书（WebSocket 模式）..." "Configure Feishu (WebSocket mode)...")
+            Write-Onyx (T "配置飞书（WebSocket 模式）..." "Configure Feishu (WebSocket mode)...")
             $script:ChannelExtra["feishu_app_id"]     = Read-Host (T "请输入飞书 App ID" "Enter Feishu App ID")
             $script:ChannelExtra["feishu_app_secret"] = Read-Host (T "请输入飞书 App Secret" "Enter Feishu App Secret")
             $script:ChannelExtra["feishu_event_mode"] = "websocket"
@@ -550,28 +550,28 @@ function Configure-Channel {
         }
         "dingtalk" {
             $script:ChannelType = "dingtalk"
-            Write-Cow (T "配置钉钉..." "Configure DingTalk...")
+            Write-Onyx (T "配置钉钉..." "Configure DingTalk...")
             $script:ChannelExtra["dingtalk_client_id"]     = Read-Host (T "请输入钉钉 Client ID" "Enter DingTalk Client ID")
             $script:ChannelExtra["dingtalk_client_secret"] = Read-Host (T "请输入钉钉 Client Secret" "Enter DingTalk Client Secret")
             $script:AccessInfo = T "钉钉渠道已配置" "DingTalk channel configured"
         }
         "wecom_bot" {
             $script:ChannelType = "wecom_bot"
-            Write-Cow (T "配置企微智能机器人..." "Configure WeCom Bot...")
+            Write-Onyx (T "配置企微智能机器人..." "Configure WeCom Bot...")
             $script:ChannelExtra["wecom_bot_id"]     = Read-Host (T "请输入 WeCom Bot ID" "Enter WeCom Bot ID")
             $script:ChannelExtra["wecom_bot_secret"] = Read-Host (T "请输入 WeCom Bot Secret" "Enter WeCom Bot Secret")
             $script:AccessInfo = T "企微智能机器人渠道已配置" "WeCom Bot channel configured"
         }
         "qq" {
             $script:ChannelType = "qq"
-            Write-Cow (T "配置 QQ 机器人..." "Configure QQ Bot...")
+            Write-Onyx (T "配置 QQ 机器人..." "Configure QQ Bot...")
             $script:ChannelExtra["qq_app_id"]     = Read-Host (T "请输入 QQ App ID" "Enter QQ App ID")
             $script:ChannelExtra["qq_app_secret"] = Read-Host (T "请输入 QQ App Secret" "Enter QQ App Secret")
             $script:AccessInfo = T "QQ 机器人渠道已配置" "QQ Bot channel configured"
         }
         "wechatcom_app" {
             $script:ChannelType = "wechatcom_app"
-            Write-Cow (T "配置企微自建应用..." "Configure WeCom App...")
+            Write-Onyx (T "配置企微自建应用..." "Configure WeCom App...")
             $script:ChannelExtra["wechatcom_corp_id"]     = Read-Host (T "请输入企业 Corp ID" "Enter WeChat Corp ID")
             $script:ChannelExtra["wechatcomapp_token"]    = Read-Host (T "请输入应用 Token" "Enter WeChat Com App Token")
             $script:ChannelExtra["wechatcomapp_secret"]   = Read-Host (T "请输入应用 Secret" "Enter WeChat Com App Secret")
@@ -584,20 +584,20 @@ function Configure-Channel {
         }
         "telegram" {
             $script:ChannelType = "telegram"
-            Write-Cow (T "配置 Telegram..." "Configure Telegram...")
+            Write-Onyx (T "配置 Telegram..." "Configure Telegram...")
             $script:ChannelExtra["telegram_token"] = Read-Host (T "请输入 Telegram Bot Token" "Enter Telegram Bot Token")
             $script:AccessInfo = T "Telegram 渠道已配置" "Telegram channel configured"
         }
         "slack" {
             $script:ChannelType = "slack"
-            Write-Cow (T "配置 Slack..." "Configure Slack...")
+            Write-Onyx (T "配置 Slack..." "Configure Slack...")
             $script:ChannelExtra["slack_bot_token"] = Read-Host ((T "请输入 Slack Bot Token" "Enter Slack Bot Token") + " (xoxb-...)")
             $script:ChannelExtra["slack_app_token"] = Read-Host ((T "请输入 Slack App Token" "Enter Slack App Token") + " (xapp-...)")
             $script:AccessInfo = T "Slack 渠道已配置" "Slack channel configured"
         }
         "discord" {
             $script:ChannelType = "discord"
-            Write-Cow (T "配置 Discord..." "Configure Discord...")
+            Write-Onyx (T "配置 Discord..." "Configure Discord...")
             $script:ChannelExtra["discord_token"] = Read-Host (T "请输入 Discord Bot Token" "Enter Discord Bot Token")
             $script:AccessInfo = T "Discord 渠道已配置" "Discord channel configured"
         }
@@ -606,12 +606,12 @@ function Configure-Channel {
 
 # ── generate config.json ─────────────────────────────────────────
 function New-ConfigFile {
-    Write-Cow (T "正在生成 config.json..." "Generating config.json...")
+    Write-Onyx (T "正在生成 config.json..." "Generating config.json...")
 
     $config = [ordered]@{
         channel_type              = if ($script:ChannelType) { $script:ChannelType } else { "web" }
         model                     = if ($script:ModelName)  { $script:ModelName }  else { "" }
-        cow_lang                  = if ($script:InstallLang) { $script:InstallLang } else { "auto" }
+        onyx_lang                  = if ($script:InstallLang) { $script:InstallLang } else { "auto" }
         open_ai_api_key           = ""
         open_ai_api_base          = "https://api.openai.com/v1"
         claude_api_key            = ""
@@ -661,29 +661,29 @@ function New-ConfigFile {
 
     $jsonText = $config | ConvertTo-Json -Depth 5
     [System.IO.File]::WriteAllText("$BaseDir\config.json", $jsonText, (New-Object System.Text.UTF8Encoding $false))
-    Write-Cow (T "配置文件创建成功。" "Configuration file created.")
+    Write-Onyx (T "配置文件创建成功。" "Configuration file created.")
 }
 
-# ── start via cow CLI ─────────────────────────────────────────────
-function Start-CowAgent {
-    Write-Cow (T "正在启动 CowAgent..." "Starting CowAgent...")
-    $cowBin = Get-Command cow -ErrorAction SilentlyContinue
-    if ($cowBin) {
-        & cow start
+# ── start via onyx CLI ─────────────────────────────────────────────
+function Start-OnyxAgent {
+    Write-Onyx (T "正在启动 OnyxAgent..." "Starting OnyxAgent...")
+    $onyxBin = Get-Command onyx -ErrorAction SilentlyContinue
+    if ($onyxBin) {
+        & onyx start
     } else {
-        Write-Warn (T "未找到 cow CLI，直接启动..." "cow CLI not found, starting directly...")
+        Write-Warn (T "未找到 onyx CLI，直接启动..." "onyx CLI not found, starting directly...")
         & $PythonCmd "$BaseDir\app.py"
     }
 }
 
-# ── delegate management commands to cow CLI ──────────────────────
-function Invoke-CowCommand {
+# ── delegate management commands to onyx CLI ──────────────────────
+function Invoke-OnyxCommand {
     param([string]$Cmd)
-    $cowBin = Get-Command cow -ErrorAction SilentlyContinue
-    if ($cowBin) {
-        & cow $Cmd
+    $onyxBin = Get-Command onyx -ErrorAction SilentlyContinue
+    if ($onyxBin) {
+        & onyx $Cmd
     } else {
-        Write-Err (T "未找到 cow CLI，请先不带参数运行本脚本进行安装。" "cow CLI not found. Run this script without arguments first to install.")
+        Write-Err (T "未找到 onyx CLI，请先不带参数运行本脚本进行安装。" "onyx CLI not found. Run this script without arguments first to install.")
         exit 1
     }
 }
@@ -691,7 +691,7 @@ function Invoke-CowCommand {
 # ── usage ─────────────────────────────────────────────────────────
 function Show-Usage {
     Write-Info "========================================="
-    Write-Info "   CowAgent Management Script (Windows)"
+    Write-Info "   OnyxAgent Management Script (Windows)"
     Write-Info "========================================="
     Write-Host ""
     Write-Host (T "用法:" "Usage:")
@@ -714,7 +714,7 @@ function Show-Usage {
 function Install-Mode {
     Clear-Host
     Write-Info "========================================="
-    Write-Info "   CowAgent Installation (Windows)"
+    Write-Info "   OnyxAgent Installation (Windows)"
     Write-Info "========================================="
     Write-Host ""
 
@@ -723,9 +723,9 @@ function Install-Mode {
     Write-Host ""
 
     if ($IsProjectDir) {
-        Write-Cow (T "检测到已有项目目录。" "Detected existing project directory.")
+        Write-Onyx (T "检测到已有项目目录。" "Detected existing project directory.")
         if (Test-Path "$BaseDir\config.json") {
-            Write-Cow (T "项目已配置。" "Project already configured.")
+            Write-Onyx (T "项目已配置。" "Project already configured.")
             Write-Host ""
             Show-Usage
             return
@@ -747,25 +747,25 @@ function Install-Mode {
 
     # Auto-start after configuration for a true out-of-the-box experience.
     Write-Host ""
-    if ($script:AccessInfo) { Write-Cow $script:AccessInfo }
-    Start-CowAgent
+    if ($script:AccessInfo) { Write-Onyx $script:AccessInfo }
+    Start-OnyxAgent
 }
 
 # ── update ────────────────────────────────────────────────────────
 function Update-Project {
-    Write-Cow (T "正在更新 CowAgent..." "Updating CowAgent...")
+    Write-Onyx (T "正在更新 OnyxAgent..." "Updating OnyxAgent...")
     Set-Location $BaseDir
 
     # Stop if running
-    $cowBin = Get-Command cow -ErrorAction SilentlyContinue
-    if ($cowBin) {
+    $onyxBin = Get-Command onyx -ErrorAction SilentlyContinue
+    if ($onyxBin) {
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-        & cow stop 2>&1 | Out-Null
+        & onyx stop 2>&1 | Out-Null
         $ErrorActionPreference = $prevEAP
     }
 
     if (Test-Path "$BaseDir\.git") {
-        Write-Cow (T "正在拉取最新代码..." "Pulling latest code...")
+        Write-Onyx (T "正在拉取最新代码..." "Pulling latest code...")
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
         git pull 2>&1 | Out-Null
         $pullExit = $LASTEXITCODE
@@ -773,7 +773,7 @@ function Update-Project {
         if ($pullExit -ne 0) {
             Write-Warn (T "GitHub 拉取失败，尝试 Gitee..." "GitHub failed, trying Gitee...")
             $ErrorActionPreference = "Continue"
-            git remote set-url origin https://gitee.com/zhayujie/CowAgent.git 2>&1 | Out-Null
+            git remote set-url origin https://gitee.com/zhayujie/OnyxAgent.git 2>&1 | Out-Null
             git pull 2>&1 | Out-Null
             $ErrorActionPreference = $prevEAP
         }
@@ -784,9 +784,9 @@ function Update-Project {
     Assert-Python
     Install-Dependencies
 
-    # Start via python -m cli.cli instead of cow.exe, because the exe may
+    # Start via python -m cli.cli instead of onyx.exe, because the exe may
     # still be cached/locked from the previous installation on Windows.
-    Write-Cow (T "正在启动 CowAgent..." "Starting CowAgent...")
+    Write-Onyx (T "正在启动 OnyxAgent..." "Starting OnyxAgent...")
     & $PythonCmd -m cli.cli start
 }
 
@@ -795,11 +795,11 @@ Initialize-UiLang
 
 switch ($Command.ToLower()) {
     ""        { Install-Mode }
-    "start"   { Invoke-CowCommand "start" }
-    "stop"    { Invoke-CowCommand "stop" }
-    "restart" { Invoke-CowCommand "restart" }
-    "status"  { Invoke-CowCommand "status" }
-    "logs"    { Invoke-CowCommand "logs" }
+    "start"   { Invoke-OnyxCommand "start" }
+    "stop"    { Invoke-OnyxCommand "stop" }
+    "restart" { Invoke-OnyxCommand "restart" }
+    "status"  { Invoke-OnyxCommand "status" }
+    "logs"    { Invoke-OnyxCommand "logs" }
     "config"  {
         Assert-Python
         Install-Dependencies
@@ -809,7 +809,7 @@ switch ($Command.ToLower()) {
         Configure-Channel
         New-ConfigFile
         $r = Read-Host (T "现在重启服务吗？[Y/n]" "Restart service now? [Y/n]")
-        if ($r -ne "n" -and $r -ne "N") { Invoke-CowCommand "restart" }
+        if ($r -ne "n" -and $r -ne "N") { Invoke-OnyxCommand "restart" }
     }
     "update"  { Update-Project }
     "help"    { Show-Usage }

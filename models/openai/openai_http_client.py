@@ -35,8 +35,8 @@ DEFAULT_API_BASE = "https://api.openai.com/v1"
 DEFAULT_TIMEOUT = 600  # seconds; matches old openai SDK default
 
 
-_APP_TITLE = "CowAgent"
-_APP_REFERER = "https://github.com/zhayujie/CowAgent"
+_APP_TITLE = "OnyxAgent"
+_APP_REFERER = "https://github.com/zhayujie/OnyxAgent"
 
 # Per-gateway app attribution headers, only sent when the request host
 # matches a documented gateway. Sending these to user-configured custom

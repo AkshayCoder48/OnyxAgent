@@ -75,7 +75,7 @@ SAFETY:
             return ToolResult.fail("Error: command parameter is required")
 
         # Security check: Prevent direct access to the credential file
-        if re.search(r'\.cow[/\\]\.env', command):
+        if re.search(r'\.onyx[/\\]\.env', command):
             return ToolResult.fail(
                 "Error: Access denied. API keys and credentials must be accessed through the env_config tool only."
             )
@@ -91,8 +91,8 @@ SAFETY:
             # Prepare environment with .env file variables
             env = os.environ.copy()
             
-            # Load environment variables from ~/.cow/.env if it exists
-            env_file = expand_path("~/.cow/.env")
+            # Load environment variables from ~/.onyx/.env if it exists
+            env_file = expand_path("~/.onyx/.env")
             dotenv_vars = {}
             if os.path.exists(env_file):
                 try:

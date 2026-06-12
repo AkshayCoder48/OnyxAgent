@@ -1,17 +1,17 @@
 """
-CowCli plugin - Intercept cow/slash commands in chat messages.
+OnyxCli plugin - Intercept onyx/slash commands in chat messages.
 
 Matches messages like:
-  cow skill list
-  cow install-browser
+  onyx skill list
+  onyx install-browser
   /skill list
   /context clear
   /status
   /install-browser
 
 Does NOT match:
-  cow是什么
-  cow真好用
+  onyx是什么
+  onyx真好用
   /开头但不是已知命令
 """
 
@@ -28,7 +28,7 @@ from config import conf
 from cli import __version__
 
 
-# Known top-level subcommands that cow supports.
+# Known top-level subcommands that onyx supports.
 # "start" / "stop" / "restart" refer to daemon lifecycle on the host shell;
 # in chat, "/cancel" aborts the in-flight agent run instead.
 KNOWN_COMMANDS = {
@@ -65,19 +65,19 @@ DEFAULT_ALIASES = {
 
 
 @plugins.register(
-    name="cow_cli",
-    desc="Handle cow/slash commands in chat messages",
+    name="onyx_cli",
+    desc="Handle onyx/slash commands in chat messages",
     version="0.1.0",
-    author="CowAgent",
+    author="OnyxAgent",
     desire_priority=1000,
 )
-class CowCliPlugin(Plugin):
+class OnyxCliPlugin(Plugin):
 
     def __init__(self):
         super().__init__()
         self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
         self.aliases = self._build_aliases()
-        logger.debug("[CowCli] initialized")
+        logger.debug("[OnyxCli] initialized")
 
     def reload(self):
         """Rebuild the alias table (e.g. after config changes)."""
@@ -97,14 +97,14 @@ class CowCliPlugin(Plugin):
         try:
             overrides = conf().get("command_aliases", {}) or {}
         except Exception as e:
-            logger.warning(f"[CowCli] could not read command_aliases from config: {e}")
+            logger.warning(f"[OnyxCli] could not read command_aliases from config: {e}")
             overrides = {}
         if not isinstance(overrides, dict):
-            logger.warning(f"[CowCli] command_aliases must be an object, got {type(overrides).__name__}; ignoring")
+            logger.warning(f"[OnyxCli] command_aliases must be an object, got {type(overrides).__name__}; ignoring")
             overrides = {}
         for key, value in overrides.items():
             if not isinstance(key, str) or not isinstance(value, str):
-                logger.warning(f"[CowCli] ignoring non-string alias entry: {key!r} -> {value!r}")
+                logger.warning(f"[OnyxCli] ignoring non-string alias entry: {key!r} -> {value!r}")
                 continue
             k = key.strip().lower()
             if k:
@@ -114,10 +114,10 @@ class CowCliPlugin(Plugin):
         for key, value in merged.items():
             head = value.split(None, 1)[0].lower() if value.strip() else ""
             if head not in KNOWN_COMMANDS:
-                logger.warning(f"[CowCli] dropping alias '/{key}' -> '{value}': unknown command '{head}'")
+                logger.warning(f"[OnyxCli] dropping alias '/{key}' -> '{value}': unknown command '{head}'")
                 continue
             if key in KNOWN_COMMANDS:
-                logger.warning(f"[CowCli] alias '/{key}' shadows a real command; the command takes precedence")
+                logger.warning(f"[OnyxCli] alias '/{key}' shadows a real command; the command takes precedence")
             valid[key] = value
         return valid
 
@@ -140,7 +140,7 @@ class CowCliPlugin(Plugin):
 
         if kind == "run":
             _, cmd, args = result
-            logger.info(f"[CowCli] intercepted command: {cmd} {args}")
+            logger.info(f"[OnyxCli] intercepted command: {cmd} {args}")
             reply_text = self._dispatch(cmd, args, e_context)
         elif kind == "ambiguous":
             reply_text = self._ambiguous_hint(token, result[1])
@@ -153,10 +153,10 @@ class CowCliPlugin(Plugin):
 
     def _parse_command(self, content: str):
         """
-        Parse cow command from message text.
+        Parse onyx command from message text.
 
         Supported formats:
-          cow <command> [args...]   e.g. "cow skill list"
+          onyx <command> [args...]   e.g. "onyx skill list"
           /<command> [args...]      e.g. "/skill list"
 
         Returns:
@@ -177,15 +177,15 @@ class CowCliPlugin(Plugin):
             args = parts[1] if len(parts) > 1 else ""
             return cmd, args
 
-        if content.startswith("cow "):
+        if content.startswith("onyx "):
             rest = content[4:].strip()
             if not rest:
                 return None
             parts = rest.split(None, 1)
             cmd = parts[0].lower()
             if cmd not in KNOWN_COMMANDS:
-                # 'cow xxx' that isn't a command — don't intercept (could be
-                # natural language like "cow xxx 怎么样").
+                # 'onyx xxx' that isn't a command — don't intercept (could be
+                # natural language like "onyx xxx 怎么样").
                 return None
             args = parts[1] if len(parts) > 1 else ""
             return cmd, args
@@ -246,7 +246,7 @@ class CowCliPlugin(Plugin):
           6. no match                 -> ("passthrough",)
 
         Pure function of (token, user_args, KNOWN_COMMANDS, self.aliases) so it
-        is trivially unit-testable. Note the `cow ` form never reaches stages
+        is trivially unit-testable. Note the `onyx ` form never reaches stages
         2-5: `_parse_command` only returns known tokens for it, so it stays
         strict and alias/prefix matching applies to the `/` form only.
         """
@@ -301,7 +301,7 @@ class CowCliPlugin(Plugin):
     # ------------------------------------------------------------------
 
     def execute(self, query: str, session_id: str = "") -> str:
-        """Execute a cow/slash command string without a channel context.
+        """Execute a onyx/slash command string without a channel context.
 
         Used by cloud on_chat to intercept commands before the agent runs.
         Returns None when *query* is not command-like at all (e.g. natural
@@ -326,8 +326,8 @@ class CowCliPlugin(Plugin):
     def _dispatch(self, cmd: str, args: str, e_context: EventContext, session_id: str = "") -> str:
         if cmd in CLI_ONLY_COMMANDS:
             return _t(
-                f"⚠️ `cow {cmd}` 只能在命令行终端中执行。\n请在终端运行: cow {cmd}",
-                f"⚠️ `cow {cmd}` can only run in a terminal.\nRun it in your shell: cow {cmd}",
+                f"⚠️ `onyx {cmd}` 只能在命令行终端中执行。\n请在终端运行: onyx {cmd}",
+                f"⚠️ `onyx {cmd}` can only run in a terminal.\nRun it in your shell: onyx {cmd}",
             )
 
         handler_attr = "_cmd_" + cmd.replace("-", "_")
@@ -336,7 +336,7 @@ class CowCliPlugin(Plugin):
             try:
                 return handler(args, e_context, session_id=session_id)
             except Exception as e:
-                logger.error(f"[CowCli] command '{cmd}' failed: {e}")
+                logger.error(f"[OnyxCli] command '{cmd}' failed: {e}")
                 return _t(f"命令执行失败: {e}", f"Command failed: {e}")
 
         return _t(f"未知命令: {cmd}", f"Unknown command: {cmd}")
@@ -348,7 +348,7 @@ class CowCliPlugin(Plugin):
     def _cmd_help(self, args: str, e_context, **_) -> str:
         if _t("zh", "en") == "en":
             lines = [
-                "📋 CowAgent Commands",
+                "📋 OnyxAgent Commands",
                 "",
                 "/help: Show this help",
                 "/version: Show version",
@@ -372,11 +372,11 @@ class CowCliPlugin(Plugin):
                 "/knowledge list: Show knowledge base file tree",
                 "/knowledge on|off: Enable/disable knowledge base",
                 "",
-                "💡 You can also use cow <command> instead of /<command>",
+                "💡 You can also use onyx <command> instead of /<command>",
             ]
         else:
             lines = [
-                "📋 CowAgent 命令列表",
+                "📋 OnyxAgent 命令列表",
                 "",
                 "/help: 显示此帮助",
                 "/version: 查看版本",
@@ -400,12 +400,12 @@ class CowCliPlugin(Plugin):
                 "/knowledge list: 查看知识库文件树",
                 "/knowledge on|off: 开启/关闭知识库",
                 "",
-                "💡 也可以用 cow <command> 代替 /<command>",
+                "💡 也可以用 onyx <command> 代替 /<command>",
             ]
         return "\n".join(lines)
 
     def _cmd_version(self, args: str, e_context, **_) -> str:
-        return f"CowAgent v{__version__}"
+        return f"OnyxAgent v{__version__}"
 
     # ------------------------------------------------------------------
     # cancel — abort the in-flight agent run for the current session.
@@ -450,7 +450,7 @@ class CowCliPlugin(Plugin):
         from config import conf
 
         cfg = conf()
-        lines = [_t("📊 CowAgent 运行状态", "📊 CowAgent Status"), ""]
+        lines = [_t("📊 OnyxAgent 运行状态", "📊 OnyxAgent Status"), ""]
 
         lines.append(_t(f"  版本: v{__version__}", f"  Version: v{__version__}"))
         lines.append(_t(f"  进程: PID {os.getpid()}", f"  Process: PID {os.getpid()}"))
@@ -710,12 +710,12 @@ class CowCliPlugin(Plugin):
                 if env_key.lower() == k_lower:
                     os.environ[env_key] = str_val
                     synced_envs[env_key] = str_val
-        logger.info(f"[CowCli] config update: {updates}, synced envs: {synced_envs}")
+        logger.info(f"[OnyxCli] config update: {updates}, synced envs: {synced_envs}")
 
         try:
             load_config()
         except Exception as e:
-            logger.warning(f"[CowCli] config reload warning: {e}")
+            logger.warning(f"[OnyxCli] config reload warning: {e}")
 
         result = _t(f"✅ 配置已更新\n\n  {key}: {old_val} → {new_val}", f"✅ Config updated\n\n  {key}: {old_val} → {new_val}")
         if "bot_type" in updates and updates["bot_type"] != old_bot_type:
@@ -759,14 +759,14 @@ class CowCliPlugin(Plugin):
         return const.OPENAI
 
     # ------------------------------------------------------------------
-    # install-browser (shared logic with cow install-browser CLI)
+    # install-browser (shared logic with onyx install-browser CLI)
     # ------------------------------------------------------------------
 
     @staticmethod
     def _send_install_progress(e_context, text: str) -> None:
         """Push a short status line to the chat channel (SSE: phase event, not done)."""
         if e_context is None:
-            logger.info(f"[CowCli] install-browser: {text}")
+            logger.info(f"[OnyxCli] install-browser: {text}")
             return
         try:
             channel = e_context["channel"]
@@ -776,7 +776,7 @@ class CowCliPlugin(Plugin):
                 r.sse_phase = True
                 channel.send(r, context)
         except Exception as e:
-            logger.warning(f"[CowCli] install-browser progress send failed: {e}")
+            logger.warning(f"[OnyxCli] install-browser progress send failed: {e}")
 
     def _cmd_install_browser(self, args: str, e_context, **_) -> str:
         from cli.commands.install import run_install_browser
@@ -784,10 +784,10 @@ class CowCliPlugin(Plugin):
         if args.strip():
             return _t(
                 "用法: /install-browser\n\n"
-                "无需参数，等同于终端执行 `cow install-browser`。\n"
+                "无需参数，等同于终端执行 `onyx install-browser`。\n"
                 "安装过程可能持续数分钟；进度会以多条消息推送，pip 详细输出见服务日志。",
                 "Usage: /install-browser\n\n"
-                "No arguments needed; equivalent to running `cow install-browser` in a terminal.\n"
+                "No arguments needed; equivalent to running `onyx install-browser` in a terminal.\n"
                 "Installation may take a few minutes; progress is pushed as multiple messages, and detailed pip output goes to the service log.",
             )
 
@@ -802,13 +802,13 @@ class CowCliPlugin(Plugin):
         if code != 0:
             return _t(
                 "❌ 安装未成功结束，请查看上方分段提示或服务器日志；"
-                "也可在终端执行 `cow install-browser`。",
+                "也可在终端执行 `onyx install-browser`。",
                 "❌ Installation did not finish successfully. Check the messages above or the server log; "
-                "you can also run `cow install-browser` in a terminal.",
+                "you can also run `onyx install-browser` in a terminal.",
             )
         return _t(
-            "✅ 安装流程已结束。请重启 CowAgent 后使用 browser 工具（进度见上方消息）。",
-            "✅ Installation finished. Restart CowAgent to use the browser tool (see messages above for progress).",
+            "✅ 安装流程已结束。请重启 OnyxAgent 后使用 browser 工具（进度见上方消息）。",
+            "✅ Installation finished. Restart OnyxAgent to use the browser tool (see messages above for progress).",
         )
 
     # ------------------------------------------------------------------
@@ -867,7 +867,7 @@ class CowCliPlugin(Plugin):
                     agent.skill_manager.refresh_skills()
                     break
         except Exception as e:
-            logger.debug(f"[CowCli] skill refresh skipped: {e}")
+            logger.debug(f"[OnyxCli] skill refresh skipped: {e}")
 
     def _skill_list_local(self) -> str:
         from cli.utils import load_skills_config, get_skills_dir, get_builtin_skills_dir
@@ -979,7 +979,7 @@ class CowCliPlugin(Plugin):
             lines.append(_t(f"💡 /skill list --remote --page {page - 1}: 上一页", f"💡 /skill list --remote --page {page - 1}: Previous page"))
         lines.append(_t("💡 /skill install <名称>: 安装技能", "💡 /skill install <name>: Install a skill"))
         lines.append(_t("💡 /skill search <关键词>: 搜索技能", "💡 /skill search <keyword>: Search skills"))
-        lines.append(_t("🌐 https://skills.cowagent.ai  在线浏览全部技能", "🌐 https://skills.cowagent.ai  Browse all skills online"))
+        lines.append(_t("🌐 https://skills.onyxagent.ai  在线浏览全部技能", "🌐 https://skills.onyxagent.ai  Browse all skills online"))
         return "\n".join(lines)
 
     def _skill_search(self, query: str) -> str:
@@ -1284,7 +1284,7 @@ class CowCliPlugin(Plugin):
                 else:
                     self._notify(e_context, _t("💤 记忆蒸馏跳过 — 没有新的记忆内容需要整理", "💤 Memory distillation skipped — no new memories to process"))
             except Exception as e:
-                logger.warning(f"[CowCli] /memory dream failed: {e}")
+                logger.warning(f"[OnyxCli] /memory dream failed: {e}")
                 self._notify(e_context, _t(f"❌ 记忆蒸馏失败: {e}", f"❌ Memory distillation failed: {e}"))
 
         threading.Thread(target=_run, daemon=True).start()
@@ -1301,7 +1301,7 @@ class CowCliPlugin(Plugin):
                 return self._build_dream_result(flush_mgr, is_web=True)
             return _t("💤 记忆蒸馏跳过 — 没有新的记忆内容需要整理", "💤 Memory distillation skipped — no new memories to process")
         except Exception as e:
-            logger.warning(f"[CowCli] /memory dream sync failed: {e}")
+            logger.warning(f"[OnyxCli] /memory dream sync failed: {e}")
             return _t(f"❌ 记忆蒸馏失败: {e}", f"❌ Memory distillation failed: {e}")
 
     @staticmethod
@@ -1418,7 +1418,7 @@ class CowCliPlugin(Plugin):
             fresh_provider = AgentInitializer(bridge=None, agent_bridge=None) \
                 ._init_embedding_provider(memory_manager.config, session_id=session_id)
         except Exception as e:
-            logger.exception("[CowCli] /memory rebuild-index: build provider failed")
+            logger.exception("[OnyxCli] /memory rebuild-index: build provider failed")
             return _t(f"⚠️ 无法根据当前配置构造 embedding provider: {e}", f"⚠️ Failed to build embedding provider from current config: {e}")
 
         if fresh_provider is None:
@@ -1460,7 +1460,7 @@ class CowCliPlugin(Plugin):
                 else:
                     self._notify(e_context, _t(f"❌ 索引重建失败: {result.error}", f"❌ Index rebuild failed: {result.error}"))
             except Exception as e:
-                logger.exception("[CowCli] /memory rebuild-index failed")
+                logger.exception("[OnyxCli] /memory rebuild-index failed")
                 self._notify(e_context, _t(f"❌ 索引重建失败: {e}", f"❌ Index rebuild failed: {e}"))
 
         threading.Thread(target=_run, daemon=True).start()
@@ -1478,7 +1478,7 @@ class CowCliPlugin(Plugin):
         try:
             result = rebuild_in_process(memory_manager)
         except Exception as e:
-            logger.exception("[CowCli] /memory rebuild-index sync failed")
+            logger.exception("[OnyxCli] /memory rebuild-index sync failed")
             return _t(f"❌ 索引重建失败: {e}", f"❌ Index rebuild failed: {e}")
 
         if not result.ok:
@@ -1498,7 +1498,7 @@ class CowCliPlugin(Plugin):
     def _notify(e_context, text: str):
         """Push a notification message back to the chat channel."""
         if e_context is None:
-            logger.info(f"[CowCli] {text}")
+            logger.info(f"[OnyxCli] {text}")
             return
         try:
             channel = e_context["channel"]
@@ -1506,7 +1506,7 @@ class CowCliPlugin(Plugin):
             if channel and context:
                 channel.send(Reply(ReplyType.TEXT, text), context)
         except Exception as e:
-            logger.warning(f"[CowCli] notify failed: {e}")
+            logger.warning(f"[OnyxCli] notify failed: {e}")
 
     @staticmethod
     def _is_web_channel(e_context) -> bool:
@@ -1589,7 +1589,7 @@ class CowCliPlugin(Plugin):
         from bridge.bridge import Bridge
         from bridge.agent_bridge import AgentLLMModel
 
-        workspace = Path(expand_path(conf().get("agent_workspace", "~/cow")))
+        workspace = Path(expand_path(conf().get("agent_workspace", "~/onyx")))
         flush_mgr = MemoryFlushManager(workspace_dir=workspace)
         flush_mgr.llm_model = AgentLLMModel(Bridge())
         return flush_mgr
@@ -1641,7 +1641,7 @@ class CowCliPlugin(Plugin):
         from config import conf
         from common.utils import expand_path
         knowledge_dir = os.path.join(
-            expand_path(conf().get("agent_workspace", "~/cow")),
+            expand_path(conf().get("agent_workspace", "~/onyx")),
             "knowledge"
         )
         if not os.path.isdir(knowledge_dir):
@@ -1689,7 +1689,7 @@ class CowCliPlugin(Plugin):
         from config import conf
         from common.utils import expand_path
         knowledge_dir = os.path.join(
-            expand_path(conf().get("agent_workspace", "~/cow")),
+            expand_path(conf().get("agent_workspace", "~/onyx")),
             "knowledge"
         )
         if not os.path.isdir(knowledge_dir):
@@ -1748,4 +1748,4 @@ class CowCliPlugin(Plugin):
             return None
 
     def get_help_text(self, **kwargs):
-        return _t("在对话中使用 /help 或 cow help 查看可用命令", "Use /help or cow help in chat to see available commands")
+        return _t("在对话中使用 /help 或 onyx help 查看可用命令", "Use /help or onyx help in chat to see available commands")

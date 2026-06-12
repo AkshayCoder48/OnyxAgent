@@ -1,7 +1,7 @@
 """
 Slack message adapter.
 
-Convert a Slack event payload into cow's unified ChatMessage.
+Convert a Slack event payload into onyx's unified ChatMessage.
 File downloads are NOT performed here; the channel layer downloads files
 on demand because it needs the bot token for authenticated download URLs.
 """
@@ -54,7 +54,7 @@ class SlackMessage(ChatMessage):
     @staticmethod
     def get_tmp_dir() -> str:
         """Local download directory, aligned with other channels (agent_workspace/tmp)."""
-        workspace_root = expand_path(conf().get("agent_workspace", "~/cow"))
+        workspace_root = expand_path(conf().get("agent_workspace", "~/onyx"))
         tmp_dir = os.path.join(workspace_root, "tmp")
         os.makedirs(tmp_dir, exist_ok=True)
         return tmp_dir

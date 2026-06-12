@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" width="960" height="280">
+  <defs>
+    <linearGradient id="ringGrad" x1="40" y1="40" x2="240" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fb7185"/>
+      <stop offset="40%" stop-color="#f43f5e"/>
+      <stop offset="100%" stop-color="#be123c"/>
+    </linearGradient>
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Icon: Onyx O with gem facet notch -->
+  <g>
+    <!-- Main O ring (center 140,140; outer R=100, inner R=65; notch from -60° to -20°) -->
+    <path d="M190 53 A100 100 0 1 1 234 106 L201 118 A65 65 0 1 0 173 84 Z"
+          fill="url(#ringGrad)"/>
+
+    <!-- Facet highlight edges -->
+    <line x1="190" y1="53" x2="173" y2="84" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.22"/>
+    <line x1="234" y1="106" x2="201" y2="118" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.32"/>
+
+    <!-- AI intelligence node -->
+    <circle cx="194" cy="87" r="10" fill="#fff" opacity="0.12" filter="url(#softGlow)"/>
+    <circle cx="194" cy="87" r="7" fill="#fff" opacity="0.92"/>
+    <circle cx="194" cy="87" r="3" fill="#e11d48"/>
+
+    <!-- Tiny sparkle accent -->
+    <circle cx="198" cy="83" r="1.2" fill="#fff" opacity="0.7"/>
+  </g>
+
+  <!-- Wordmark: OnyxAgent -->
+  <text x="285" y="172" font-family="'Inter', 'SF Pro Display', -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="78" letter-spacing="-1.5">
+    <tspan font-weight="700" fill="#111827">Onyx</tspan><tspan font-weight="500" fill="#9ca3af">Agent</tspan>
+  </text>
+
+  <!-- Subtle underline accent -->
+  <rect x="285" y="184" width="60" height="3" rx="1.5" fill="#f43f5e" opacity="0.7"/>
+</svg>

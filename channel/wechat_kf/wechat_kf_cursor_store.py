@@ -13,7 +13,7 @@ Why we need this:
 
 This implementation deliberately avoids any external dependency
 (no Redis / no DB) — a single JSON file under the project's tmp dir is
-enough for a CoW-style single-process deployment.
+enough for a Onyx-style single-process deployment.
 """
 import json
 import os

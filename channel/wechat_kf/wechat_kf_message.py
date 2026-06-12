@@ -1,7 +1,7 @@
 # -*- coding=utf-8 -*-
 """
 Adapter that turns a single `sync_msg` item from WeCom customer-service
-into a CoW `ChatMessage` object.
+into a Onyx `ChatMessage` object.
 """
 import os
 import re
@@ -20,7 +20,7 @@ def _get_tmp_dir() -> str:
     resolve a relative path like `tmp/xxx.pdf` against their own
     workspace root. Mirrors the convention used by weixin / wecom_bot.
     """
-    ws_root = expand_path(conf().get("agent_workspace", "~/cow"))
+    ws_root = expand_path(conf().get("agent_workspace", "~/onyx"))
     tmp_dir = os.path.join(ws_root, "tmp")
     os.makedirs(tmp_dir, exist_ok=True)
     return tmp_dir

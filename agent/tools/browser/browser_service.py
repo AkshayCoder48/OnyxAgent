@@ -18,7 +18,7 @@ from common.log import logger
 from common.utils import expand_path, is_cloud_deployment
 
 
-_DEFAULT_USER_DATA_DIR = "~/.cow/browser_profile"
+_DEFAULT_USER_DATA_DIR = "~/.onyx/browser_profile"
 
 try:
     from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Playwright
@@ -207,7 +207,7 @@ _SNAPSHOT_JS = """
     }
 
     const result = walk(document.body);
-    window.__cowRefMap = refMap;
+    window.__onyxRefMap = refMap;
     return { tree: result, refCount: refCounter };
 }
 """ % (
@@ -509,7 +509,7 @@ class BrowserService:
             if "singletonlock" in msg or "profile" in msg or "lock" in msg:
                 raise RuntimeError(
                     f"Browser profile '{self._user_data_dir}' is in use by another process. "
-                    "Close the other Chromium / cow instance, or set a different "
+                    "Close the other Chromium / onyx instance, or set a different "
                     "tools.browser.user_data_dir."
                 ) from e
             raise
@@ -758,7 +758,7 @@ class BrowserService:
             if ref is not None:
                 result = page.evaluate(f"""
                     () => {{
-                        const el = window.__cowRefMap && window.__cowRefMap[{ref}];
+                        const el = window.__onyxRefMap && window.__onyxRefMap[{ref}];
                         if (!el) return {{ error: "ref {ref} not found. Run snapshot first." }};
                         el.click();
                         return {{ clicked: true, tag: el.tagName.toLowerCase() }};
@@ -786,7 +786,7 @@ class BrowserService:
             if ref is not None:
                 result = page.evaluate(f"""
                     () => {{
-                        const el = window.__cowRefMap && window.__cowRefMap[{ref}];
+                        const el = window.__onyxRefMap && window.__onyxRefMap[{ref}];
                         if (!el) return {{ error: "ref {ref} not found. Run snapshot first." }};
                         el.focus();
                         el.value = "";
@@ -815,7 +815,7 @@ class BrowserService:
             if ref is not None:
                 result = page.evaluate(f"""
                     () => {{
-                        const el = window.__cowRefMap && window.__cowRefMap[{ref}];
+                        const el = window.__onyxRefMap && window.__onyxRefMap[{ref}];
                         if (!el || el.tagName.toLowerCase() !== "select")
                             return {{ error: "ref {ref} is not a <select> element" }};
                         el.value = {repr(value)};

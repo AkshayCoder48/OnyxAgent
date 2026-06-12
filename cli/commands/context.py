@@ -1,4 +1,4 @@
-"""cow context - Context management commands."""
+"""onyx context - Context management commands."""
 
 import click
 

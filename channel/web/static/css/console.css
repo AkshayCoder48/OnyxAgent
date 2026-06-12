@@ -1,5 +1,5 @@
 /* =====================================================================
-   CowAgent Console Styles
+   OnyxAgent Console Styles
    ===================================================================== */
 
 /* Animations */
@@ -425,12 +425,12 @@
 .msg-content th { background: #f1f5f9; font-weight: 600; }
 .dark .msg-content th { background: #111111; }
 .msg-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 0.5em 0; }
-.msg-content a { color: #35A85B; text-decoration: underline; }
-.msg-content a:hover { color: #228547; }
+.msg-content a { color: #e11d48; text-decoration: underline; }
+.msg-content a:hover { color: #be123c; }
 
-/* Overrides for user bubble (white text on green bg) */
+/* Overrides for user bubble (white text on rose bg) */
 .user-bubble.msg-content a { color: #ffffff !important; text-decoration: underline; text-decoration-color: rgba(255,255,255,0.6); }
-.user-bubble.msg-content a:hover { color: #e0f5e8 !important; text-decoration-color: #e0f5e8; }
+.user-bubble.msg-content a:hover { color: #ffe4e6 !important; text-decoration-color: #ffe4e6; }
 .user-bubble.msg-content :not(pre) > code { background: rgba(255,255,255,0.2); color: #ffffff; }
 .msg-content hr { border: none; height: 1px; background: #e2e8f0; margin: 1.2em 0; }
 .dark .msg-content hr { background: rgba(255,255,255,0.1); }
@@ -730,7 +730,7 @@
 .dark .cfg-dropdown-item:hover { background: rgba(255, 255, 255, 0.08); }
 .cfg-dropdown-item.active {
     background: rgba(74, 190, 110, 0.1);
-    color: #228547;
+    color: #be123c;
     font-weight: 500;
 }
 .dark .cfg-dropdown-item.active {
@@ -767,7 +767,7 @@
 .dark .cfg-dropdown-item.active .cfg-dropdown-hint {
     color: rgba(116, 233, 164, 0.6);
 }
-/* The active row gets a trailing brand-green checkmark via a Font Awesome
+/* The active row gets a trailing brand-rose checkmark via a Font Awesome
    pseudo-element so every dropdown (chat / vision / image / asr / tts / etc.)
    surfaces "this is what's currently selected" without per-call JS plumbing.
    When a hint is present, the ✓ sits to its right with a small gap; without
@@ -810,7 +810,7 @@
 
 /* Models page — provider dropdown rows.
    Configured rows look like ordinary picker entries; the .active row's
-   trailing brand-green ✓ already announces "this is what's selected"
+   trailing brand-rose ✓ already announces "this is what's selected"
    (handled globally by .cfg-dropdown-item.active::after above).
    Unconfigured rows are visually subdued and carry a trailing gear icon
    as a "click to set up" affordance. */
@@ -853,7 +853,7 @@
 }
 
 /* "Add vendor" modal picker — each configured row carries a static
-   brand-green ✓ via decorateVendorModalPicker so users can see what's set
+   brand-rose ✓ via decorateVendorModalPicker so users can see what's set
    up at a glance. The active row's global ✓ is suppressed here to avoid
    showing two checks side by side on configured + selected rows. */
 .vendor-picker-item.active::after {
@@ -922,7 +922,7 @@
 }
 .attach-menu-item:hover {
     background: #EDFDF3;
-    color: #228547;
+    color: #be123c;
 }
 .attach-menu-item i {
     width: 14px;
@@ -1077,7 +1077,7 @@
     font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 }
 .slash-menu-item.active .cmd {
-    color: #228547;
+    color: #be123c;
 }
 .slash-menu-item .desc {
     font-size: 12px;
@@ -1209,7 +1209,7 @@
 }
 .knowledge-tree-file.active {
     background: #EDFDF3;
-    color: #228547;
+    color: #be123c;
 }
 .dark .knowledge-tree-file:hover {
     background: rgba(255,255,255,0.06);

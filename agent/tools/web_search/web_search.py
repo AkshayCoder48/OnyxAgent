@@ -366,7 +366,7 @@ class WebSearch(BaseTool):
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            "X-Appbuilder-From": "cow",
+            "X-Appbuilder-From": "onyx",
         }
 
         count = max(1, min(int(count or 10), 50))

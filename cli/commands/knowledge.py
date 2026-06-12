@@ -1,4 +1,4 @@
-"""cow knowledge - Knowledge base management commands."""
+"""onyx knowledge - Knowledge base management commands."""
 
 import os
 
@@ -14,9 +14,9 @@ def _get_knowledge_dir():
         sys.path.insert(0, get_project_root())
         from config import conf
         from common.utils import expand_path
-        workspace = expand_path(conf().get("agent_workspace", "~/cow"))
+        workspace = expand_path(conf().get("agent_workspace", "~/onyx"))
     except Exception:
-        workspace = os.path.expanduser("~/cow")
+        workspace = os.path.expanduser("~/onyx")
     return os.path.join(workspace, "knowledge")
 
 
@@ -33,7 +33,7 @@ def _get_knowledge_enabled():
 @click.group(invoke_without_command=True)
 @click.pass_context
 def knowledge(ctx):
-    """Manage CowAgent knowledge base."""
+    """Manage OnyxAgent knowledge base."""
     if ctx.invoked_subcommand is None:
         click.echo(_stats())
 

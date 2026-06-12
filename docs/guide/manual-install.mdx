@@ -1,6 +1,6 @@
 ---
 title: Manual Install
-description: Deploy CowAgent manually (source code / Docker)
+description: Deploy OnyxAgent manually (source code / Docker)
 ---
 
 ## Source Code Deployment
@@ -8,12 +8,12 @@ description: Deploy CowAgent manually (source code / Docker)
 ### 1. Clone the project
 
 ```bash
-git clone https://github.com/zhayujie/CowAgent
-cd CowAgent/
+git clone https://github.com/zhayujie/OnyxAgent
+cd OnyxAgent/
 ```
 
 <Tip>
-  For network issues, use the mirror: https://gitee.com/zhayujie/CowAgent
+  For network issues, use the mirror: https://gitee.com/zhayujie/OnyxAgent
 </Tip>
 
 ### 2. Install dependencies
@@ -30,7 +30,7 @@ Optional dependencies (recommended):
 pip3 install -r requirements-optional.txt
 ```
 
-### 3. Install Cow CLI
+### 3. Install Onyx CLI
 
 Install the command-line tool for managing services and skills:
 
@@ -38,14 +38,14 @@ Install the command-line tool for managing services and skills:
 pip3 install -e .
 ```
 
-Then use the `cow` command:
+Then use the `onyx` command:
 
 ```bash
-cow help
+onyx help
 ```
 
 <Note>
-  This step is recommended. After installation you can use `cow start`, `cow stop`, `cow update` to manage the service, and `cow skill` to manage skills. Without the CLI, you can use `./run.sh` or `python3 app.py` to run.
+  This step is recommended. After installation you can use `onyx start`, `onyx stop`, `onyx update` to manage the service, and `onyx skill` to manage skills. Without the CLI, you can use `./run.sh` or `python3 app.py` to run.
 </Note>
 
 ### 4. Configure
@@ -60,10 +60,10 @@ Fill in model API keys, channel type, and other settings in `config.json`. See t
 
 ### 5. Run
 
-**Using Cow CLI (recommended):**
+**Using Onyx CLI (recommended):**
 
 ```bash
-cow start
+onyx start
 ```
 
 **Or run locally in foreground:**
@@ -95,7 +95,7 @@ Docker deployment does not require cloning source code or installing dependencie
 **1. Download config**
 
 ```bash
-curl -O https://cdn.link-ai.tech/code/cow/docker-compose.yml
+curl -O https://cdn.link-ai.tech/cod./onyx/docker-compose.yml
 ```
 
 Edit `docker-compose.yml` with your configuration.
@@ -124,11 +124,11 @@ sudo docker logs -f chatgpt-on-wechat
   "model": "deepseek-v4-flash",
   "deepseek_api_key": "",
   "agent": true,
-  "agent_workspace": "~/cow",
+  "agent_workspace": "~/onyx",
   "agent_max_context_tokens": 40000,
   "agent_max_context_turns": 30,
   "agent_max_steps": 15,
-  "cow_lang": "auto"
+  "onyx_lang": "auto"
 }
 ```
 
@@ -137,12 +137,12 @@ sudo docker logs -f chatgpt-on-wechat
 | `channel_type` | Channel type | `web` |
 | `model` | Model name | `deepseek-v4-flash` |
 | `agent` | Enable Agent mode | `true` |
-| `agent_workspace` | Agent workspace path | `~/cow` |
+| `agent_workspace` | Agent workspace path | `~/onyx` |
 | `agent_max_context_tokens` | Max context tokens | `40000` |
 | `agent_max_context_turns` | Max context turns | `30` |
 | `agent_max_steps` | Max decision steps per task | `15` |
-| `cow_lang` | Language for the UI, command text and system prompts; `auto` to detect, or set `zh` / `en` | `auto` |
+| `onyx_lang` | Language for the UI, command text and system prompts; `auto` to detect, or set `zh` / `en` | `auto` |
 
 <Tip>
-  Full configuration options are in the project [`config.py`](https://github.com/zhayujie/CowAgent/blob/master/config.py).
+  Full configuration options are in the project [`config.py`](https://github.com/zhayujie/OnyxAgent/blob/master/config.py).
 </Tip>

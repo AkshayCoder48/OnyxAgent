@@ -20,7 +20,7 @@ env:
 
 jobs:
   build-and-push-image:
-    if: github.repository == 'zhayujie/CowAgent'
+    if: github.repository == 'zhayujie/OnyxAgent'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,9 +49,9 @@ jobs:
         with:
           images: |
             zhayujie/chatgpt-on-wechat
-            zhayujie/cowagent
+            zhayujie/onyxagent
             ${{ env.REGISTRY }}/zhayujie/chatgpt-on-wechat
-            ${{ env.REGISTRY }}/zhayujie/cowagent
+            ${{ env.REGISTRY }}/zhayujie/onyxagent
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch

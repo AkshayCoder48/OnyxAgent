@@ -1,16 +1,16 @@
 ---
 title: Process Management
-description: Manage CowAgent process lifecycle with cow commands
+description: Manage OnyxAgent process lifecycle with onyx commands
 ---
 
-Process management commands control the CowAgent background process. These commands are only available in the terminal.
+Process management commands control the OnyxAgent background process. These commands are only available in the terminal.
 
 ## start
 
-Start the CowAgent service. Runs as a background daemon by default and automatically tails logs.
+Start the OnyxAgent service. Runs as a background daemon by default and automatically tails logs.
 
 ```bash
-cow start
+onyx start
 ```
 
 **Options:**
@@ -22,18 +22,18 @@ cow start
 
 ## stop
 
-Stop the running CowAgent service.
+Stop the running OnyxAgent service.
 
 ```bash
-cow stop
+onyx stop
 ```
 
 ## restart
 
-Restart the CowAgent service (stop then start).
+Restart the OnyxAgent service (stop then start).
 
 ```bash
-cow restart
+onyx restart
 ```
 
 **Options:**
@@ -53,7 +53,7 @@ Update code and restart the service. Automatically performs:
 5. Start service
 
 ```bash
-cow update
+onyx update
 ```
 
 <Warning>
@@ -62,10 +62,10 @@ cow update
 
 ## status
 
-Check CowAgent service status, including process info, version, and current model/channel configuration.
+Check OnyxAgent service status, including process info, version, and current model/channel configuration.
 
 ```bash
-cow status
+onyx status
 ```
 
 ## logs
@@ -73,7 +73,7 @@ cow status
 View service logs.
 
 ```bash
-cow logs
+onyx logs
 ```
 
 **Options:**
@@ -87,10 +87,10 @@ Examples:
 
 ```bash
 # View last 100 lines
-cow logs -n 100
+onyx logs -n 100
 
 # Continuously tail logs
-cow logs -f
+onyx logs -f
 ```
 
 ## install-browser
@@ -98,7 +98,7 @@ cow logs -f
 Install Playwright and Chromium browser for the [browser tool](/tools/browser).
 
 ```bash
-cow install-browser
+onyx install-browser
 ```
 
 <Tip>
@@ -107,17 +107,17 @@ cow install-browser
 
 ## run.sh Compatibility
 
-If Cow CLI is not installed, you can use `run.sh` to manage the service:
+If Onyx CLI is not installed, you can use `run.sh` to manage the service:
 
-| cow command | run.sh equivalent |
+| onyx command | run.sh equivalent |
 | --- | --- |
-| `cow start` | `./run.sh start` |
-| `cow stop` | `./run.sh stop` |
-| `cow restart` | `./run.sh restart` |
-| `cow update` | `./run.sh update` |
-| `cow status` | `./run.sh status` |
-| `cow logs` | `./run.sh logs` |
+| `onyx start` | `./run.sh start` |
+| `onyx stop` | `./run.sh stop` |
+| `onyx restart` | `./run.sh restart` |
+| `onyx update` | `./run.sh update` |
+| `onyx status` | `./run.sh status` |
+| `onyx logs` | `./run.sh logs` |
 
 <Note>
-  The `cow` command is recommended — it provides cleaner syntax and richer features. It is automatically installed via the one-click install script.
+  The `onyx` command is recommended — it provides cleaner syntax and richer features. It is automatically installed via the one-click install script.
 </Note>

@@ -32,7 +32,7 @@ plugins/banwords/lib/__pycache__
 !plugins/role
 !plugins/keyword
 !plugins/linkai
-!plugins/cow_cli
+!plugins/onyx_cli
 client_config.json
 ref/
 **/.dev.vars
@@ -40,8 +40,8 @@ ref/
 local/
 node_modules/
 
-# cow cli
+# onyx cli
 dist/
 build/
 *.egg-info/
-.cow.pid
+.onyx.pid

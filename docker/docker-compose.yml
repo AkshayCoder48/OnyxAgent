@@ -8,7 +8,7 @@ services:
     ports:
       - "9899:9899"
     environment:
-      COW_LANG: 'auto'
+      Onyx_LANG: 'auto'
       CHANNEL_TYPE: 'weixin'
       MODEL: 'deepseek-v4-flash'
       DEEPSEEK_API_KEY: ''
@@ -46,4 +46,4 @@ services:
       AGENT_MAX_CONTEXT_TURNS: 20
       AGENT_MAX_STEPS: 20
     volumes:
-      - ./cow:/home/agent/cow
+      - ./cow:/home/agent/onyx

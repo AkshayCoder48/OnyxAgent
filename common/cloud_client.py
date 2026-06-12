@@ -72,7 +72,7 @@ class CloudClient(LinkAIClient):
                 from agent.skills.service import SkillService
                 from config import conf
                 from common.utils import expand_path
-                workspace_root = expand_path(conf().get("agent_workspace", "~/cow"))
+                workspace_root = expand_path(conf().get("agent_workspace", "~/onyx"))
                 manager = SkillManager(custom_dir=os.path.join(workspace_root, "skills"))
                 self._skill_service = SkillService(manager)
                 logger.debug("[CloudClient] SkillService initialised")
@@ -88,7 +88,7 @@ class CloudClient(LinkAIClient):
                 from agent.memory.service import MemoryService
                 from config import conf
                 from common.utils import expand_path
-                workspace_root = expand_path(conf().get("agent_workspace", "~/cow"))
+                workspace_root = expand_path(conf().get("agent_workspace", "~/onyx"))
                 self._memory_service = MemoryService(workspace_root)
                 logger.debug("[CloudClient] MemoryService initialised")
             except Exception as e:
@@ -103,7 +103,7 @@ class CloudClient(LinkAIClient):
                 from agent.knowledge.service import KnowledgeService
                 from config import conf
                 from common.utils import expand_path
-                workspace_root = expand_path(conf().get("agent_workspace", "~/cow"))
+                workspace_root = expand_path(conf().get("agent_workspace", "~/onyx"))
                 self._knowledge_service = KnowledgeService(workspace_root)
                 logger.debug("[CloudClient] KnowledgeService initialised")
             except Exception as e:
@@ -332,7 +332,7 @@ class CloudClient(LinkAIClient):
     def _remove_weixin_credentials():
         """Remove the weixin token credentials file so next connect triggers QR login."""
         cred_path = os.path.expanduser(
-            conf().get("weixin_credentials_path", "~/.weixin_cow_credentials.json")
+            conf().get("weixin_credentials_path", "~/.weixin_onyx_credentials.json")
         )
         try:
             if os.path.exists(cred_path):
@@ -544,18 +544,18 @@ class CloudClient(LinkAIClient):
             session_id = f"session_{session_id}"
         logger.info(f"[CloudClient] on_chat: session={session_id}, channel={channel_type}, query={query[:80]}")
 
-        # Intercept cow/slash commands before the agent runs
+        # Intercept onyx/slash commands before the agent runs
         try:
             from plugins import PluginManager
             mgr = PluginManager()
-            instance = mgr.instances.get("COW_CLI")
+            instance = mgr.instances.get("Onyx_CLI")
             if instance and hasattr(instance, "execute"):
                 result = instance.execute(query, session_id=session_id)
                 if result is not None:
                     send_chunk_fn({"chunk_type": "content", "delta": result, "segment_id": 0})
                     return
         except Exception as e:
-            logger.warning(f"[CloudClient] cow_cli intercept failed: {e}")
+            logger.warning(f"[CloudClient] onyx_cli intercept failed: {e}")
 
         svc = self.chat_service
         if svc is None:
@@ -741,11 +741,11 @@ def get_website_base_url() -> str:
 
 
 # Subdir under websites/ used by the send tool
-COW_SEND_WEB_SUBDIR = "cow-send"
+Onyx_SEND_WEB_SUBDIR = "onyx-send"
 
 
 def copy_send_file(src_path: str, workspace_root: str) -> str:
-    """Copy *src_path* into ``websites/cow-send/`` and return its URL.
+    """Copy *src_path* into ``websites/onyx-send/`` and return its URL.
 
     Returns empty string in local env.
     """
@@ -758,7 +758,7 @@ def copy_send_file(src_path: str, workspace_root: str) -> str:
     if not base or not src_path or not os.path.isfile(src_path):
         return ""
     ws = os.path.abspath(expand_path(workspace_root))
-    send_dir = os.path.join(ws, "websites", COW_SEND_WEB_SUBDIR)
+    send_dir = os.path.join(ws, "websites", Onyx_SEND_WEB_SUBDIR)
     try:
         os.makedirs(send_dir, exist_ok=True)
     except OSError:
@@ -773,7 +773,7 @@ def copy_send_file(src_path: str, workspace_root: str) -> str:
     except OSError as e:
         logger.warning(f"[cloud] copy_send_file: copy failed: {e}")
         return ""
-    return f"{base}/{COW_SEND_WEB_SUBDIR}/{dest_name}"
+    return f"{base}/{Onyx_SEND_WEB_SUBDIR}/{dest_name}"
 
 
 def build_website_prompt(workspace_dir: str) -> list:

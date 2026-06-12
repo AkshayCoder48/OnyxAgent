@@ -49,7 +49,7 @@ def init_scheduler(agent_bridge) -> bool:
             from agent.tools.scheduler.scheduler_service import SchedulerService
 
             # Get workspace from config
-            workspace_root = expand_path(conf().get("agent_workspace", "~/cow"))
+            workspace_root = expand_path(conf().get("agent_workspace", "~/onyx"))
             store_path = os.path.join(workspace_root, "scheduler", "tasks.json")
 
             # Create task store (reuse if already created)

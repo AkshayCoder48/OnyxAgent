@@ -83,7 +83,7 @@ def _check_auth():
     """Return True if request is authenticated or password not enabled."""
     if not _is_password_enabled():
         return True
-    return _verify_auth_token(web.cookies().get("cow_auth_token", ""))
+    return _verify_auth_token(web.cookies().get("onyx_auth_token", ""))
 
 
 def _require_auth():
@@ -105,7 +105,7 @@ def _cancel_reply_text(cancelled: int, lang: str) -> str:
 
 def _get_upload_dir() -> str:
     from common.utils import expand_path
-    ws_root = expand_path(conf().get("agent_workspace", "~/cow"))
+    ws_root = expand_path(conf().get("agent_workspace", "~/onyx"))
     tmp_dir = os.path.join(ws_root, "tmp")
     os.makedirs(tmp_dir, exist_ok=True)
     return tmp_dir
@@ -1056,8 +1056,8 @@ class WebChannel(ChatChannel):
         with open(file_path, 'r', encoding='utf-8') as f:
             html = f.read()
         # Inject the backend-resolved default language so the console can use
-        # it on first load (when the user has no saved cow_lang preference).
-        return html.replace("{{COW_DEFAULT_LANG}}", i18n.get_language())
+        # it on first load (when the user has no saved onyx_lang preference).
+        return html.replace("{{Onyx_DEFAULT_LANG}}", i18n.get_language())
 
     def startup(self):
         configured_host = conf().get("web_host", "")
@@ -1194,7 +1194,7 @@ class WebChannel(ChatChannel):
         except OSError as e:
             if e.errno in (48, 98):  # macOS/Linux EADDRINUSE
                 logger.error(
-                    f"[WebChannel] 端口 {port} 已被占用，可执行 `cow restart` 清理残留进程，"
+                    f"[WebChannel] 端口 {port} 已被占用，可执行 `onyx restart` 清理残留进程，"
                     f"或在 config.json 中修改 web_port"
                 )
             raise
@@ -1239,7 +1239,7 @@ class AuthLoginHandler:
             logger.warning("[WebChannel] Invalid login attempt")
             return json.dumps({"status": "error", "message": "Wrong password"})
         token = _create_auth_token()
-        web.setcookie("cow_auth_token", token, expires=_session_expire_seconds(),
+        web.setcookie("onyx_auth_token", token, expires=_session_expire_seconds(),
                        path="/", httponly=True, samesite="Lax")
         return json.dumps({"status": "success"})
 
@@ -1247,7 +1247,7 @@ class AuthLoginHandler:
 class AuthLogoutHandler:
     def POST(self):
         web.header('Content-Type', 'application/json; charset=utf-8')
-        web.setcookie("cow_auth_token", "", expires=-1, path="/")
+        web.setcookie("onyx_auth_token", "", expires=-1, path="/")
         return json.dumps({"status": "success"})
 
 
@@ -1399,7 +1399,7 @@ class FileServeHandler:
             serve_root = conf().get("web_file_serve_root", "~") or "~"
             allowed_roots = [
                 os.path.realpath(os.path.expanduser(serve_root)),
-                os.path.realpath(os.path.expanduser(conf().get("agent_workspace", "~/cow"))),
+                os.path.realpath(os.path.expanduser(conf().get("agent_workspace", "~/onyx"))),
             ]
             if os.sep not in allowed_roots and not any(
                 os.path.commonpath([file_path, root]) == root for root in allowed_roots
@@ -1461,7 +1461,7 @@ class ChatHandler:
         html = html.replace('assets/js/console.js', f'assets/js/console.js?v={cache_bust}')
         html = html.replace('assets/css/console.css', f'assets/css/console.css?v={cache_bust}')
         # Inject the backend-resolved default language for first-load fallback.
-        html = html.replace("{{COW_DEFAULT_LANG}}", i18n.get_language())
+        html = html.replace("{{Onyx_DEFAULT_LANG}}", i18n.get_language())
         return html
 
 
@@ -1603,7 +1603,7 @@ class ConfigHandler:
     ])
 
     EDITABLE_KEYS = {
-        "cow_lang",
+        "onyx_lang",
         "model", "bot_type", "use_linkai",
         "open_ai_api_base", "deepseek_api_base", "qianfan_api_base", "claude_api_base", "gemini_api_base",
         "zhipu_ai_api_base", "moonshot_base_url", "ark_base_url", "custom_api_base", "mimo_api_base",
@@ -1628,7 +1628,7 @@ class ConfigHandler:
         try:
             local_config = conf()
             use_agent = local_config.get("agent", True)
-            title = "CowAgent" if use_agent else "AI Assistant"
+            title = "OnyxAgent" if use_agent else "AI Assistant"
 
             api_bases = {}
             api_keys_masked = {}
@@ -1742,9 +1742,9 @@ class ConfigHandler:
 
             # Apply a language change immediately so backend logs, agent
             # replies and CLI output switch without a restart.
-            if "cow_lang" in applied:
+            if "onyx_lang" in applied:
                 try:
-                    i18n.resolve_language(applied["cow_lang"])
+                    i18n.resolve_language(applied["onyx_lang"])
                     logger.info(f"[WebChannel] Language switched to: {i18n.get_language()}")
                 except Exception as lang_err:
                     logger.warning(f"[WebChannel] Failed to apply language: {lang_err}")
@@ -3261,7 +3261,7 @@ class ModelsHandler:
         self._write_file_config(file_cfg)
         logger.info(f"[ModelsHandler] embedding updated: provider={provider_id!r} model={model!r}")
         # The next /memory rebuild-index command hot-swaps the provider onto
-        # the running MemoryManager (see plugins/cow_cli). The dim may have
+        # the running MemoryManager (see plugins/onyx_cli). The dim may have
         # changed, so the frontend prompts the user to rebuild.
         return json.dumps({"status": "success", "provider": provider_id, "model": model})
 
@@ -3826,7 +3826,7 @@ class WeixinQrHandler:
                 return json.dumps({"status": "error", "message": "Login confirmed but missing token"})
 
             cred_path = os.path.expanduser(
-                conf().get("weixin_credentials_path", "~/.weixin_cow_credentials.json")
+                conf().get("weixin_credentials_path", "~/.weixin_onyx_credentials.json")
             )
             from channel.weixin.weixin_channel import _save_credentials
             _save_credentials(cred_path, {
@@ -3930,7 +3930,7 @@ class FeishuRegisterHandler:
                 result = lark.register_app(
                     on_qr_code=_on_qr,
                     on_status_change=_on_status,
-                    source="cowagent",
+                    source="onyxagent",
                     cancel_event=cancel_event,
                 )
                 with cls._lock:
@@ -4035,7 +4035,7 @@ class FeishuRegisterHandler:
 def _get_workspace_root():
     """Resolve the agent workspace directory."""
     from common.utils import expand_path
-    return expand_path(conf().get("agent_workspace", "~/cow"))
+    return expand_path(conf().get("agent_workspace", "~/onyx"))
 
 
 class ToolsHandler:

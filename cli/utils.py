@@ -1,4 +1,4 @@
-"""Shared utilities for cow CLI."""
+"""Shared utilities for onyx CLI."""
 
 import os
 import sys
@@ -6,15 +6,15 @@ import json
 
 
 def get_project_root() -> str:
-    """Get the CowAgent project root directory."""
+    """Get the OnyxAgent project root directory."""
     # cli/ is directly under the project root
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def get_workspace_dir() -> str:
-    """Get the agent workspace directory from config, defaulting to ~/cow."""
+    """Get the agent workspace directory from config, defaulting to ~/onyx."""
     config = load_config_json()
-    workspace = config.get("agent_workspace", "~/cow")
+    workspace = config.get("agent_workspace", "~/onyx")
     return os.path.expanduser(workspace)
 
 
@@ -43,14 +43,14 @@ def load_config_json() -> dict:
 def get_cli_language() -> str:
     """Resolve the CLI UI language using the shared i18n detector.
 
-    Reads the `cow_lang` field from config.json (defaults to "auto") and runs
+    Reads the `onyx_lang` field from config.json (defaults to "auto") and runs
     the same detection used by the running app, so CLI output matches.
     """
     ensure_sys_path()
     try:
         from common import i18n
 
-        configured = load_config_json().get("cow_lang", "auto")
+        configured = load_config_json().get("onyx_lang", "auto")
         return i18n.resolve_language(configured)
     except Exception:
         return "en"
@@ -75,4 +75,4 @@ def ensure_sys_path():
         sys.path.insert(0, root)
 
 
-SKILL_HUB_API = "https://skills.cowagent.ai/api"
+SKILL_HUB_API = "https://skills.onyxagent.ai/api"

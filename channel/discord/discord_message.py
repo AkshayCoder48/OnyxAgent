@@ -1,7 +1,7 @@
 """
 Discord message adapter.
 
-Convert a discord.py Message into cow's unified ChatMessage.
+Convert a discord.py Message into onyx's unified ChatMessage.
 File downloads are NOT performed here; the channel layer downloads
 attachments on demand inside the async event loop.
 """
@@ -54,7 +54,7 @@ class DiscordMessage(ChatMessage):
     @staticmethod
     def get_tmp_dir() -> str:
         """Local download directory, aligned with other channels (agent_workspace/tmp)."""
-        workspace_root = expand_path(conf().get("agent_workspace", "~/cow"))
+        workspace_root = expand_path(conf().get("agent_workspace", "~/onyx"))
         tmp_dir = os.path.join(workspace_root, "tmp")
         os.makedirs(tmp_dir, exist_ok=True)
         return tmp_dir

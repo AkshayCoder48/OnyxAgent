@@ -7,7 +7,7 @@ Design:
 - Pruning: age-based only (sessions not updated within N days are deleted)
 - Thread-safe via a single in-process lock
 
-Storage path: ~/cow/sessions/conversations.db
+Storage path: ~/onyx/sessions/conversations.db
 """
 
 from __future__ import annotations
@@ -1253,7 +1253,7 @@ def get_conversation_store() -> ConversationStore:
     Return the process-wide ConversationStore singleton.
 
     Reuses the long-term memory database so the project stays with a single
-    SQLite file: ~/cow/memory/long-term/index.db
+    SQLite file: ~/onyx/memory/long-term/index.db
     The conversation tables (sessions / messages) are separate from the
     memory tables (memory_chunks / file_metadata) — no conflicts.
     """
@@ -1270,7 +1270,7 @@ def get_conversation_store() -> ConversationStore:
             db_path = get_default_memory_config().get_db_path()
         except Exception:
             from common.utils import expand_path
-            db_path = Path(expand_path("~/cow")) / "memory" / "long-term" / "index.db"
+            db_path = Path(expand_path("~/onyx")) / "memory" / "long-term" / "index.db"
 
         _store_instance = ConversationStore(db_path)
         logger.debug(f"[ConversationStore] Using shared DB at: {db_path}")

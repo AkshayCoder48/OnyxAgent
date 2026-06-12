@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CowAgent Console</title>
+    <title>OnyxAgent Console</title>
     <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
     <!-- Vendored third-party assets (no external CDN dependency).
          See channel/web/static/vendor/README.md for sources & versions. -->
@@ -49,7 +49,7 @@
     <script>
     // Map an arbitrary locale string (zh-CN, en-US, fr ...) to 'zh' / 'en',
     // or '' when unrecognized so callers can fall through to the next source.
-    window.__cowNormalizeLang__ = function(raw) {
+    window.__onyxNormalizeLang__ = function(raw) {
         if (!raw) return '';
         var v = String(raw).trim().toLowerCase();
         if (v === 'auto') return '';
@@ -59,18 +59,18 @@
     };
     // Resolve the console language by priority:
     //   user choice (localStorage) -> backend-detected -> browser -> 'zh'.
-    window.__cowResolveLang__ = function() {
-        return window.__cowNormalizeLang__(localStorage.getItem('cow_lang'))
-            || window.__cowNormalizeLang__(window.__COW_DEFAULT_LANG__)
-            || window.__cowNormalizeLang__(navigator.language || (navigator.languages && navigator.languages[0]))
+    window.__onyxResolveLang__ = function() {
+        return window.__onyxNormalizeLang__(localStorage.getItem('onyx_lang'))
+            || window.__onyxNormalizeLang__(window.__ONYX_DEFAULT_LANG__)
+            || window.__onyxNormalizeLang__(navigator.language || (navigator.languages && navigator.languages[0]))
             || 'zh';
     };
     (function() {
-        // Backend-resolved default language (from cow_lang config / auto-detect).
-        window.__COW_DEFAULT_LANG__ = '{{COW_DEFAULT_LANG}}';
-        var theme = localStorage.getItem('cow_theme') || 'dark';
+        // Backend-resolved default language (from onyx_lang config / auto-detect).
+        window.__ONYX_DEFAULT_LANG__ = '{{Onyx_DEFAULT_LANG}}';
+        var theme = localStorage.getItem('onyx_theme') || 'dark';
         if (theme === 'dark') document.documentElement.classList.add('dark');
-        document.documentElement.setAttribute('lang', window.__cowResolveLang__());
+        document.documentElement.setAttribute('lang', window.__onyxResolveLang__());
     })();
     </script>
 </head>
@@ -80,8 +80,8 @@
     <div id="login-overlay" class="fixed inset-0 z-[200] bg-gray-50 dark:bg-[#111111] flex items-center justify-center hidden">
         <div class="w-full max-w-sm mx-4">
             <div class="flex flex-col items-center mb-8">
-                <img src="assets/logo.jpg" alt="CowAgent" class="w-16 h-16 rounded-2xl mb-4 shadow-lg">
-                <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">CowAgent</h1>
+                <img src="assets/logo.jpg" alt="OnyxAgent" class="w-16 h-16 rounded-2xl mb-4 shadow-lg">
+                <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">OnyxAgent</h1>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" id="login-subtitle">请输入密码以访问控制台</p>
             </div>
             <form id="login-form" class="space-y-4" onsubmit="return false;">
@@ -120,9 +120,9 @@
                                     transition-transform duration-300 ease-in-out">
             <!-- Logo -->
             <div class="flex items-center gap-3 px-5 h-14 border-b border-white/10 flex-shrink-0">
-                <img src="assets/logo.jpg" alt="CowAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
+                <img src="assets/logo.jpg" alt="OnyxAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
                 <div class="flex flex-col min-w-0">
-                    <span class="text-white font-semibold text-sm truncate">CowAgent</span>
+                    <span class="text-white font-semibold text-sm truncate">OnyxAgent</span>
                     <span class="text-neutral-500 text-xs" data-i18n="console">控制台</span>
                 </div>
             </div>
@@ -285,14 +285,14 @@
                 </button>
 
                 <!-- Docs Link -->
-                <a id="docs-link" href="https://docs.cowagent.ai" target="_blank" rel="noopener noreferrer"
+                <a id="docs-link" href="https://docs.onyxagent.ai" target="_blank" rel="noopener noreferrer"
                    class="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
                           cursor-pointer transition-colors duration-150" title="Documentation">
                     <i class="fas fa-book text-base"></i>
                 </a>
 
                 <!-- Website Link -->
-                <a href="https://cowagent.ai" target="_blank" rel="noopener noreferrer"
+                <a href="https://onyxagent.ai" target="_blank" rel="noopener noreferrer"
                    class="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
                           cursor-pointer transition-colors duration-150" title="Website">
                     <i class="fas fa-home text-base"></i>
@@ -317,8 +317,8 @@
                     <div id="chat-messages" class="flex-1 overflow-y-auto">
                         <!-- Welcome Screen -->
                         <div id="welcome-screen" class="flex flex-col items-center justify-center h-full px-6 pb-16" style="padding-top: 6vh">
-                            <img src="assets/logo.jpg" alt="CowAgent" class="w-16 h-16 rounded-2xl mb-6 shadow-lg shadow-primary-500/20">
-                            <h1 id="welcome-title" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-3">CowAgent</h1>
+                            <img src="assets/logo.jpg" alt="OnyxAgent" class="w-16 h-16 rounded-2xl mb-6 shadow-lg shadow-primary-500/20">
+                            <h1 id="welcome-title" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-3">OnyxAgent</h1>
                             <p id="welcome-subtitle" class="text-slate-500 dark:text-slate-400 text-center max-w-lg mb-10 leading-relaxed"
                                data-i18n-html="welcome_subtitle">我可以帮你解答问题、管理计算机、创造和执行技能，并通过<br>长期记忆和知识库不断成长</p>
 
@@ -346,8 +346,8 @@
                                 <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
                                             cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
                                     <div class="flex items-center gap-2 mb-2">
-                                        <div class="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
-                                            <i class="fas fa-code text-emerald-500 text-xs"></i>
+                                        <div class="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
+                                            <i class="fas fa-code text-rose-500 text-xs"></i>
                                         </div>
                                         <span class="font-medium text-sm text-slate-700 dark:text-slate-200" data-i18n="example_code_title">编程助手</span>
                                     </div>
@@ -572,8 +572,8 @@
                                 <!-- Agent Config Card -->
                                 <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
                                     <div class="flex items-center gap-3 mb-5">
-                                        <div class="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
-                                            <i class="fas fa-robot text-emerald-500 text-sm"></i>
+                                        <div class="w-9 h-9 rounded-lg bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
+                                            <i class="fas fa-robot text-rose-500 text-sm"></i>
                                         </div>
                                         <h3 class="font-semibold text-slate-800 dark:text-slate-100" data-i18n="config_agent">Agent 配置</h3>
                                     </div>
@@ -712,7 +712,7 @@
                                     <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100" data-i18n="skills_title">技能管理</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="skills_desc">查看、启用或禁用 Agent 技能</p>
                                 </div>
-                                <a href="https://skills.cowagent.ai/" target="_blank"
+                                <a href="https://skills.onyxagent.ai/" target="_blank"
                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary-500 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors">
                                     <i class="fas fa-puzzle-piece text-[10px]"></i>
                                     <span data-i18n="skills_hub_btn">探索技能广场</span>
@@ -855,8 +855,8 @@
 
                             <!-- Empty state -->
                             <div id="knowledge-empty" class="flex flex-col items-center justify-center py-20">
-                                <div class="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mb-4">
-                                    <i class="fas fa-book text-emerald-400 text-xl"></i>
+                                <div class="w-16 h-16 rounded-2xl bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center mb-4">
+                                    <i class="fas fa-book text-rose-400 text-xl"></i>
                                 </div>
                                 <p class="text-slate-500 dark:text-slate-400 font-medium" data-i18n="knowledge_loading">加载知识库中...</p>
                                 <p class="text-sm text-slate-400 dark:text-slate-500 mt-1" data-i18n="knowledge_loading_desc">知识页面将显示在这里</p>
@@ -1025,7 +1025,7 @@
                                     <div class="flex gap-1.5">
                                         <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
                                         <span class="w-3 h-3 rounded-full bg-amber-500/80"></span>
-                                        <span class="w-3 h-3 rounded-full bg-emerald-500/80"></span>
+                                        <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
                                     </div>
                                     <span class="text-xs text-slate-400 ml-2 font-mono">run.log</span>
                                     <div class="flex-1"></div>
@@ -1052,7 +1052,7 @@
                                         </label>
                                     </div>
                                     <div class="flex items-center gap-1.5">
-                                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
                                         <span class="text-xs text-slate-500" data-i18n="logs_live">实时</span>
                                     </div>
                                 </div>

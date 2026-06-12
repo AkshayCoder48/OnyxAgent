@@ -80,7 +80,7 @@ class Read(BaseTool):
         absolute_path = self._resolve_path(path)
         
         # Security check: Prevent reading sensitive config files
-        env_config_path = expand_path("~/.cow/.env")
+        env_config_path = expand_path("~/.onyx/.env")
         if os.path.abspath(absolute_path) == os.path.abspath(env_config_path):
             return ToolResult.fail(
                 "Error: Access denied. API keys and credentials must be accessed through the env_config tool only."

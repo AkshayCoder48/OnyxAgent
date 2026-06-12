@@ -97,7 +97,7 @@ class WeixinChannel(ChatChannel):
         token = conf().get("weixin_token", "")
 
         self._credentials_path = os.path.expanduser(
-            conf().get("weixin_credentials_path", "~/.weixin_cow_credentials.json")
+            conf().get("weixin_credentials_path", "~/.weixin_onyx_credentials.json")
         )
 
         # Always load credentials so we can restore context_tokens even when

@@ -1,4 +1,4 @@
-"""CowAgent CLI - Manage your CowAgent from the command line."""
+"""OnyxAgent CLI - Manage your OnyxAgent from the command line."""
 
 import os as _os
 

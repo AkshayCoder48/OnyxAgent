@@ -441,7 +441,7 @@ class ChatChannel(Channel):
 
     # Chat commands that must bypass the per-session serial queue,
     # otherwise /cancel would queue behind the task it tries to cancel.
-    # Use /cancel (not /stop) to avoid colliding with `cow stop` CLI.
+    # Use /cancel (not /stop) to avoid colliding with `onyx stop` CLI.
     _BYPASS_QUEUE_COMMANDS = ("/cancel",)
 
     def produce(self, context: Context):

@@ -2,7 +2,7 @@
 set -e
 
 # ============================
-# CowAgent Management Script
+# OnyxAgent Management Script
 # ============================
 
 # ANSI colors
@@ -15,7 +15,7 @@ NC='\033[0m'
 
 # Emojis
 EMOJI_ROCKET="🚀"
-EMOJI_COW="🐄"
+EMOJI_ONYX="🐄"
 EMOJI_CHECK="✅"
 EMOJI_CROSS="❌"
 EMOJI_WARN="⚠️"
@@ -413,25 +413,25 @@ check_python_version() {
 
 # Clone project
 clone_project() {
-    echo -e "${GREEN}🔍 Cloning CowAgent project...${NC}"
+    echo -e "${GREEN}🔍 Cloning OnyxAgent project...${NC}"
 
-    if [ -d "CowAgent" ]; then
+    if [ -d "OnyxAgent" ]; then
         # An existing directory is automatically backed up (no prompt) so the
         # installer stays one-shot / hands-off.
-        local backup_dir="CowAgent_backup_$(date +%s)"
-        echo -e "${YELLOW}⚠️  $(t "目录 'CowAgent' 已存在，自动备份到" "Directory 'CowAgent' exists, backing up to") '$backup_dir'...${NC}"
-        mv CowAgent "$backup_dir"
+        local backup_dir="OnyxAgent_backup_$(date +%s)"
+        echo -e "${YELLOW}⚠️  $(t "目录 'OnyxAgent' 已存在，自动备份到" "Directory 'OnyxAgent' exists, backing up to") '$backup_dir'...${NC}"
+        mv OnyxAgent "$backup_dir"
     fi
 
     check_and_install_tool git
 
     if ! command -v git &> /dev/null; then
         echo -e "${YELLOW}⚠️  Git not available. Trying wget/curl...${NC}"
-        local zip_url="https://gitee.com/zhayujie/CowAgent/repository/archive/master.zip"
+        local zip_url="https://gitee.com/zhayujie/OnyxAgent/repository/archive/master.zip"
         if command -v wget &> /dev/null; then
-            wget "$zip_url" -O CowAgent.zip
+            wget "$zip_url" -O OnyxAgent.zip
         elif command -v curl &> /dev/null; then
-            curl -L "$zip_url" -o CowAgent.zip
+            curl -L "$zip_url" -o OnyxAgent.zip
         else
             echo -e "${RED}❌ Cannot download project. Please install Git, wget, or curl.${NC}"
             exit 1
@@ -439,22 +439,22 @@ clone_project() {
         # Unzip: prefer `unzip`, otherwise fall back to Python's zipfile (no
         # extra dependency) so minimal environments without unzip still work.
         if command -v unzip &> /dev/null; then
-            unzip CowAgent.zip
+            unzip OnyxAgent.zip
         elif command -v python3 &> /dev/null; then
-            python3 -m zipfile -e CowAgent.zip .
+            python3 -m zipfile -e OnyxAgent.zip .
         elif command -v python &> /dev/null; then
-            python -m zipfile -e CowAgent.zip .
+            python -m zipfile -e OnyxAgent.zip .
         else
             echo -e "${RED}❌ Cannot extract archive. Please install 'unzip' or Python.${NC}"
             exit 1
         fi
-        # Archive top-level dir name may vary (CowAgent-master, etc.); detect it.
-        local _extracted="CowAgent-master"
+        # Archive top-level dir name may vary (OnyxAgent-master, etc.); detect it.
+        local _extracted="OnyxAgent-master"
         if [ ! -d "$_extracted" ]; then
-            _extracted=$(ls -d CowAgent-*/ 2>/dev/null | head -1 | sed 's:/*$::')
+            _extracted=$(ls -d OnyxAgent-*/ 2>/dev/null | head -1 | sed 's:/*$::')
         fi
-        [ -n "$_extracted" ] && [ -d "$_extracted" ] && mv "$_extracted" CowAgent
-        rm -f CowAgent.zip
+        [ -n "$_extracted" ] && [ -d "$_extracted" ] && mv "$_extracted" OnyxAgent
+        rm -f OnyxAgent.zip
     else
         local clone_ok=false
         # Detect and temporarily disable invalid git proxy settings
@@ -470,11 +470,11 @@ clone_project() {
         # Test GitHub connectivity before attempting clone
         if curl -sI --connect-timeout 5 --max-time 10 https://github.com > /dev/null 2>&1; then
             echo -e "${YELLOW}🌐 GitHub is reachable, cloning from GitHub...${NC}"
-            _timeout 60 git clone --depth 10 --progress https://github.com/zhayujie/CowAgent.git && clone_ok=true
+            _timeout 60 git clone --depth 10 --progress https://github.com/zhayujie/OnyxAgent.git && clone_ok=true
         fi
         if [ "$clone_ok" = false ]; then
             echo -e "${YELLOW}⚠️  GitHub clone failed or timed out, switching to Gitee mirror...${NC}"
-            _timeout 30 git clone --depth 10 --progress https://gitee.com/zhayujie/CowAgent.git && clone_ok=true
+            _timeout 30 git clone --depth 10 --progress https://gitee.com/zhayujie/OnyxAgent.git && clone_ok=true
         fi
         if [ "$clone_ok" = false ]; then
             echo -e "${RED}❌ Project clone failed. Please check network connection.${NC}"
@@ -488,7 +488,7 @@ clone_project() {
         fi
     fi
 
-    cd CowAgent || { echo -e "${RED}❌ Failed to enter project directory.${NC}"; exit 1; }
+    cd OnyxAgent || { echo -e "${RED}❌ Failed to enter project directory.${NC}"; exit 1; }
     export BASE_DIR=$(pwd)
     echo -e "${GREEN}✅ Project cloned successfully: $BASE_DIR${NC}"
     
@@ -577,14 +577,14 @@ install_dependencies() {
 
     rm -f /tmp/pip_install.log
 
-    # Register `cow` CLI command via editable install
-    echo -e "${YELLOW}Registering cow CLI...${NC}"
+    # Register `onyx` CLI command via editable install
+    echo -e "${YELLOW}Registering onyx CLI...${NC}"
     set +e
     $PYTHON_CMD -m pip install -e . $PIP_EXTRA_ARGS $PIP_MIRROR > /dev/null 2>&1
-    if command -v cow &> /dev/null; then
-        echo -e "${GREEN}✅ cow CLI registered.${NC}"
+    if command -v onyx &> /dev/null; then
+        echo -e "${GREEN}✅ onyx CLI registered.${NC}"
     else
-        echo -e "${YELLOW}⚠️  cow CLI not in PATH, you can still use: $PYTHON_CMD -m cli.cli${NC}"
+        echo -e "${YELLOW}⚠️  onyx CLI not in PATH, you can still use: $PYTHON_CMD -m cli.cli${NC}"
     fi
     set -e
 }
@@ -847,14 +847,14 @@ create_config_file() {
     SLACK_BOT_TOKEN="${SLACK_BOT_TOKEN:-}" \
     SLACK_APP_TOKEN="${SLACK_APP_TOKEN:-}" \
     DISCORD_TOKEN="${DISCORD_TOKEN:-}" \
-    COW_LANG="${INSTALL_LANG:-auto}" \
+    ONYX_LANG="${INSTALL_LANG:-auto}" \
     $PYTHON_CMD -c "
 import json, os
 e = os.environ.get
 base = {
     'channel_type': e('CHANNEL_TYPE') or 'web',
     'model': e('MODEL_NAME') or '',
-    'cow_lang': e('COW_LANG', 'auto'),
+    'onyx_lang': e('ONYX_LANG', 'auto'),
     'open_ai_api_key': e('OPENAI_KEY', ''),
     'open_ai_api_base': e('OPENAI_BASE'),
     'claude_api_key': e('CLAUDE_KEY', ''),
@@ -921,17 +921,17 @@ with open('config.json', 'w') as f:
 # Start project
 start_project() {
     echo ""
-    echo -e "${GREEN}${EMOJI_ROCKET} Starting CowAgent...${NC}"
+    echo -e "${GREEN}${EMOJI_ROCKET} Starting OnyxAgent...${NC}"
     sleep 1
 
-    local USE_COW=false
-    if command -v cow &> /dev/null; then
-        USE_COW=true
+    local USE_ONYX=false
+    if command -v onyx &> /dev/null; then
+        USE_ONYX=true
     fi
 
-    if $USE_COW; then
+    if $USE_ONYX; then
         cd "${BASE_DIR}"
-        cow start --no-logs
+        onyx start --no-logs
     else
         if [ ! -f "${BASE_DIR}/nohup.out" ]; then
             touch "${BASE_DIR}/nohup.out"
@@ -941,10 +941,10 @@ start_project() {
 
         if [[ "$OS_TYPE" == "Linux" ]]; then
             nohup setsid $PYTHON_CMD "${BASE_DIR}/app.py" > "${BASE_DIR}/nohup.out" 2>&1 &
-            echo -e "${GREEN}${EMOJI_COW} CowAgent started on Linux (using $PYTHON_CMD)${NC}"
+            echo -e "${GREEN}${EMOJI_ONYX} OnyxAgent started on Linux (using $PYTHON_CMD)${NC}"
         elif [[ "$OS_TYPE" == "Darwin" ]]; then
             nohup $PYTHON_CMD "${BASE_DIR}/app.py" > "${BASE_DIR}/nohup.out" 2>&1 &
-            echo -e "${GREEN}${EMOJI_COW} CowAgent started on macOS (using $PYTHON_CMD)${NC}"
+            echo -e "${GREEN}${EMOJI_ONYX} OnyxAgent started on macOS (using $PYTHON_CMD)${NC}"
         else
             echo -e "${RED}❌ Unsupported OS: ${OS_TYPE}${NC}"
             exit 1
@@ -954,7 +954,7 @@ start_project() {
     sleep 2
     echo ""
     echo -e "${CYAN}${BOLD}=========================================${NC}"
-    echo -e "${GREEN}${EMOJI_CHECK} $(t "CowAgent 已在后台运行" "CowAgent is now running in background")!${NC}"
+    echo -e "${GREEN}${EMOJI_CHECK} $(t "OnyxAgent 已在后台运行" "OnyxAgent is now running in background")!${NC}"
     echo -e "${GREEN}${EMOJI_CHECK} $(t "关闭终端后进程仍会继续运行" "Process will continue after closing terminal").${NC}"
     echo -e "${CYAN}$ACCESS_INFO${NC}"
 
@@ -967,13 +967,13 @@ start_project() {
     fi
     echo ""
     echo -e "${CYAN}${BOLD}$(t "管理命令" "Management Commands"):${NC}"
-    if $USE_COW; then
-        echo -e "  ${GREEN}cow stop${NC}       $(t "停止服务" "Stop the service")"
-        echo -e "  ${GREEN}cow restart${NC}    $(t "重启服务" "Restart the service")"
-        echo -e "  ${GREEN}cow status${NC}     $(t "查看状态" "Check status")"
-        echo -e "  ${GREEN}cow logs${NC}       $(t "查看日志" "View logs")"
-        echo -e "  ${GREEN}cow update${NC}     $(t "更新并重启" "Update and restart")"
-        echo -e "  ${GREEN}cow install-browser${NC}  $(t "安装浏览器工具" "Install browser tool")"
+    if $USE_ONYX; then
+        echo -e "  ${GREEN}onyx stop${NC}       $(t "停止服务" "Stop the service")"
+        echo -e "  ${GREEN}onyx restart${NC}    $(t "重启服务" "Restart the service")"
+        echo -e "  ${GREEN}onyx status${NC}     $(t "查看状态" "Check status")"
+        echo -e "  ${GREEN}onyx logs${NC}       $(t "查看日志" "View logs")"
+        echo -e "  ${GREEN}onyx update${NC}     $(t "更新并重启" "Update and restart")"
+        echo -e "  ${GREEN}onyx install-browser${NC}  $(t "安装浏览器工具" "Install browser tool")"
     else
         echo -e "  ${GREEN}./run.sh stop${NC}       $(t "停止服务" "Stop the service")"
         echo -e "  ${GREEN}./run.sh restart${NC}    $(t "重启服务" "Restart the service")"
@@ -992,7 +992,7 @@ start_project() {
 # Show usage
 show_usage() {
     echo -e "${CYAN}${BOLD}=========================================${NC}"
-    echo -e "${CYAN}${BOLD}   ${EMOJI_COW} CowAgent Management Script${NC}"
+    echo -e "${CYAN}${BOLD}   ${EMOJI_ONYX} OnyxAgent Management Script${NC}"
     echo -e "${CYAN}${BOLD}=========================================${NC}"
     echo ""
     echo -e "${YELLOW}$(t "用法" "Usage"):${NC}"
@@ -1033,9 +1033,9 @@ is_running() {
     [ -n "$(get_pid)" ]
 }
 
-# Check if cow CLI is available
-has_cow() {
-    command -v cow &> /dev/null
+# Check if onyx CLI is available
+has_onyx() {
+    command -v onyx &> /dev/null
 }
 
 # Start service
@@ -1046,12 +1046,12 @@ cmd_start() {
         exit 1
     fi
 
-    if has_cow; then
+    if has_onyx; then
         cd "${BASE_DIR}"
-        cow start
+        onyx start
     else
         if is_running; then
-            echo -e "${YELLOW}${EMOJI_WARN} $(t "CowAgent 已在运行中" "CowAgent is already running") (PID: $(get_pid))${NC}"
+            echo -e "${YELLOW}${EMOJI_WARN} $(t "OnyxAgent 已在运行中" "OnyxAgent is already running") (PID: $(get_pid))${NC}"
             echo -e "${YELLOW}$(t "使用 './run.sh restart' 重启" "Use './run.sh restart' to restart")${NC}"
             return
         fi
@@ -1065,14 +1065,14 @@ cmd_stop() {
     # Don't let kill/return non-zero (e.g. process already gone) abort the
     # caller (cmd_restart) under `set -e`.
     set +e
-    if has_cow; then
+    if has_onyx; then
         cd "${BASE_DIR}"
-        cow stop
+        onyx stop
     else
-        echo -e "${GREEN}${EMOJI_STOP} $(t "正在停止 CowAgent" "Stopping CowAgent")...${NC}"
+        echo -e "${GREEN}${EMOJI_STOP} $(t "正在停止 OnyxAgent" "Stopping OnyxAgent")...${NC}"
 
         if ! is_running; then
-            echo -e "${YELLOW}${EMOJI_WARN} $(t "CowAgent 未在运行" "CowAgent is not running")${NC}"
+            echo -e "${YELLOW}${EMOJI_WARN} $(t "OnyxAgent 未在运行" "OnyxAgent is not running")${NC}"
             return 0
         fi
 
@@ -1092,15 +1092,15 @@ cmd_stop() {
             kill -9 ${pid} 2>/dev/null || true
         fi
 
-        echo -e "${GREEN}${EMOJI_CHECK} $(t "CowAgent 已停止" "CowAgent stopped")${NC}"
+        echo -e "${GREEN}${EMOJI_CHECK} $(t "OnyxAgent 已停止" "OnyxAgent stopped")${NC}"
     fi
 }
 
 # Restart service
 cmd_restart() {
-    if has_cow; then
+    if has_onyx; then
         cd "${BASE_DIR}"
-        cow restart
+        onyx restart
     else
         cmd_stop
         sleep 1
@@ -1110,12 +1110,12 @@ cmd_restart() {
 
 # Check status
 cmd_status() {
-    if has_cow; then
+    if has_onyx; then
         cd "${BASE_DIR}"
-        cow status
+        onyx status
     else
         echo -e "${CYAN}${BOLD}=========================================${NC}"
-        echo -e "${CYAN}${BOLD}   ${EMOJI_COW} CowAgent Status${NC}"
+        echo -e "${CYAN}${BOLD}   ${EMOJI_ONYX} OnyxAgent Status${NC}"
         echo -e "${CYAN}${BOLD}=========================================${NC}"
 
         if is_running; then
@@ -1143,9 +1143,9 @@ cmd_status() {
 
 # View logs
 cmd_logs() {
-    if has_cow; then
+    if has_onyx; then
         cd "${BASE_DIR}"
-        cow logs -f
+        onyx logs -f
     else
         if [ -f "${BASE_DIR}/nohup.out" ]; then
             echo -e "${YELLOW}$(t "查看日志（Ctrl+C 退出）" "Viewing logs (Ctrl+C to exit)"):${NC}"
@@ -1166,7 +1166,7 @@ cmd_config() {
     # Choose language first so the rest of the flow is localized.
     select_language
     echo ""
-    echo -e "${YELLOW}${EMOJI_WRENCH} $(t "正在重新配置 CowAgent" "Reconfiguring CowAgent")...${NC}"
+    echo -e "${YELLOW}${EMOJI_WRENCH} $(t "正在重新配置 OnyxAgent" "Reconfiguring OnyxAgent")...${NC}"
     
     if [ -f "${BASE_DIR}/config.json" ]; then
         backup_file="${BASE_DIR}/config.json.backup.$(date +%s)"
@@ -1193,7 +1193,7 @@ cmd_config() {
 
 # Update project
 cmd_update() {
-    echo -e "${GREEN}${EMOJI_WRENCH} $(t "正在更新 CowAgent" "Updating CowAgent")...${NC}"
+    echo -e "${GREEN}${EMOJI_WRENCH} $(t "正在更新 OnyxAgent" "Updating OnyxAgent")...${NC}"
     cd "${BASE_DIR}"
     
     # Pull latest code first (service still running)
@@ -1204,7 +1204,7 @@ cmd_update() {
             pull_ok=true
         else
             echo -e "${YELLOW}⚠️  $(t "git pull 失败，尝试 Gitee 镜像" "git pull failed, trying Gitee mirror")...${NC}"
-            git remote set-url origin https://gitee.com/zhayujie/CowAgent.git
+            git remote set-url origin https://gitee.com/zhayujie/OnyxAgent.git
             if git pull; then
                 pull_ok=true
             else
@@ -1245,7 +1245,7 @@ install_mode() {
     set +e
     clear
     echo -e "${CYAN}${BOLD}=========================================${NC}"
-    echo -e "${CYAN}${BOLD}   ${EMOJI_COW} CowAgent Installation${NC}"
+    echo -e "${CYAN}${BOLD}   ${EMOJI_ONYX} OnyxAgent Installation${NC}"
     echo -e "${CYAN}${BOLD}=========================================${NC}"
     echo ""
 
@@ -1303,16 +1303,16 @@ require_project_dir() {
     fi
 }
 
-# Initialize UI_LANG for management commands: prefer cow_lang from an existing
+# Initialize UI_LANG for management commands: prefer onyx_lang from an existing
 # config.json, otherwise fall back to environment detection. The install flow
 # overrides this later via select_language().
 init_ui_lang() {
     [ -n "$UI_LANG" ] && return
     local cfg_lang=""
     if [ -f "${BASE_DIR}/config.json" ]; then
-        # `|| true`: grep returns 1 when cow_lang is absent, which would abort
+        # `|| true`: grep returns 1 when onyx_lang is absent, which would abort
         # the whole script under `set -e` at the very first management command.
-        cfg_lang=$(grep -o '"cow_lang"[[:space:]]*:[[:space:]]*"[^"]*"' "${BASE_DIR}/config.json" 2>/dev/null | cut -d'"' -f4 || true)
+        cfg_lang=$(grep -o '"onyx_lang"[[:space:]]*:[[:space:]]*"[^"]*"' "${BASE_DIR}/config.json" 2>/dev/null | cut -d'"' -f4 || true)
     fi
     case "$cfg_lang" in
         zh) UI_LANG="zh" ;;

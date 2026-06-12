@@ -36,7 +36,7 @@ class AgentInitializer:
         Initialize agent initializer
         
         Args:
-            bridge: COW bridge instance
+            bridge: Onyx bridge instance
             agent_bridge: AgentBridge instance (for create_agent method)
         """
         self.bridge = bridge
@@ -55,7 +55,7 @@ class AgentInitializer:
         from config import conf
         
         # Get workspace from config
-        workspace_root = expand_path(conf().get("agent_workspace", "~/cow"))
+        workspace_root = expand_path(conf().get("agent_workspace", "~/onyx"))
         
         # Migrate API keys
         self._migrate_config_to_env(workspace_root)
@@ -255,7 +255,7 @@ class AgentInitializer:
     
     def _load_env_file(self):
         """Load environment variables from .env file"""
-        env_file = expand_path("~/.cow/.env")
+        env_file = expand_path("~/.onyx/.env")
         if os.path.exists(env_file):
             try:
                 from dotenv import load_dotenv
@@ -696,7 +696,7 @@ class AgentInitializer:
             "linkai_api_key": "LINKAI_API_KEY",
         }
         
-        env_file = expand_path("~/.cow/.env")
+        env_file = expand_path("~/.onyx/.env")
         
         # Read existing env vars (key -> value)
         existing_env_vars = {}

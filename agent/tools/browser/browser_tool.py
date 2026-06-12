@@ -7,7 +7,7 @@ close().
 
 Launch modes (configured under `tools.browser` in config.json):
   - persistent (default): Chromium runs with a persistent user_data_dir
-    (default `~/.cow/browser_profile`), so cookies and login state survive
+    (default `~/.onyx/browser_profile`), so cookies and login state survive
     across runs. The user only needs to log in once.
   - cdp: When `cdp_endpoint` is set, attach to an externally launched Chrome
     via the Chrome DevTools Protocol. Lets the agent reuse the user's real

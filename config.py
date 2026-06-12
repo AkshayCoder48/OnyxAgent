@@ -17,7 +17,7 @@ available_setting = {
     # and channel replies. Options: "auto" (detect from system locale, default),
     # "zh" (Chinese) or "en" (English). An explicit value locks the language.
     # value: auto/en/zh
-    "cow_lang": "auto",
+    "onyx_lang": "auto",
     # openai api config
     "open_ai_api_key": "",  # openai api key
     # openai api base; when use_azure_chatgpt is true, set the matching api base
@@ -199,7 +199,7 @@ available_setting = {
     "weixin_token": "",  # bot_token obtained after WeChat login; leave empty to auto scan-login on startup
     "weixin_base_url": "https://ilinkai.weixin.qq.com",  # Weixin ilink API base URL
     "weixin_cdn_base_url": "https://novac2c.cdn.weixin.qq.com/c2c",  # CDN base URL
-    "weixin_credentials_path": "~/.weixin_cow_credentials.json",  # credentials file path
+    "weixin_credentials_path": "~/.weixin_onyx_credentials.json",  # credentials file path
     # custom trigger words for chatgpt commands
     "clear_memory_commands": ["#清除记忆"],  # session-reset command; must start with #
     # channel config
@@ -247,7 +247,7 @@ available_setting = {
     "web_session_expire_days": 30,  # Auth session expiry in days
     "web_file_serve_root": "~",  # Root dir the /api/file endpoint may serve; "/" allows the whole filesystem
     "agent": True,  # whether to enable Agent mode
-    "agent_workspace": "~/cow",  # agent workspace path, used to store skills, memory, etc.
+    "agent_workspace": "~/onyx",  # agent workspace path, used to store skills, memory, etc.
     "agent_max_context_tokens": 50000,  # max context tokens in Agent mode
     "agent_max_context_turns": 20,  # max context memory turns in Agent mode
     "agent_max_steps": 20,  # max decision steps per run in Agent mode
@@ -418,7 +418,7 @@ def load_config():
 
     # Resolve the global UI language as early as possible so that every
     # downstream layer (logs, CLI, agent prompts, channel replies) shares it.
-    resolved_lang = i18n.resolve_language(config.get("cow_lang", "auto"))
+    resolved_lang = i18n.resolve_language(config.get("onyx_lang", "auto"))
 
     logger.info("[INIT] load config: {}".format(drag_sensitive(config)))
 
@@ -432,7 +432,7 @@ def load_config():
 
     # Agent mode info
     if config.get("agent", True):
-        workspace = config.get("agent_workspace", "~/cow")
+        workspace = config.get("agent_workspace", "~/onyx")
         logger.info("[INIT] Mode: Agent (workspace: {})".format(workspace))
     else:
         logger.info("[INIT] Mode: Chat (set \"agent\":true in config.json to enable Agent mode)")
