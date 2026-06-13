@@ -1061,8 +1061,19 @@ class WebChannel(ChatChannel):
 
     def startup(self):
         configured_host = conf().get("web_host", "")
+        # Check for WEB_HOST env var (for Docker/HF Spaces deployment)
+        env_host = os.environ.get("WEB_HOST", "")
+        if env_host:
+            configured_host = env_host
         host = configured_host or ("0.0.0.0" if _is_password_enabled() else "127.0.0.1")
+        # In containerized environments (Docker, HF Spaces), default to 0.0.0.0
+        if host == "127.0.0.1" and os.path.exists("/.dockerenv"):
+            host = "0.0.0.0"
         port = conf().get("web_port", 9899)
+        # Allow WEB_PORT env var override (HF Spaces uses 7860)
+        env_port = os.environ.get("WEB_PORT", "")
+        if env_port:
+            port = int(env_port)
         is_public_bind = host in ("0.0.0.0", "::")
 
         self._cleanup_stale_voice_recordings()
