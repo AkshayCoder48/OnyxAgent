@@ -6,6 +6,7 @@
   <a href="https://github.com/AkshayCoder48/OnyxAgent/releases/latest"><img src="https://img.shields.io/github/v/release/AkshayCoder48/OnyxAgent?cacheSeconds=3600" alt="Latest release"></a>
   <a href="https://github.com/AkshayCoder48/OnyxAgent/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-rose.svg" alt="License: MIT"></a>
   <a href="https://github.com/AkshayCoder48/OnyxAgent"><img src="https://img.shields.io/github/stars/AkshayCoder48/OnyxAgent?style=flat-square&cacheSeconds=3600" alt="Stars"></a>
+  <a href="https://onyxagent-docs.vercel.app"><img src="https://img.shields.io/badge/Docs-Live-rose?style=flat&logo=vercel" alt="Docs"></a>
   <img src="https://img.shields.io/badge/Fork-OnyxAgent-rose?style=flat&logo=github" alt="OnyxAgent">
 </p>
 
@@ -18,6 +19,7 @@
 OnyxAgent is lightweight, easy to deploy, and built to extend. Plug in any major LLM provider and run it 24/7 on a personal computer or server, across the web and all major IM platforms.
 
 <p align="center">
+  <a href="https://onyxagent-docs.vercel.app">📚 Docs</a> &nbsp;·&nbsp;
   <a href="https://github.com/AkshayCoder48/OnyxAgent">🌐 GitHub</a> &nbsp;·&nbsp;
   <a href="https://github.com/AkshayCoder48/OnyxAgent#-quick-start">🚀 Quick Start</a> &nbsp;·&nbsp;
   <a href="https://github.com/AkshayCoder48/OnyxAgent#-architecture">📖 Architecture</a> &nbsp;·&nbsp;
