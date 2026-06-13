@@ -7,30 +7,30 @@
     "default": "light"
   },
   "colors": {
-    "primary": "#35A85B",
-    "light": "#4ABE6E",
-    "dark": "#228547"
+    "primary": "#e11d48",
+    "light": "#f43f5e",
+    "dark": "#be123c"
   },
   "logo": {
-    "light": "/images/logo.jpg",
-    "dark": "/images/logo.jpg"
+    "light": "/images/onyxagent-logo.svg",
+    "dark": "/images/onyxagent-logo.svg"
   },
   "favicon": "/images/favicon.ico",
   "navbar": {
     "links": [
       {
-        "label": "官网",
-        "href": "https://onyxagent.ai/"
+        "label": "Website",
+        "href": "https://onyxagent-docs.vercel.app"
       },
       {
         "label": "GitHub",
-        "href": "https://github.com/zhayujie/OnyxAgent"
+        "href": "https://github.com/AkshayCoder48/OnyxAgent"
       }
     ]
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/zhayujie/OnyxAgent"
+      "github": "https://github.com/AkshayCoder48/OnyxAgent"
     }
   },
   "redirects": [
@@ -49,11 +49,11 @@
           "links": [
             {
               "label": "Website",
-              "href": "https://onyxagent.ai/"
+              "href": "https://onyxagent-docs.vercel.app"
             },
             {
               "label": "GitHub",
-              "href": "https://github.com/zhayujie/OnyxAgent"
+              "href": "https://github.com/AkshayCoder48/OnyxAgent"
             }
           ]
         },
@@ -265,11 +265,11 @@
           "links": [
             {
               "label": "官网",
-              "href": "https://onyxagent.ai/?lang=zh"
+              "href": "https://onyxagent-docs.vercel.app"
             },
             {
               "label": "GitHub",
-              "href": "https://github.com/zhayujie/OnyxAgent"
+              "href": "https://github.com/AkshayCoder48/OnyxAgent"
             }
           ]
         },
@@ -481,11 +481,11 @@
           "links": [
             {
               "label": "ウェブサイト",
-              "href": "https://onyxagent.ai/"
+              "href": "https://onyxagent-docs.vercel.app"
             },
             {
               "label": "GitHub",
-              "href": "https://github.com/zhayujie/OnyxAgent"
+              "href": "https://github.com/AkshayCoder48/OnyxAgent"
             }
           ]
         },
