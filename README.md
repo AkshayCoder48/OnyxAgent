@@ -7,6 +7,7 @@
   <a href="https://github.com/AkshayCoder48/OnyxAgent/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-rose.svg" alt="License: MIT"></a>
   <a href="https://github.com/AkshayCoder48/OnyxAgent"><img src="https://img.shields.io/github/stars/AkshayCoder48/OnyxAgent?style=flat-square&cacheSeconds=3600" alt="Stars"></a>
   <a href="https://onyxagent-docs.vercel.app"><img src="https://img.shields.io/badge/Docs-Live-rose?style=flat&logo=vercel" alt="Docs"></a>
+  <a href="https://huggingface.co/spaces/Ahhwhwhsbsb7/OnyxAgent"><img src="https://img.shields.io/badge/Demo-HF%20Spaces-rose?style=flat&logo=huggingface" alt="Demo"></a>
   <img src="https://img.shields.io/badge/Fork-OnyxAgent-rose?style=flat&logo=github" alt="OnyxAgent">
 </p>
 
@@ -20,6 +21,7 @@ OnyxAgent is lightweight, easy to deploy, and built to extend. Plug in any major
 
 <p align="center">
   <a href="https://onyxagent-docs.vercel.app">📚 Docs</a> &nbsp;·&nbsp;
+  <a href="https://huggingface.co/spaces/Ahhwhwhsbsb7/OnyxAgent">🎮 Demo</a> &nbsp;·&nbsp;
   <a href="https://github.com/AkshayCoder48/OnyxAgent">🌐 GitHub</a> &nbsp;·&nbsp;
   <a href="https://github.com/AkshayCoder48/OnyxAgent#-quick-start">🚀 Quick Start</a> &nbsp;·&nbsp;
   <a href="https://github.com/AkshayCoder48/OnyxAgent#-architecture">📖 Architecture</a> &nbsp;·&nbsp;
