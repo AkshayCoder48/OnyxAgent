@@ -979,7 +979,7 @@ class OnyxCliPlugin(Plugin):
             lines.append(_t(f"💡 /skill list --remote --page {page - 1}: 上一页", f"💡 /skill list --remote --page {page - 1}: Previous page"))
         lines.append(_t("💡 /skill install <名称>: 安装技能", "💡 /skill install <name>: Install a skill"))
         lines.append(_t("💡 /skill search <关键词>: 搜索技能", "💡 /skill search <keyword>: Search skills"))
-        lines.append(_t("🌐 https://skills.onyxagent.ai  在线浏览全部技能", "🌐 https://skills.onyxagent.ai  Browse all skills online"))
+        lines.append(_t("🌐 http://skills.cowagent.ai  在线浏览全部技能", "🌐 http://skills.cowagent.ai  Browse all skills online"))
         return "\n".join(lines)
 
     def _skill_search(self, query: str) -> str:

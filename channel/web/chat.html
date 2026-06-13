@@ -4,7 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>OnyxAgent Console</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#F43F5E">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="OnyxAgent">
+    <meta name="application-name" content="OnyxAgent">
+    <meta name="msapplication-TileColor" content="#F43F5E">
+    <meta name="msapplication-navbutton-color" content="#F43F5E">
+
+    <!-- PWA Icons -->
     <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+    <link rel="manifest" href="assets/manifest.json">
     <!-- Vendored third-party assets (no external CDN dependency).
          See channel/web/static/vendor/README.md for sources & versions. -->
     <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
@@ -282,6 +297,14 @@
                                                   cursor-pointer transition-colors duration-150"
                         onclick="toggleTheme()">
                     <i id="theme-icon" class="fas fa-moon"></i>
+                </button>
+
+                <!-- PWA Install Button (shown when installable) -->
+                <button id="pwa-install-btn" class="hidden p-2 rounded-lg text-primary-500
+                                                     hover:bg-primary-50 dark:hover:bg-primary-900/20
+                                                     cursor-pointer transition-colors duration-150"
+                        onclick="installPWA()" title="Install App">
+                    <i class="fas fa-download text-base"></i>
                 </button>
 
                 <!-- Docs Link (hidden on mobile) -->
@@ -712,7 +735,7 @@
                                     <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100" data-i18n="skills_title">技能管理</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="skills_desc">查看、启用或禁用 Agent 技能</p>
                                 </div>
-                                <a href="https://skills.onyxagent.ai/" target="_blank"
+                                <a href="http://skills.cowagent.ai/" target="_blank"
                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary-500 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors">
                                     <i class="fas fa-puzzle-piece text-[10px]"></i>
                                     <span data-i18n="skills_hub_btn">探索技能广场</span>
@@ -1251,5 +1274,40 @@
     })();
     </script>
     <script defer src="assets/js/console.js"></script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('assets/sw.js', { scope: '/' })
+                .then(function(reg) {
+                    console.log('[PWA] Service Worker registered:', reg.scope);
+                    // Check for updates periodically
+                    setInterval(function() { reg.update(); }, 30 * 60 * 1000);
+                })
+                .catch(function(err) {
+                    console.warn('[PWA] Service Worker registration failed:', err);
+                });
+        });
+
+        // Handle PWA install prompt
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            window.__onyxInstallPrompt = e;
+            // Show install button after a short delay
+            setTimeout(function() {
+                var btn = document.getElementById('pwa-install-btn');
+                if (btn) btn.classList.remove('hidden');
+            }, 3000);
+        });
+
+        window.addEventListener('appinstalled', function() {
+            console.log('[PWA] App installed');
+            var btn = document.getElementById('pwa-install-btn');
+            if (btn) btn.classList.add('hidden');
+            window.__onyxInstallPrompt = null;
+        });
+    }
+    </script>
 </body>
 </html>

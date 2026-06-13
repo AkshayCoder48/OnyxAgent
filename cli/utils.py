@@ -75,4 +75,4 @@ def ensure_sys_path():
         sys.path.insert(0, root)
 
 
-SKILL_HUB_API = "https://skills.onyxagent.ai/api"
+SKILL_HUB_API = "http://skills.cowagent.ai/api"

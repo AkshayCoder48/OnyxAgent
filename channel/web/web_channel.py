@@ -4462,6 +4462,13 @@ class AssetsHandler:
                 # 默认为二进制流
                 web.header('Content-Type', 'application/octet-stream')
 
+            # PWA: Set correct Content-Type for manifest and service worker
+            if file_path.endswith('manifest.json'):
+                web.header('Content-Type', 'application/manifest+json')
+            elif file_path.endswith('sw.js'):
+                web.header('Content-Type', 'application/javascript')
+                web.header('Service-Worker-Allowed', '/')
+
             # 读取并返回文件内容
             with open(full_path, 'rb') as f:
                 return f.read()

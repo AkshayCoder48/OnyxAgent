@@ -637,6 +637,30 @@ function toggleTheme() {
 }
 
 // =====================================================================
+// PWA Install
+// =====================================================================
+function installPWA() {
+    const prompt = window.__onyxInstallPrompt;
+    if (!prompt) {
+        // Fallback: show instructions
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+            alert('To install OnyxAgent:\n\n1. Tap the Share button (⬆️) in Safari\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" to confirm');
+        } else {
+            alert('To install OnyxAgent:\n\n1. Look for the install icon in your browser\'s address bar\n2. Or use browser menu → "Install app" / "Add to Home Screen"');
+        }
+        return;
+    }
+    prompt.prompt();
+    prompt.userChoice.then((result) => {
+        console.log('[PWA] Install prompt result:', result.outcome);
+        window.__onyxInstallPrompt = null;
+        const btn = document.getElementById('pwa-install-btn');
+        if (btn) btn.classList.add('hidden');
+    });
+}
+
+// =====================================================================
 // Sidebar & Navigation
 // =====================================================================
 const VIEW_META = {

@@ -782,7 +782,7 @@ def _list_remote(page: int = 1):
     if nav_parts:
         click.echo(f"  Navigate: {' | '.join(nav_parts)}")
     click.echo(f"  Install:  onyx skill install <name>")
-    click.echo(f"  Browse:   https://skills.onyxagent.ai\n")
+    click.echo(f"  Browse:   http://skills.cowagent.ai\n")
 
 
 # ------------------------------------------------------------------
