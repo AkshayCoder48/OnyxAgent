@@ -4724,7 +4724,7 @@ function showConfirmDialog({ title, message, okText, cancelText, onConfirm, hide
 // Capability cards rendered on the Models page. Order matters — main model
 // comes first because it transitively decides defaults for vision and image.
 // Icon palette is grouped by capability family:
-//   - chat                       → primary (brand green; the "main" capability)
+//   - chat                       → primary (brand rose; the "main" capability)
 //   - vision + image             → blue    (everything visual)
 //   - asr + tts                  → amber   (everything audio)
 //   - embedding                  → purple  (vectors)
@@ -5646,7 +5646,7 @@ function capabilitySupportsAuto(capId) {
 
 // After initDropdown renders the capability provider menu, decorate each
 // row with the right-aligned configuration cue:
-//   - configured rows: nothing extra — the .active marker (a brand-green ✓)
+//   - configured rows: nothing extra — the .active marker (a brand-rose ✓)
 //     already comes from initDropdown's selected-state CSS for the row the
 //     user currently picked. Other configured rows show no chrome, mirroring
 //     a plain "switch to this" selector.
@@ -5705,7 +5705,7 @@ function decorateCapabilityProviderDropdown(def, ddEl, opts) {
 }
 
 // Lightweight decorator for the "add vendor" modal's provider picker:
-// every configured vendor row gets a trailing brand-green ✓ so the user can
+// every configured vendor row gets a trailing brand-rose ✓ so the user can
 // see at a glance who's already set up, without having to read each row.
 // Unlike decorateCapabilityProviderDropdown we don't hijack clicks here —
 // picking an unconfigured vendor in this modal *is* the intended action.

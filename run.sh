@@ -15,7 +15,7 @@ NC='\033[0m'
 
 # Emojis
 EMOJI_ROCKET="🚀"
-EMOJI_ONYX="🐄"
+EMOJI_ONYX="🟣"
 EMOJI_CHECK="✅"
 EMOJI_CROSS="❌"
 EMOJI_WARN="⚠️"

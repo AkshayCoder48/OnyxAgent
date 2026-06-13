@@ -3323,7 +3323,7 @@ class ChannelsHandler:
         ("weixin", {
             "label": {"zh": "微信", "en": "WeChat"},
             "icon": "fa-comment",
-            "color": "emerald",
+            "color": "rose",
             "fields": [],
         }),
         ("feishu", {
@@ -3347,7 +3347,7 @@ class ChannelsHandler:
         ("wecom_bot", {
             "label": {"zh": "企微智能机器人", "en": "WeCom Bot"},
             "icon": "fa-robot",
-            "color": "emerald",
+            "color": "rose",
             "fields": [
                 {"key": "wecom_bot_id", "label": "Bot ID", "type": "text"},
                 {"key": "wecom_bot_secret", "label": "Secret", "type": "secret"},
@@ -3365,7 +3365,7 @@ class ChannelsHandler:
         ("wechatcom_app", {
             "label": {"zh": "企微自建应用", "en": "WeCom App"},
             "icon": "fa-building",
-            "color": "emerald",
+            "color": "rose",
             "fields": [
                 {"key": "wechatcom_corp_id", "label": "Corp ID", "type": "text"},
                 {"key": "wechatcomapp_agent_id", "label": "Agent ID", "type": "text"},
@@ -3378,7 +3378,7 @@ class ChannelsHandler:
         ("wechat_kf", {
             "label": {"zh": "微信客服", "en": "WeChat Customer Service"},
             "icon": "fa-headset",
-            "color": "emerald",
+            "color": "rose",
             "fields": [
                 {"key": "wechat_kf_corp_id", "label": "Corp ID", "type": "text"},
                 {"key": "wechat_kf_secret", "label": "Secret", "type": "secret"},
@@ -3390,7 +3390,7 @@ class ChannelsHandler:
         ("wechatmp", {
             "label": {"zh": "公众号", "en": "WeChat MP"},
             "icon": "fa-comment-dots",
-            "color": "emerald",
+            "color": "rose",
             "fields": [
                 {"key": "wechatmp_app_id", "label": "App ID", "type": "text"},
                 {"key": "wechatmp_app_secret", "label": "App Secret", "type": "secret"},

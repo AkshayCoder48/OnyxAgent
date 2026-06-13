@@ -8,7 +8,7 @@ description: 手动部署 OnyxAgent（源码 / Docker）
 ### 1. 克隆项目代码
 
 ```bash
-git clone https://github.com/zhayujie/OnyxAgent
+git clone https://github.com/AkshayCoder48/OnyxAgent
 cd OnyxAgent/
 ```
 
@@ -111,7 +111,7 @@ nohup python3 app.py & tail -f nohup.out
 **1. 下载配置文件**
 
 ```bash
-curl -O https://cdn.link-ai.tech/cod./onyx/docker-compose.yml
+git clone https://github.com/AkshayCoder48/OnyxAgent.git && cd OnyxAgent
 ```
 
 打开 `docker-compose.yml` 填写所需配置。
@@ -125,7 +125,7 @@ sudo docker compose up -d
 **3. 查看日志**
 
 ```bash
-sudo docker logs -f chatgpt-on-wechat
+sudo docker logs -f onyxagent
 ```
 
 <Tip>
@@ -178,5 +178,5 @@ sudo docker logs -f chatgpt-on-wechat
 | `onyx_lang` | `Onyx_LANG` | 界面、命令文案、系统提示词等的语言，`auto` 自动检测，可设为 `zh` / `en` | `auto` |
 
 <Tip>
-  全部配置项可在项目 [`config.py`](https://github.com/zhayujie/OnyxAgent/blob/master/config.py) 文件中查看。Docker 部署时，配置项名称需转为大写环境变量格式。
+  全部配置项可在项目 [`config.py`](https://github.com/AkshayCoder48/OnyxAgent/blob/master/config.py) 文件中查看。Docker 部署时，配置项名称需转为大写环境变量格式。
 </Tip>

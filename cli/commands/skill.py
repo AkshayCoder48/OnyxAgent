@@ -328,7 +328,7 @@ def _install_local(path: str, result: InstallResult):
 def _register_installed_skill(name: str, source: str = "onyxhub", display_name: str = ""):
     """Register a newly installed skill into skills_config.json.
 
-    source values: builtin, cow, github, clawhub, linkai, local, url
+    source values: builtin, onyx, github, clawhub, linkai, local, url
     """
     skills_dir = get_skills_dir()
     config_path = os.path.join(skills_dir, "skills_config.json")

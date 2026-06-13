@@ -9,27 +9,23 @@ Supports Linux, macOS, and Windows. Requires Python 3.7-3.13 (3.9 recommended).
 
 ## Install Command
 
-<Tabs>
-  <Tab title="Linux / macOS">
-    ```bash
-    bash <(curl -fsSL https://cdn.link-ai.tech/cod./onyx/run.sh)
-    ```
-  </Tab>
-  <Tab title="Windows (PowerShell)">
-    ```powershell
-    irm https://cdn.link-ai.tech/cod./onyx/run.ps1 | iex
-    ```
-  </Tab>
-</Tabs>
+Clone the repository and install dependencies:
 
-The script automatically performs these steps:
+```bash
+git clone https://github.com/AkshayCoder48/OnyxAgent.git
+cd OnyxAgent
+pip install -r requirements.txt
+cp config-template.json config.json
+python app.py
+```
+
+The setup automatically performs these steps:
 
 1. Check Python environment (requires Python 3.7+)
-2. Install required tools (git, curl, etc.)
-3. Clone project to `~/OnyxAgent`
-4. Install Python dependencies and Onyx CLI
-5. Guided configuration for AI model and channel
-6. Start service
+2. Clone project from GitHub
+3. Install Python dependencies and Onyx CLI
+4. Guided configuration for AI model and channel
+5. Start service
 
 By default, the Web console starts after installation. Access `http://localhost:9899` to begin chatting.
 

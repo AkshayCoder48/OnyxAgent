@@ -3,8 +3,10 @@
 .SYNOPSIS
     OnyxAgent installer & management script for Windows.
 .DESCRIPTION
-    One-liner install:
-      irm https://cdn.link-ai.tech/cod./onyx/run.ps1 | iex
+    Install from GitHub:
+      git clone https://github.com/AkshayCoder48/OnyxAgent.git
+      cd OnyxAgent
+      .\scripts\run.ps1
     Or from a local clone:
       .\scripts\run.ps1              # install / configure
       .\scripts\run.ps1 start        # start service  (delegates to onyx CLI)

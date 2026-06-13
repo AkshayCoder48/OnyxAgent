@@ -8,7 +8,7 @@ description: Deploy OnyxAgent manually (source code / Docker)
 ### 1. Clone the project
 
 ```bash
-git clone https://github.com/zhayujie/OnyxAgent
+git clone https://github.com/AkshayCoder48/OnyxAgent
 cd OnyxAgent/
 ```
 
@@ -95,7 +95,7 @@ Docker deployment does not require cloning source code or installing dependencie
 **1. Download config**
 
 ```bash
-curl -O https://cdn.link-ai.tech/cod./onyx/docker-compose.yml
+git clone https://github.com/AkshayCoder48/OnyxAgent.git && cd OnyxAgent
 ```
 
 Edit `docker-compose.yml` with your configuration.
@@ -109,7 +109,7 @@ sudo docker compose up -d
 **3. View logs**
 
 ```bash
-sudo docker logs -f chatgpt-on-wechat
+sudo docker logs -f onyxagent
 ```
 
 <Tip>
@@ -144,5 +144,5 @@ sudo docker logs -f chatgpt-on-wechat
 | `onyx_lang` | Language for the UI, command text and system prompts; `auto` to detect, or set `zh` / `en` | `auto` |
 
 <Tip>
-  Full configuration options are in the project [`config.py`](https://github.com/zhayujie/OnyxAgent/blob/master/config.py).
+  Full configuration options are in the project [`config.py`](https://github.com/AkshayCoder48/OnyxAgent/blob/master/config.py).
 </Tip>

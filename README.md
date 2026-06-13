@@ -6,7 +6,7 @@
   <a href="https://github.com/AkshayCoder48/OnyxAgent/releases/latest"><img src="https://img.shields.io/github/v/release/AkshayCoder48/OnyxAgent?cacheSeconds=3600" alt="Latest release"></a>
   <a href="https://github.com/AkshayCoder48/OnyxAgent/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-rose.svg" alt="License: MIT"></a>
   <a href="https://github.com/AkshayCoder48/OnyxAgent"><img src="https://img.shields.io/github/stars/AkshayCoder48/OnyxAgent?style=flat-square&cacheSeconds=3600" alt="Stars"></a>
-  <img src="https://img.shields.io/badge/Fork-CowAgent-rose?style=flat&logo=github" alt="Fork of CowAgent">
+  <img src="https://img.shields.io/badge/Fork-OnyxAgent-rose?style=flat&logo=github" alt="OnyxAgent">
 </p>
 
 <p align="center">
