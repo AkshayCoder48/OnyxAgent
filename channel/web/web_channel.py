@@ -1186,7 +1186,25 @@ class WebChannel(ChatChannel):
         logging.getLogger("web.httpserver").setLevel(logging.ERROR)
 
         # Build WSGI app with middleware (same as runsimple but without print)
-        func = web.httpserver.StaticMiddleware(app.wsgifunc())
+        wsgi_func = app.wsgifunc()
+
+        # Inject headers that allow the app to be embedded in iframes
+        # (required for HuggingFace Spaces and similar platforms).
+        def _iframe_headers_middleware(environ, start_response):
+            def custom_start_response(status, headers, exc_info=None):
+                # Remove any existing X-Frame-Options / CSP frame-ancestors
+                headers = [
+                    (k, v) for k, v in headers
+                    if k.lower() not in ('x-frame-options', 'content-security-policy')
+                ]
+                # Allow embedding from any origin (HF Spaces uses iframes)
+                headers.append(('X-Frame-Options', 'ALLOWALL'))
+                headers.append(('Content-Security-Policy',
+                                "frame-ancestors 'self' https://*.huggingface.co https://huggingface.co *;"))
+                return start_response(status, headers, exc_info)
+            return wsgi_func(environ, custom_start_response)
+
+        func = web.httpserver.StaticMiddleware(_iframe_headers_middleware)
         func = web.httpserver.LogMiddleware(func)
         server = web.httpserver.WSGIServer((host, port), func)
         server.daemon_threads = True

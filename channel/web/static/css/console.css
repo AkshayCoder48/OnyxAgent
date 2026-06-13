@@ -61,7 +61,7 @@
     background: rgba(255, 255, 255, 0.08);
     color: #FFFFFF;
 }
-.sidebar-item.active .item-icon { color: #4ABE6E; }
+.sidebar-item.active .item-icon { color: #FB7185; }
 
 /* Session Panel */
 .session-panel {
@@ -212,7 +212,7 @@
     text-align: center;
 }
 .dark .session-icon { color: #525252; }
-.session-item.active .session-icon { color: #4ABE6E; }
+.session-item.active .session-icon { color: #FB7185; }
 .session-title {
     flex: 1;
     min-width: 0;
@@ -405,18 +405,18 @@
     font-size: 0.875em;
 }
 .msg-content :not(pre) > code {
-    background: rgba(74, 190, 110, 0.1); color: #1C6B3B;
+    background: rgba(251, 113, 133, 0.1); color: #BE123C;
     padding: 2px 6px; border-radius: 4px;
 }
 .dark .msg-content :not(pre) > code {
-    background: rgba(74, 190, 110, 0.15); color: #74E9A4;
+    background: rgba(251, 113, 133, 0.15); color: #FDA4AF;
 }
 .msg-content pre code { background: transparent; padding: 0; color: inherit; }
 .msg-content blockquote {
-    border-left: 3px solid #4ABE6E; padding: 0.5em 1em;
-    margin: 0.8em 0; background: rgba(74, 190, 110, 0.05); border-radius: 0 6px 6px 0;
+    border-left: 3px solid #FB7185; padding: 0.5em 1em;
+    margin: 0.8em 0; background: rgba(251, 113, 133, 0.05); border-radius: 0 6px 6px 0;
 }
-.dark .msg-content blockquote { background: rgba(74, 190, 110, 0.08); }
+.dark .msg-content blockquote { background: rgba(251, 113, 133, 0.08); }
 .msg-content table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
 .msg-content th, .msg-content td {
     border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left;
@@ -441,7 +441,7 @@
     content: '▋';
     display: inline-block;
     margin-left: 2px;
-    color: #4ABE6E;
+    color: #FB7185;
     animation: blink 0.9s step-end infinite;
     font-size: 0.85em;
     vertical-align: middle;
@@ -637,8 +637,8 @@
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 #view-config input:focus {
-    border-color: #4ABE6E;
-    box-shadow: 0 0 0 3px rgba(74, 190, 110, 0.12);
+    border-color: #FB7185;
+    box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.12);
 }
 #view-config input[type="text"]:hover,
 #view-config input[type="number"]:hover,
@@ -680,8 +680,8 @@
 .dark .cfg-dropdown-selected:hover { border-color: #64748b; }
 .cfg-dropdown.open .cfg-dropdown-selected,
 .cfg-dropdown:focus .cfg-dropdown-selected {
-    border-color: #4ABE6E;
-    box-shadow: 0 0 0 3px rgba(74, 190, 110, 0.12);
+    border-color: #FB7185;
+    box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.12);
 }
 .cfg-dropdown-arrow {
     font-size: 0.625rem;
@@ -729,13 +729,13 @@
 .cfg-dropdown-item:hover { background: #f1f5f9; }
 .dark .cfg-dropdown-item:hover { background: rgba(255, 255, 255, 0.08); }
 .cfg-dropdown-item.active {
-    background: rgba(74, 190, 110, 0.1);
+    background: rgba(251, 113, 133, 0.1);
     color: #be123c;
     font-weight: 500;
 }
 .dark .cfg-dropdown-item.active {
-    background: rgba(74, 190, 110, 0.15);
-    color: #74E9A4;
+    background: rgba(251, 113, 133, 0.15);
+    color: #FDA4AF;
 }
 /* When an item carries a hint (e.g. brand alias next to a technical model
    id), label/hint are split into two spans so the hint sits on the right in
@@ -921,7 +921,7 @@
     text-align: left;
 }
 .attach-menu-item:hover {
-    background: #EDFDF3;
+    background: #FFF1F2;
     color: #be123c;
 }
 .attach-menu-item i {
@@ -987,8 +987,8 @@
 
 /* Drag-over highlight */
 .drag-over {
-    background: rgba(74, 190, 110, 0.08) !important;
-    border-color: #4ABE6E !important;
+    background: rgba(251, 113, 133, 0.08) !important;
+    border-color: #FB7185 !important;
 }
 
 /* User message attachments */
@@ -1068,7 +1068,7 @@
 }
 .slash-menu-item:hover,
 .slash-menu-item.active {
-    background: #EDFDF3;
+    background: #FFF1F2;
 }
 .slash-menu-item .cmd {
     font-size: 13px;
@@ -1097,13 +1097,13 @@
 }
 .dark .slash-menu-item:hover,
 .dark .slash-menu-item.active {
-    background: rgba(74, 190, 110, 0.1);
+    background: rgba(251, 113, 133, 0.1);
 }
 .dark .slash-menu-item .cmd {
     color: #e2e8f0;
 }
 .dark .slash-menu-item.active .cmd {
-    color: #4ABE6E;
+    color: #FB7185;
 }
 .dark .slash-menu-item .desc {
     color: #64748b;
@@ -1121,8 +1121,8 @@
     color: #94a3b8;
 }
 .dark .attach-menu-item:hover {
-    background: rgba(74, 190, 110, 0.1);
-    color: #4ABE6E;
+    background: rgba(251, 113, 133, 0.1);
+    color: #FB7185;
 }
 
 /* ============================================================
@@ -1208,7 +1208,7 @@
     color: #334155;
 }
 .knowledge-tree-file.active {
-    background: #EDFDF3;
+    background: #FFF1F2;
     color: #be123c;
 }
 .dark .knowledge-tree-file:hover {
@@ -1216,8 +1216,8 @@
     color: #e2e8f0;
 }
 .dark .knowledge-tree-file.active {
-    background: rgba(74, 190, 110, 0.1);
-    color: #4ABE6E;
+    background: rgba(251, 113, 133, 0.1);
+    color: #FB7185;
 }
 
 /* Graph legend */
