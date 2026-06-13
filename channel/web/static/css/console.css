@@ -2,6 +2,79 @@
    OnyxAgent Console Styles
    ===================================================================== */
 
+/* Mobile-First Viewport Fix */
+/* Fallback for browsers that don't support dvh */
+:root {
+    --app-height: 100vh;
+}
+/* Use dvh where supported for mobile browser chrome */
+@supports (height: 100dvh) {
+    :root { --app-height: 100dvh; }
+}
+body, #app, #main-content {
+    height: var(--app-height) !important;
+}
+/* Ensure the main content area fills available space correctly */
+#content-area {
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* critical for flex overflow */
+}
+/* Chat view must fill the content-area */
+#view-chat {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0; /* allow shrinking */
+    overflow: hidden;
+}
+#view-chat.active {
+    display: flex;
+}
+/* Chat messages area should scroll, input stays fixed */
+#chat-messages {
+    flex: 1;
+    min-height: 0; /* allow shrinking */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* smooth scroll on iOS */
+}
+/* Mobile: ensure input bar is always visible */
+#view-chat > .flex-shrink-0:last-child {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 5;
+}
+/* Safe area for phones with notches/home indicators */
+@supports (padding: env(safe-area-inset-bottom)) {
+    #view-chat > .flex-shrink-0:last-child {
+        padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    }
+}
+
+/* Mobile header - make it more compact */
+@media (max-width: 640px) {
+    header {
+        height: 48px !important;
+        min-height: 48px;
+        gap: 0.25rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    header button, header a {
+        padding: 0.375rem !important;
+    }
+    #lang-toggle span {
+        display: none;
+    }
+    #docs-link, #view-config a[title="Website"], #view-config a[title="GitHub"] {
+        display: none;
+    }
+    /* Hide less important header icons on very small screens */
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
 /* Animations */
 @keyframes pulseDot {
     0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
@@ -877,9 +950,19 @@
 
 /* Chat Input */
 #chat-input {
-    resize: none; height: 42px; max-height: 180px;
+    resize: none; height: 38px; max-height: 180px;
     overflow-y: hidden;
     transition: border-color 0.2s ease;
+}
+@media (min-width: 640px) {
+    #chat-input { height: 42px; }
+}
+
+/* Mobile: when virtual keyboard is open, shrink the layout */
+@media (max-height: 400px) {
+    header { height: 40px !important; min-height: 40px !important; }
+    #view-chat > .flex-shrink-0:last-child { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+    #welcome-screen { display: none !important; }
 }
 
 /* Attachment Preview Bar */

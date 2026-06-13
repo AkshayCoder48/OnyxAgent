@@ -2,7 +2,7 @@
 <html lang="zh" class="">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>OnyxAgent Console</title>
     <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
     <!-- Vendored third-party assets (no external CDN dependency).
@@ -74,7 +74,7 @@
     })();
     </script>
 </head>
-<body class="h-screen overflow-hidden bg-gray-50 dark:bg-[#111111] text-slate-800 dark:text-slate-200 font-sans">
+<body class="h-dvh overflow-hidden bg-gray-50 dark:bg-[#111111] text-slate-800 dark:text-slate-200 font-sans">
 
     <!-- Login Overlay -->
     <div id="login-overlay" class="fixed inset-0 z-[200] bg-gray-50 dark:bg-[#111111] flex items-center justify-center hidden">
@@ -110,7 +110,7 @@
         </div>
     </div>
 
-    <div id="app" class="flex h-screen">
+    <div id="app" class="flex h-dvh">
 
         <!-- ================================================================ -->
         <!-- SIDEBAR                                                          -->
@@ -243,9 +243,9 @@
         <!-- ================================================================ -->
         <!-- MAIN CONTENT                                                     -->
         <!-- ================================================================ -->
-        <div id="main-content" class="flex-1 flex flex-col min-w-0 h-screen">
+        <div id="main-content" class="flex-1 flex flex-col min-w-0 h-dvh">
             <!-- Top Header -->
-            <header class="h-14 flex items-center gap-3 px-4 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] flex-shrink-0 z-10">
+            <header class="h-14 sm:h-14 flex items-center gap-2 sm:gap-3 px-2 sm:px-4 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] flex-shrink-0 z-10">
                 <!-- Mobile menu toggle -->
                 <button id="menu-toggle" class="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer transition-colors duration-150"
                         onclick="toggleSidebar()">
@@ -284,23 +284,23 @@
                     <i id="theme-icon" class="fas fa-moon"></i>
                 </button>
 
-                <!-- Docs Link -->
+                <!-- Docs Link (hidden on mobile) -->
                 <a id="docs-link" href="https://docs.onyxagent.ai" target="_blank" rel="noopener noreferrer"
-                   class="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
+                   class="hidden sm:flex p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
                           cursor-pointer transition-colors duration-150" title="Documentation">
                     <i class="fas fa-book text-base"></i>
                 </a>
 
-                <!-- Website Link -->
+                <!-- Website Link (hidden on mobile) -->
                 <a href="https://onyxagent.ai" target="_blank" rel="noopener noreferrer"
-                   class="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
+                   class="hidden sm:flex p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
                           cursor-pointer transition-colors duration-150" title="Website">
                     <i class="fas fa-home text-base"></i>
                 </a>
 
-                <!-- GitHub Link -->
+                <!-- GitHub Link (hidden on mobile) -->
                 <a href="https://github.com/AkshayCoder48/OnyxAgent" target="_blank" rel="noopener noreferrer"
-                   class="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
+                   class="hidden sm:flex p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
                           cursor-pointer transition-colors duration-150" title="GitHub">
                     <i class="fab fa-github text-lg"></i>
                 </a>
@@ -316,14 +316,14 @@
                     <!-- Messages -->
                     <div id="chat-messages" class="flex-1 overflow-y-auto">
                         <!-- Welcome Screen -->
-                        <div id="welcome-screen" class="flex flex-col items-center justify-center h-full px-6 pb-16" style="padding-top: 6vh">
-                            <img src="assets/logo.jpg" alt="OnyxAgent" class="w-16 h-16 rounded-2xl mb-6 shadow-lg shadow-primary-500/20">
-                            <h1 id="welcome-title" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-3">OnyxAgent</h1>
-                            <p id="welcome-subtitle" class="text-slate-500 dark:text-slate-400 text-center max-w-lg mb-10 leading-relaxed"
+                        <div id="welcome-screen" class="flex flex-col items-center justify-center h-full px-4 sm:px-6 pb-8 sm:pb-16" style="padding-top: 2vh">
+                            <img src="assets/logo.jpg" alt="OnyxAgent" class="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl mb-3 sm:mb-6 shadow-lg shadow-primary-500/20">
+                            <h1 id="welcome-title" class="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2 sm:mb-3">OnyxAgent</h1>
+                            <p id="welcome-subtitle" class="text-slate-500 dark:text-slate-400 text-center max-w-lg mb-4 sm:mb-10 leading-relaxed text-sm sm:text-base"
                                data-i18n-html="welcome_subtitle">我可以帮你解答问题、管理计算机、创造和执行技能，并通过<br>长期记忆和知识库不断成长</p>
 
-                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-2xl">
-                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 w-full max-w-2xl">
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-3 sm:p-4
                                             cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
                                     <div class="flex items-center gap-2 mb-2">
                                         <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
@@ -401,30 +401,30 @@
                     </button>
 
                     <!-- Chat Input -->
-                    <div class="flex-shrink-0 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] px-4 py-3">
+                    <div class="flex-shrink-0 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] px-2 sm:px-4 py-2 sm:py-3">
                         <div class="max-w-3xl mx-auto">
                             <!-- Attachment preview bar -->
                             <div id="attachment-preview" class="attachment-preview hidden"></div>
-                            <div class="flex items-center gap-2 relative">
+                            <div class="flex items-center gap-1 sm:gap-2 relative">
                                 <div class="flex items-center flex-shrink-0">
-                                    <button id="new-chat-btn" class="w-9 h-10 flex items-center justify-center rounded-lg
+                                    <button id="new-chat-btn" class="w-8 h-9 sm:w-9 sm:h-10 flex items-center justify-center rounded-lg
                                                                      text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20
                                                                      cursor-pointer transition-colors duration-150"
                                             onclick="newChat()">
-                                        <i class="fas fa-plus text-base"></i>
+                                        <i class="fas fa-plus text-sm sm:text-base"></i>
                                     </button>
-                                    <button id="clear-context-btn" class="w-9 h-10 flex items-center justify-center rounded-lg
+                                    <button id="clear-context-btn" class="hidden sm:flex w-9 h-10 items-center justify-center rounded-lg
                                                                           text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20
                                                                           cursor-pointer transition-colors duration-150"
                                             onclick="clearContext()">
                                         <i class="fas fa-trash-can text-base"></i>
                                     </button>
-                                    <button id="attach-btn" class="w-9 h-10 flex items-center justify-center rounded-lg
+                                    <button id="attach-btn" class="w-8 h-9 sm:w-9 sm:h-10 flex items-center justify-center rounded-lg
                                                                    text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20
                                                                    cursor-pointer transition-colors duration-150"
                                             type="button"
                                             onclick="toggleAttachMenu(event)">
-                                        <i class="fas fa-paperclip text-base"></i>
+                                        <i class="fas fa-paperclip text-sm sm:text-base"></i>
                                     </button>
                                 </div>
                                 <input type="file" id="file-input" class="hidden" multiple
@@ -443,7 +443,7 @@
                                 <div id="slash-menu" class="slash-menu hidden"></div>
                                 <div class="flex-1 min-w-0 relative flex items-center">
                                     <textarea id="chat-input"
-                                              class="w-full pl-4 pr-11 py-[10px] rounded-xl border border-slate-200 dark:border-slate-600
+                                              class="w-full pl-3 sm:pl-4 pr-10 sm:pr-11 py-2 sm:py-[10px] rounded-xl border border-slate-200 dark:border-slate-600
                                                      bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-100
                                                      placeholder:text-slate-400 dark:placeholder:text-slate-500
                                                      focus:outline-none focus:ring-0 focus:border-primary-600
@@ -452,20 +452,20 @@
                                               data-i18n-placeholder="input_placeholder"
                                               placeholder="输入消息，或输入 / 使用指令"></textarea>
                                     <button id="mic-btn" type="button"
-                                            class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg
+                                            class="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg
                                                    text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20
                                                    cursor-pointer transition-colors duration-150"
                                             data-i18n-title="mic_idle_title" title="点击录音 / 再按一次结束">
-                                        <i class="fas fa-microphone text-sm"></i>
+                                        <i class="fas fa-microphone text-xs sm:text-sm"></i>
                                     </button>
                                 </div>
                                 <button id="send-btn"
-                                        class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg
+                                        class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg
                                                bg-primary-400 text-white hover:bg-primary-500
                                                disabled:bg-slate-300 dark:disabled:bg-slate-600
                                                disabled:cursor-not-allowed cursor-pointer transition-colors duration-150"
                                         disabled>
-                                    <i class="fas fa-paper-plane text-sm"></i>
+                                    <i class="fas fa-paper-plane text-xs sm:text-sm"></i>
                                 </button>
                             </div>
                         </div>
@@ -1225,6 +1225,31 @@
         </div>
     </div>
 
+    <!-- Mobile viewport fix: handle virtual keyboard on phones -->
+    <script>
+    (function() {
+        function setVH() {
+            var vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', vh + 'px');
+            // Also update --app-height for our CSS fallback
+            document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+        }
+        setVH();
+        window.addEventListener('resize', setVH);
+        // Use visualViewport for better mobile keyboard handling
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', function() {
+                var vv = window.visualViewport;
+                document.documentElement.style.setProperty('--app-height', vv.height + 'px');
+                // When keyboard opens, scroll input into view
+                var chatInput = document.getElementById('chat-input');
+                if (chatInput && document.activeElement === chatInput) {
+                    chatInput.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            });
+        }
+    })();
+    </script>
     <script defer src="assets/js/console.js"></script>
 </body>
 </html>
