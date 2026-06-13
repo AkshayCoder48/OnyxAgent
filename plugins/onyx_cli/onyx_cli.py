@@ -935,11 +935,11 @@ class OnyxCliPlugin(Plugin):
 
     def _skill_list_remote(self, page: int = 1) -> str:
         import requests
-        from cli.utils import SKILL_HUB_API, load_skills_config
+        from cli.utils import SKILL_HUB_API, CLAWHUB_API, load_skills_config
         page_size = self._REMOTE_PAGE_SIZE
         try:
             resp = requests.get(
-                f"{SKILL_HUB_API}/skills",
+                f"{CLAWHUB_API}/skills",
                 params={"page": page, "limit": page_size},
                 timeout=10,
             )
@@ -979,7 +979,7 @@ class OnyxCliPlugin(Plugin):
             lines.append(_t(f"💡 /skill list --remote --page {page - 1}: 上一页", f"💡 /skill list --remote --page {page - 1}: Previous page"))
         lines.append(_t("💡 /skill install <名称>: 安装技能", "💡 /skill install <name>: Install a skill"))
         lines.append(_t("💡 /skill search <关键词>: 搜索技能", "💡 /skill search <keyword>: Search skills"))
-        lines.append(_t("🌐 http://skills.cowagent.ai  在线浏览全部技能", "🌐 http://skills.cowagent.ai  Browse all skills online"))
+        lines.append(_t("🌐 https://clawhub.ai  在线浏览全部技能", "🌐 https://clawhub.ai  Browse all skills online"))
         return "\n".join(lines)
 
     def _skill_search(self, query: str) -> str:
@@ -987,9 +987,9 @@ class OnyxCliPlugin(Plugin):
             return _t("请指定搜索关键词: /skill search <关键词>", "Please specify a search keyword: /skill search <keyword>")
 
         import requests
-        from cli.utils import SKILL_HUB_API, load_skills_config
+        from cli.utils import SKILL_HUB_API, CLAWHUB_API, load_skills_config
         try:
-            resp = requests.get(f"{SKILL_HUB_API}/skills/search", params={"q": query}, timeout=10)
+            resp = requests.get(f"{CLAWHUB_API}/skills/search", params={"q": query}, timeout=10)
             resp.raise_for_status()
             skills = resp.json().get("skills", [])
         except Exception as e:

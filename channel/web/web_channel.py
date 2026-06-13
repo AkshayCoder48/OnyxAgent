@@ -1174,6 +1174,13 @@ class WebChannel(ChatChannel):
             '/api/messages/delete', 'MessageDeleteHandler',
             '/api/logs', 'LogsHandler',
             '/api/version', 'VersionHandler',
+            '/api/files/list', 'FilesListHandler',
+            '/api/files/read', 'FilesReadHandler',
+            '/api/files/write', 'FilesWriteHandler',
+            '/api/files/delete', 'FilesDeleteHandler',
+            '/api/files/rename', 'FilesRenameHandler',
+            '/api/files/mkdir', 'FilesMkdirHandler',
+            '/api/files/download', 'FilesDownloadHandler',
             '/assets/(.*)', 'AssetsHandler',
         )
         app = web.application(urls, globals(), autoreload=False)
@@ -4531,3 +4538,309 @@ class VersionHandler:
         web.header('Content-Type', 'application/json; charset=utf-8')
         from cli import __version__
         return json.dumps({"version": __version__})
+
+
+# =====================================================================
+# File System Browser API
+# =====================================================================
+
+def _files_workspace_root():
+    """Return the allowed root directory for file operations."""
+    from common.utils import expand_path
+    return expand_path(conf().get("agent_workspace", "~/onyx"))
+
+
+def _safe_path(requested_path, allow_create=False):
+    """Resolve and validate a path is within the workspace root.
+    Returns (resolved_path, error_response).
+    If error_response is not None, the path is unsafe."""
+    root = os.path.realpath(_files_workspace_root())
+    if not requested_path:
+        return root, None
+    # Allow both absolute and relative (to workspace root) paths
+    if os.path.isabs(requested_path):
+        resolved = os.path.realpath(requested_path)
+    else:
+        resolved = os.path.realpath(os.path.join(root, requested_path))
+    # Security: ensure the path is within the workspace root
+    if not (resolved == root or resolved.startswith(root + os.sep)):
+        return None, json.dumps({"status": "error", "message": "Path is outside the workspace"})
+    if not allow_create and not os.path.exists(resolved):
+        return None, json.dumps({"status": "error", "message": "Path does not exist"})
+    return resolved, None
+
+
+class FilesListHandler:
+    """List directory contents. GET /api/files/list?path=<dir>&depth=<1|2>"""
+    def GET(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        params = web.input(path="", depth="1")
+        req_path = params.path.strip() or "."
+        try:
+            depth = int(params.depth)
+        except ValueError:
+            depth = 1
+        depth = max(1, min(depth, 3))
+
+        resolved, err = _safe_path(req_path)
+        if err:
+            return err
+
+        if not os.path.isdir(resolved):
+            return json.dumps({"status": "error", "message": "Not a directory"})
+
+        def scan_dir(dir_path, current_depth):
+            entries = []
+            try:
+                items = sorted(os.listdir(dir_path))
+            except PermissionError:
+                return entries
+            for item in items:
+                # Skip hidden files/dirs
+                if item.startswith('.'):
+                    continue
+                full = os.path.join(dir_path, item)
+                try:
+                    stat = os.stat(full)
+                    is_dir = os.path.isdir(full)
+                    entry = {
+                        "name": item,
+                        "path": os.path.relpath(full, _files_workspace_root()),
+                        "is_dir": is_dir,
+                        "size": stat.st_size if not is_dir else 0,
+                        "modified": datetime.datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    }
+                    if is_dir and current_depth < depth:
+                        entry["children"] = scan_dir(full, current_depth + 1)
+                    entries.append(entry)
+                except (PermissionError, OSError):
+                    continue
+            return entries
+
+        result = {
+            "status": "success",
+            "root": os.path.relpath(resolved, _files_workspace_root()) or ".",
+            "workspace": _files_workspace_root(),
+            "entries": scan_dir(resolved, 1),
+        }
+        return json.dumps(result, ensure_ascii=False)
+
+
+class FilesReadHandler:
+    """Read file content. GET /api/files/read?path=<file>"""
+    def GET(self):
+        _require_auth()
+        params = web.input(path="")
+        resolved, err = _safe_path(params.path)
+        if err:
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return err
+        if os.path.isdir(resolved):
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return json.dumps({"status": "error", "message": "Cannot read a directory"})
+        if not os.path.isfile(resolved):
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return json.dumps({"status": "error", "message": "File not found"})
+
+        # Check file size (limit to 2MB for text reading)
+        file_size = os.path.getsize(resolved)
+        if file_size > 2 * 1024 * 1024:
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return json.dumps({"status": "error", "message": "File too large (>2MB). Use download instead."})
+
+        try:
+            # Try UTF-8 first, fall back to latin-1
+            try:
+                with open(resolved, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                encoding = 'utf-8'
+            except UnicodeDecodeError:
+                with open(resolved, 'rb') as f:
+                    content = f.read().decode('latin-1')
+                encoding = 'latin-1'
+
+            # Detect if binary
+            is_binary = '\x00' in content[:8192]
+
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return json.dumps({
+                "status": "success",
+                "path": params.path,
+                "content": content if not is_binary else "[Binary file - use download]",
+                "encoding": encoding,
+                "is_binary": is_binary,
+                "size": file_size,
+            }, ensure_ascii=False)
+        except Exception as e:
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class FilesWriteHandler:
+    """Write/update file content. POST /api/files/write {path, content}"""
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            data = json.loads(web.data().decode('utf-8'))
+        except Exception:
+            return json.dumps({"status": "error", "message": "Invalid JSON body"})
+
+        path = data.get("path", "").strip()
+        content = data.get("content", "")
+
+        resolved, err = _safe_path(path, allow_create=True)
+        if err:
+            return err
+
+        # Security: don't allow writing outside workspace
+        root = os.path.realpath(_files_workspace_root())
+        if not (resolved == root or resolved.startswith(root + os.sep)):
+            return json.dumps({"status": "error", "message": "Path is outside the workspace"})
+
+        try:
+            # Auto-create parent directories
+            parent = os.path.dirname(resolved)
+            os.makedirs(parent, exist_ok=True)
+            with open(resolved, 'w', encoding='utf-8') as f:
+                f.write(content)
+            return json.dumps({"status": "success", "message": "File saved", "path": path})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class FilesDeleteHandler:
+    """Delete a file or directory. POST /api/files/delete {path}"""
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            data = json.loads(web.data().decode('utf-8'))
+        except Exception:
+            return json.dumps({"status": "error", "message": "Invalid JSON body"})
+
+        path = data.get("path", "").strip()
+        resolved, err = _safe_path(path)
+        if err:
+            return err
+
+        # Don't allow deleting the workspace root itself
+        if resolved == os.path.realpath(_files_workspace_root()):
+            return json.dumps({"status": "error", "message": "Cannot delete the workspace root"})
+
+        try:
+            if os.path.isdir(resolved):
+                shutil.rmtree(resolved)
+            else:
+                os.remove(resolved)
+            return json.dumps({"status": "success", "message": "Deleted", "path": path})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class FilesRenameHandler:
+    """Rename/move a file or directory. POST /api/files/rename {old_path, new_name}"""
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            data = json.loads(web.data().decode('utf-8'))
+        except Exception:
+            return json.dumps({"status": "error", "message": "Invalid JSON body"})
+
+        old_path = data.get("old_path", "").strip()
+        new_name = data.get("new_name", "").strip()
+
+        if not new_name or '/' in new_name or '\\' in new_name:
+            return json.dumps({"status": "error", "message": "Invalid new name"})
+
+        resolved_old, err = _safe_path(old_path)
+        if err:
+            return err
+
+        new_path = os.path.join(os.path.dirname(resolved_old), new_name)
+        root = os.path.realpath(_files_workspace_root())
+        if not (new_path == root or new_path.startswith(root + os.sep)):
+            return json.dumps({"status": "error", "message": "New path is outside the workspace"})
+
+        if os.path.exists(new_path):
+            return json.dumps({"status": "error", "message": "A file/folder with that name already exists"})
+
+        try:
+            os.rename(resolved_old, new_path)
+            rel_new = os.path.relpath(new_path, _files_workspace_root())
+            return json.dumps({"status": "success", "message": "Renamed", "new_path": rel_new})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class FilesMkdirHandler:
+    """Create a directory. POST /api/files/mkdir {path}"""
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            data = json.loads(web.data().decode('utf-8'))
+        except Exception:
+            return json.dumps({"status": "error", "message": "Invalid JSON body"})
+
+        path = data.get("path", "").strip()
+        resolved, err = _safe_path(path, allow_create=True)
+        if err:
+            return err
+
+        root = os.path.realpath(_files_workspace_root())
+        if not (resolved == root or resolved.startswith(root + os.sep)):
+            return json.dumps({"status": "error", "message": "Path is outside the workspace"})
+
+        try:
+            os.makedirs(resolved, exist_ok=True)
+            return json.dumps({"status": "success", "message": "Directory created", "path": path})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class FilesDownloadHandler:
+    """Download a file or folder (as zip). GET /api/files/download?path=<path>"""
+    def GET(self):
+        _require_auth()
+        params = web.input(path="")
+        resolved, err = _safe_path(params.path)
+        if err:
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return err
+
+        if not os.path.exists(resolved):
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return json.dumps({"status": "error", "message": "Path does not exist"})
+
+        try:
+            if os.path.isdir(resolved):
+                # Zip the directory
+                import zipfile, io
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    for root_dir, dirs, files in os.walk(resolved):
+                        for file in files:
+                            if file.startswith('.'):
+                                continue
+                            file_full = os.path.join(root_dir, file)
+                            arcname = os.path.relpath(file_full, os.path.dirname(resolved))
+                            zf.write(file_full, arcname)
+                zip_buffer.seek(0)
+                dirname = os.path.basename(resolved)
+                web.header('Content-Type', 'application/zip')
+                web.header('Content-Disposition', f'attachment; filename="{dirname}.zip"')
+                return zip_buffer.getvalue()
+            else:
+                # Single file download
+                filename = os.path.basename(resolved)
+                content_type = mimetypes.guess_type(resolved)[0] or 'application/octet-stream'
+                web.header('Content-Type', content_type)
+                web.header('Content-Disposition', f'attachment; filename="{filename}"')
+                with open(resolved, 'rb') as f:
+                    return f.read()
+        except Exception as e:
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return json.dumps({"status": "error", "message": str(e)})

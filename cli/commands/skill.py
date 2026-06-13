@@ -22,6 +22,8 @@ from cli.utils import (
     get_builtin_skills_dir,
     load_skills_config,
     SKILL_HUB_API,
+    CLAWHUB_API,
+    CLAWHUB_REGISTRY,
 )
 
 
@@ -734,18 +736,28 @@ _REMOTE_PAGE_SIZE = 10
 
 
 def _list_remote(page: int = 1):
-    """List skills from remote Skill Hub with server-side pagination."""
+    """List skills from ClawHub with server-side pagination."""
     try:
         resp = requests.get(
-            f"{SKILL_HUB_API}/skills",
+            f"{CLAWHUB_API}/skills",
             params={"page": page, "limit": _REMOTE_PAGE_SIZE},
             timeout=10,
         )
         resp.raise_for_status()
         data = resp.json()
-    except Exception as e:
-        click.echo(f"Error: Failed to fetch from Skill Hub: {e}", err=True)
-        sys.exit(1)
+    except Exception:
+        # Fallback to Skill Hub if ClawHub is unavailable
+        try:
+            resp = requests.get(
+                f"{SKILL_HUB_API}/skills",
+                params={"page": page, "limit": _REMOTE_PAGE_SIZE},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            click.echo(f"Error: Failed to fetch skills: {e}", err=True)
+            sys.exit(1)
 
     skills = data.get("skills", [])
     total = data.get("total", len(skills))
@@ -782,7 +794,7 @@ def _list_remote(page: int = 1):
     if nav_parts:
         click.echo(f"  Navigate: {' | '.join(nav_parts)}")
     click.echo(f"  Install:  onyx skill install <name>")
-    click.echo(f"  Browse:   http://skills.cowagent.ai\n")
+    click.echo(f"  Browse:   https://clawhub.ai\n")
 
 
 # ------------------------------------------------------------------
@@ -791,14 +803,20 @@ def _list_remote(page: int = 1):
 @skill.command()
 @click.argument("query")
 def search(query):
-    """Search skills on Skill Hub."""
+    """Search skills on ClawHub."""
     try:
-        resp = requests.get(f"{SKILL_HUB_API}/skills/search", params={"q": query}, timeout=10)
+        resp = requests.get(f"{CLAWHUB_API}/skills/search", params={"q": query}, timeout=10)
         resp.raise_for_status()
         data = resp.json()
-    except Exception as e:
-        click.echo(f"Error: Failed to search Skill Hub: {e}", err=True)
-        sys.exit(1)
+    except Exception:
+        # Fallback to Skill Hub
+        try:
+            resp = requests.get(f"{SKILL_HUB_API}/skills/search", params={"q": query}, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            click.echo(f"Error: Failed to search skills: {e}", err=True)
+            sys.exit(1)
 
     skills = data.get("skills", [])
     if not skills:
@@ -971,30 +989,43 @@ def install(name):
 
 
 def _install_hub(name, result: InstallResult, provider=None):
-    """Install a skill from Skill Hub."""
+    """Install a skill from ClawHub (with fallback to Skill Hub)."""
     skills_dir = get_skills_dir()
     os.makedirs(skills_dir, exist_ok=True)
 
     result.messages.append(f"Fetching skill info for '{name}'...")
 
-    try:
-        body = {}
-        if provider:
-            body["provider"] = provider
-        resp = requests.post(
-            f"{SKILL_HUB_API}/skills/{name}/download",
-            json=body,
-            timeout=15,
-        )
-        resp.raise_for_status()
-    except requests.HTTPError as e:
-        if e.response is not None and e.response.status_code == 404:
-            raise SkillInstallError(f"Skill '{name}' not found on Skill Hub.")
-        raise SkillInstallError(f"Failed to fetch skill: {e}")
-    except SkillInstallError:
-        raise
-    except Exception as e:
-        raise SkillInstallError(f"Failed to connect to Skill Hub: {e}")
+    # Try ClawHub first, then fall back to Skill Hub
+    api_urls = [
+        (CLAWHUB_API, "ClawHub"),
+        (SKILL_HUB_API, "Skill Hub"),
+    ]
+
+    resp = None
+    used_source = None
+    for api_url, source_name in api_urls:
+        try:
+            body = {}
+            if provider:
+                body["provider"] = provider
+            resp = requests.post(
+                f"{api_url}/skills/{name}/download",
+                json=body,
+                timeout=15,
+            )
+            resp.raise_for_status()
+            used_source = source_name
+            break
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                continue  # Try next source
+            if source_name == api_urls[-1][0]:
+                raise SkillInstallError(f"Failed to fetch skill: {e}")
+        except requests.RequestException:
+            continue  # Try next source
+
+    if resp is None:
+        raise SkillInstallError(f"Skill '{name}' not found on ClawHub or Skill Hub.")
 
     content_type = resp.headers.get("Content-Type", "")
     hub_display_name = ""

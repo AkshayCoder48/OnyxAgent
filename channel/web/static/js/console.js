@@ -15,7 +15,19 @@ const I18N = {
         console: '控制台',
         nav_chat: '对话', nav_manage: '管理', nav_monitor: '监控',
         menu_chat: '对话', menu_config: '配置', menu_models: '模型', menu_skills: '技能',
-        menu_memory: '记忆', menu_knowledge: '知识', menu_channels: '通道', menu_tasks: '定时',
+        menu_memory: '记忆', menu_knowledge: '知识', menu_files: '文件', menu_channels: '通道', menu_tasks: '定时',
+        files_title: '文件浏览器',
+        files_desc: '浏览和管理工作空间文件',
+        files_upload: '上传',
+        files_new_folder: '新建文件夹',
+        files_new_file: '新建文件',
+        files_ctx_download: '下载',
+        files_ctx_edit: '编辑',
+        files_ctx_rename: '重命名',
+        files_ctx_delete: '删除',
+        files_rename_title: '重命名',
+        files_mkdir_title: '新建文件夹',
+        files_newfile_title: '新建文件',
         menu_logs: '日志',
         models_title: '模型管理',
         models_desc: '统一管理对话、图像、语音、向量、搜索能力',
@@ -230,7 +242,19 @@ const I18N = {
         console: 'Console',
         nav_chat: 'Chat', nav_manage: 'Management', nav_monitor: 'Monitor',
         menu_chat: 'Chat', menu_config: 'Config', menu_models: 'Models', menu_skills: 'Skills',
-        menu_memory: 'Memory', menu_knowledge: 'Knowledge', menu_channels: 'Channels', menu_tasks: 'Tasks',
+        menu_memory: 'Memory', menu_knowledge: 'Knowledge', menu_files: 'Files', menu_channels: 'Channels', menu_tasks: 'Tasks',
+        files_title: 'File Browser',
+        files_desc: 'Browse and manage workspace files',
+        files_upload: 'Upload',
+        files_new_folder: 'New Folder',
+        files_new_file: 'New File',
+        files_ctx_download: 'Download',
+        files_ctx_edit: 'Edit',
+        files_ctx_rename: 'Rename',
+        files_ctx_delete: 'Delete',
+        files_rename_title: 'Rename',
+        files_mkdir_title: 'New Folder',
+        files_newfile_title: 'New File',
         menu_logs: 'Logs',
         models_title: 'Models',
         models_desc: 'Manage chat, image, voice, embedding and search capabilities in one place',
@@ -670,6 +694,7 @@ const VIEW_META = {
     skills:   { group: 'nav_manage',  page: 'menu_skills' },
     memory:   { group: 'nav_manage',  page: 'menu_memory' },
     knowledge:{ group: 'nav_manage',  page: 'menu_knowledge' },
+    files:    { group: 'nav_manage',  page: 'menu_files' },
     channels: { group: 'nav_manage',  page: 'menu_channels' },
     tasks:    { group: 'nav_manage',  page: 'menu_tasks' },
     logs:     { group: 'nav_monitor', page: 'menu_logs' },
@@ -692,6 +717,7 @@ function navigateTo(viewId) {
     document.getElementById('breadcrumb-page').dataset.i18n = meta.page;
     currentView = viewId;
     if (window.innerWidth < 1024) closeSidebar();
+    if (viewId === 'files') filesLoadDirectory();
 }
 
 function toggleSidebar() {
@@ -8153,6 +8179,386 @@ function initApp() {
     });
     chatInput.focus();
 }
+
+// =====================================================================
+// File Browser
+// =====================================================================
+let filesCurrentPath = '.';
+let filesSelectedPath = null;
+let filesSelectedIsDir = false;
+let _editingFilePath = null;
+
+function filesNavigateTo(path) {
+    filesCurrentPath = path;
+    filesLoadDirectory();
+}
+
+function filesLoadDirectory() {
+    const container = document.getElementById('files-content');
+    container.innerHTML = '<div class="flex items-center justify-center py-12 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Loading...</div>';
+
+    fetch('/api/files/list?path=' + encodeURIComponent(filesCurrentPath) + '&depth=1')
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'error') {
+                container.innerHTML = '<div class="text-red-500 text-center py-8">' + escapeHtml(data.message) + '</div>';
+                return;
+            }
+            filesRenderBreadcrumb(data.root);
+            filesRenderEntries(data.entries);
+        })
+        .catch(err => {
+            container.innerHTML = '<div class="text-red-500 text-center py-8">Failed to load files</div>';
+        });
+}
+
+function filesRenderBreadcrumb(currentPath) {
+    const bc = document.getElementById('files-breadcrumb');
+    const parts = currentPath === '.' ? [] : currentPath.split('/');
+    let html = '<span class="cursor-pointer text-primary-500 hover:text-primary-600 font-medium" onclick="filesNavigateTo(\'.\')">~</span>';
+    let accumulated = '';
+    parts.forEach((part, i) => {
+        accumulated += (i === 0 ? '' : '/') + part;
+        const path = accumulated;
+        html += '<i class="fas fa-chevron-right text-[10px] text-slate-300 dark:text-slate-600 mx-1"></i>';
+        if (i === parts.length - 1) {
+            html += '<span class="text-slate-700 dark:text-slate-200 font-medium">' + escapeHtml(part) + '</span>';
+        } else {
+            html += '<span class="cursor-pointer text-primary-500 hover:text-primary-600" onclick="filesNavigateTo(\'' + escapeHtml(path) + '\')">' + escapeHtml(part) + '</span>';
+        }
+    });
+    bc.innerHTML = html;
+}
+
+function filesRenderEntries(entries) {
+    const container = document.getElementById('files-content');
+    if (!entries || entries.length === 0) {
+        container.innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500"><i class="fas fa-folder-open text-3xl mb-3 block"></i><p>This folder is empty</p></div>';
+        return;
+    }
+
+    // Sort: directories first, then files
+    const dirs = entries.filter(e => e.is_dir).sort((a,b) => a.name.localeCompare(b.name));
+    const files = entries.filter(e => !e.is_dir).sort((a,b) => a.name.localeCompare(b.name));
+    const sorted = [...dirs, ...files];
+
+    let html = '';
+    // Header row
+    html += '<div class="hidden sm:grid grid-cols-[1fr_100px_160px] gap-2 px-3 py-2 text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">';
+    html += '<span>Name</span><span>Size</span><span>Modified</span></div>';
+
+    sorted.forEach(entry => {
+        const icon = entry.is_dir ? 'fa-folder text-amber-400' : getFileIcon(entry.name);
+        const size = entry.is_dir ? '--' : formatFileSize(entry.size);
+        const modified = entry.modified ? new Date(entry.modified).toLocaleDateString() : '--';
+
+        html += '<div class="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors duration-150" ';
+        html += 'data-path="' + escapeHtml(entry.path) + '" data-is-dir="' + entry.is_dir + '" ';
+        html += 'onclick="filesEntryClick(this)" oncontextmenu="filesContextMenu(event, this)">';
+        html += '<i class="fas ' + icon + ' text-base w-5 text-center flex-shrink-0"></i>';
+        html += '<div class="flex-1 min-w-0">';
+        html += '<span class="text-sm text-slate-700 dark:text-slate-200 truncate block">' + escapeHtml(entry.name) + '</span>';
+        html += '</div>';
+        html += '<span class="hidden sm:block text-xs text-slate-400 dark:text-slate-500 w-[100px] text-right">' + size + '</span>';
+        html += '<span class="hidden sm:block text-xs text-slate-400 dark:text-slate-500 w-[160px] text-right">' + modified + '</span>';
+        html += '<button class="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all duration-150" onclick="event.stopPropagation(); filesContextMenu(event, this.closest(\'[data-path]\'))">';
+        html += '<i class="fas fa-ellipsis-vertical text-xs"></i></button>';
+        html += '</div>';
+    });
+
+    container.innerHTML = html;
+}
+
+function filesEntryClick(el) {
+    const path = el.dataset.path;
+    const isDir = el.dataset.isDir === 'true';
+    if (isDir) {
+        filesNavigateTo(path);
+    } else {
+        fileAction('edit');
+    }
+}
+
+function filesContextMenu(event, el) {
+    event.preventDefault();
+    event.stopPropagation();
+    filesSelectedPath = el.dataset.path;
+    filesSelectedIsDir = el.dataset.isDir === 'true';
+
+    const menu = document.getElementById('file-context-menu');
+    // Hide edit for directories
+    const editBtn = menu.querySelector('[onclick*="edit"]');
+    if (editBtn) editBtn.style.display = filesSelectedIsDir ? 'none' : '';
+
+    menu.style.left = Math.min(event.clientX, window.innerWidth - 200) + 'px';
+    menu.style.top = Math.min(event.clientY, window.innerHeight - 200) + 'px';
+    menu.classList.remove('hidden');
+}
+
+function fileAction(action) {
+    hideFileContextMenu();
+    if (!filesSelectedPath) return;
+
+    switch(action) {
+        case 'download':
+            window.open('/api/files/download?path=' + encodeURIComponent(filesSelectedPath), '_blank');
+            break;
+        case 'edit':
+            openFileEditor(filesSelectedPath);
+            break;
+        case 'rename':
+            showRenameDialog(filesSelectedPath);
+            break;
+        case 'delete':
+            if (confirm('Are you sure you want to delete "' + filesSelectedPath.split('/').pop() + '"?')) {
+                deleteFile(filesSelectedPath);
+            }
+            break;
+    }
+}
+
+function hideFileContextMenu() {
+    document.getElementById('file-context-menu').classList.add('hidden');
+}
+
+function openFileEditor(path) {
+    _editingFilePath = path;
+    fetch('/api/files/read?path=' + encodeURIComponent(path))
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'error') {
+                alert(data.message);
+                return;
+            }
+            document.getElementById('file-editor-title').textContent = path.split('/').pop();
+            document.getElementById('file-editor-content').value = data.content || '';
+            document.getElementById('file-editor-modal').classList.remove('hidden');
+        })
+        .catch(err => alert('Failed to read file'));
+}
+
+function saveFileContent() {
+    if (!_editingFilePath) return;
+    const content = document.getElementById('file-editor-content').value;
+    fetch('/api/files/write', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: _editingFilePath, content: content})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            closeFileEditor();
+            filesLoadDirectory();
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(err => alert('Failed to save file'));
+}
+
+function closeFileEditor() {
+    document.getElementById('file-editor-modal').classList.add('hidden');
+    _editingFilePath = null;
+}
+
+function showRenameDialog(path) {
+    filesSelectedPath = path;
+    const input = document.getElementById('file-rename-input');
+    input.value = path.split('/').pop();
+    document.getElementById('file-rename-dialog').classList.remove('hidden');
+    setTimeout(() => { input.focus(); input.select(); }, 100);
+}
+
+function closeRenameDialog() {
+    document.getElementById('file-rename-dialog').classList.add('hidden');
+}
+
+function confirmRename() {
+    const newName = document.getElementById('file-rename-input').value.trim();
+    if (!newName) return;
+    fetch('/api/files/rename', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({old_path: filesSelectedPath, new_name: newName})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            closeRenameDialog();
+            filesLoadDirectory();
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(err => alert('Failed to rename'));
+}
+
+function deleteFile(path) {
+    fetch('/api/files/delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: path})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            filesLoadDirectory();
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(err => alert('Failed to delete'));
+}
+
+function showMkdirDialog() {
+    document.getElementById('file-mkdir-input').value = '';
+    document.getElementById('file-mkdir-dialog').classList.remove('hidden');
+    setTimeout(() => document.getElementById('file-mkdir-input').focus(), 100);
+}
+
+function closeMkdirDialog() {
+    document.getElementById('file-mkdir-dialog').classList.add('hidden');
+}
+
+function confirmMkdir() {
+    const name = document.getElementById('file-mkdir-input').value.trim();
+    if (!name) return;
+    const path = filesCurrentPath === '.' ? name : filesCurrentPath + '/' + name;
+    fetch('/api/files/mkdir', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: path})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            closeMkdirDialog();
+            filesLoadDirectory();
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(err => alert('Failed to create folder'));
+}
+
+function showNewFileDialog() {
+    document.getElementById('file-newfile-input').value = '';
+    document.getElementById('file-newfile-dialog').classList.remove('hidden');
+    setTimeout(() => document.getElementById('file-newfile-input').focus(), 100);
+}
+
+function closeNewFileDialog() {
+    document.getElementById('file-newfile-dialog').classList.add('hidden');
+}
+
+function confirmNewFile() {
+    const name = document.getElementById('file-newfile-input').value.trim();
+    if (!name) return;
+    const path = filesCurrentPath === '.' ? name : filesCurrentPath + '/' + name;
+    fetch('/api/files/write', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: path, content: ''})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            closeNewFileDialog();
+            filesLoadDirectory();
+            // Auto-open editor for new files
+            filesSelectedPath = path;
+            openFileEditor(path);
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(err => alert('Failed to create file'));
+}
+
+function showFileUploadDialog() {
+    document.getElementById('files-upload-input').click();
+}
+
+function handleFileUpload(input) {
+    const files = input.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const path = filesCurrentPath === '.' ? file.name : filesCurrentPath + '/' + file.name;
+            fetch('/api/files/write', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({path: path, content: e.target.result})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    filesLoadDirectory();
+                } else {
+                    console.error('Upload failed:', data.message);
+                }
+            })
+            .catch(err => console.error('Upload error:', err));
+        };
+        reader.readAsText(file);
+    });
+    input.value = '';
+}
+
+function getFileIcon(name) {
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    const iconMap = {
+        'py': 'fa-file-code text-blue-400',
+        'js': 'fa-file-code text-yellow-400',
+        'ts': 'fa-file-code text-blue-400',
+        'jsx': 'fa-file-code text-yellow-400',
+        'tsx': 'fa-file-code text-blue-400',
+        'html': 'fa-file-code text-orange-400',
+        'css': 'fa-file-code text-purple-400',
+        'json': 'fa-file-code text-yellow-300',
+        'md': 'fa-file-alt text-slate-400',
+        'txt': 'fa-file-alt text-slate-400',
+        'csv': 'fa-file-csv text-green-400',
+        'pdf': 'fa-file-pdf text-red-400',
+        'jpg': 'fa-file-image text-emerald-400',
+        'jpeg': 'fa-file-image text-emerald-400',
+        'png': 'fa-file-image text-emerald-400',
+        'gif': 'fa-file-image text-emerald-400',
+        'svg': 'fa-file-image text-emerald-400',
+        'zip': 'fa-file-archive text-amber-400',
+        'tar': 'fa-file-archive text-amber-400',
+        'gz': 'fa-file-archive text-amber-400',
+        'yml': 'fa-file-code text-pink-400',
+        'yaml': 'fa-file-code text-pink-400',
+        'toml': 'fa-file-code text-pink-400',
+        'sh': 'fa-file-code text-green-400',
+        'bash': 'fa-file-code text-green-400',
+        'env': 'fa-file-code text-slate-400',
+        'sql': 'fa-database text-blue-300',
+    };
+    return iconMap[ext] || 'fa-file text-slate-400';
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+}
+
+// Close context menu on click outside
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('file-context-menu');
+    if (menu && !menu.contains(e.target)) {
+        menu.classList.add('hidden');
+    }
+});
+
+// Load files when navigating to the view
+const _origNavigateTo = typeof navigateTo === 'function' ? navigateTo : null;
 
 // =====================================================================
 // Initialization

@@ -76,3 +76,5 @@ def ensure_sys_path():
 
 
 SKILL_HUB_API = "http://skills.cowagent.ai/api"
+CLAWHUB_API = "https://clawhub.ai/api"
+CLAWHUB_REGISTRY = "https://registry.clawhub.ai"
