@@ -165,7 +165,6 @@ A single Agent instance can serve multiple channels in parallel. Most channels c
 
 ### Skills System
 
-- **Skill Hub** — open skill marketplace: browse, search, install in one click
 - **GitHub / ClawHub / URL and more** — install skills from any source
 - **Conversational authoring** — generate custom skills through dialogue with `skill-creator`; turn any workflow or third-party API into a reusable skill
 
@@ -182,10 +181,6 @@ A single Agent instance can serve multiple channels in parallel. Most channels c
 All kinds of contributions are welcome — new features, bug fixes, performance improvements, docs, or sharing your own skills on the Skill Hub. See [CONTRIBUTING.md](/CONTRIBUTING.md) to get started, then open an Issue to discuss or send a PR directly.
 
 ⭐ Star the project to show your support, and Watch → Custom → Releases to get notified of new versions. PRs and Issues are always welcome.
-
-## 🌟 Contributors
-
-![onyx contributors](https://contrib.rocks/image?repo=AkshayCoder48/OnyxAgent&max=1000)
 
 <br/>
 
