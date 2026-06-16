@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="onyxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fda4af"/>
+      <stop offset="30%" stop-color="#f43f5e"/>
+      <stop offset="70%" stop-color="#e11d48"/>
+      <stop offset="100%" stop-color="#9f1239"/>
+    </linearGradient>
+    <linearGradient id="gemShine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="innerGlow" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#fecdd3" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#be123c" stop-opacity="0.2"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#9f1239" flood-opacity="0.35"/>
+    </filter>
+    <filter id="innerLight" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#onyxGrad)" filter="url(#softShadow)"/>
+
+  <!-- Inner ring cutout -->
+  <circle cx="256" cy="256" r="155" fill="#0f0a0b"/>
+
+  <!-- Gem facet shapes - creating the onyx gemstone look -->
+  <!-- Top facet -->
+  <path d="M256 101 L341 196 L171 196 Z" fill="url(#innerGlow)" opacity="0.7"/>
+  <!-- Left facet -->
+  <path d="M171 196 L171 316 L128 256 Z" fill="#1a1012" opacity="0.6"/>
+  <!-- Right facet -->
+  <path d="M341 196 L341 316 L384 256 Z" fill="#1a1012" opacity="0.6"/>
+  <!-- Bottom left facet -->
+  <path d="M171 316 L256 411 L128 256 Z" fill="#2a1520" opacity="0.5"/>
+  <!-- Bottom right facet -->
+  <path d="M341 316 L256 411 L384 256 Z" fill="#2a1520" opacity="0.5"/>
+  <!-- Center highlight -->
+  <path d="M256 101 L341 196 L256 256 L171 196 Z" fill="url(#gemShine)" opacity="0.25"/>
+
+  <!-- Neural network / AI nodes -->
+  <g filter="url(#innerLight)">
+    <!-- Central AI node -->
+    <circle cx="256" cy="256" r="18" fill="#f43f5e" opacity="0.95"/>
+    <circle cx="256" cy="256" r="10" fill="#fff" opacity="0.9"/>
+
+    <!-- Satellite nodes -->
+    <circle cx="200" cy="185" r="7" fill="#fda4af" opacity="0.8"/>
+    <circle cx="312" cy="185" r="7" fill="#fda4af" opacity="0.8"/>
+    <circle cx="335" cy="256" r="6" fill="#fb7185" opacity="0.7"/>
+    <circle cx="177" cy="256" r="6" fill="#fb7185" opacity="0.7"/>
+    <circle cx="200" cy="327" r="7" fill="#fda4af" opacity="0.8"/>
+    <circle cx="312" cy="327" r="7" fill="#fda4af" opacity="0.8"/>
+
+    <!-- Tiny nodes -->
+    <circle cx="230" cy="148" r="3.5" fill="#fecdd3" opacity="0.6"/>
+    <circle cx="282" cy="148" r="3.5" fill="#fecdd3" opacity="0.6"/>
+    <circle cx="340" cy="215" r="3.5" fill="#fecdd3" opacity="0.6"/>
+    <circle cx="172" cy="215" r="3.5" fill="#fecdd3" opacity="0.6"/>
+    <circle cx="340" cy="297" r="3.5" fill="#fecdd3" opacity="0.6"/>
+    <circle cx="172" cy="297" r="3.5" fill="#fecdd3" opacity="0.6"/>
+    <circle cx="230" cy="364" r="3.5" fill="#fecdd3" opacity="0.6"/>
+    <circle cx="282" cy="364" r="3.5" fill="#fecdd3" opacity="0.6"/>
+  </g>
+
+  <!-- Connection lines - neural network -->
+  <g stroke="#f43f5e" stroke-width="1.5" opacity="0.35">
+    <line x1="256" y1="256" x2="200" y2="185"/>
+    <line x1="256" y1="256" x2="312" y2="185"/>
+    <line x1="256" y1="256" x2="335" y2="256"/>
+    <line x1="256" y1="256" x2="177" y2="256"/>
+    <line x1="256" y1="256" x2="200" y2="327"/>
+    <line x1="256" y1="256" x2="312" y2="327"/>
+  </g>
+  <g stroke="#fb7185" stroke-width="1" opacity="0.25">
+    <line x1="200" y1="185" x2="230" y2="148"/>
+    <line x1="200" y1="185" x2="172" y2="215"/>
+    <line x1="312" y1="185" x2="282" y2="148"/>
+    <line x1="312" y1="185" x2="340" y2="215"/>
+    <line x1="335" y1="256" x2="340" y2="297"/>
+    <line x1="177" y1="256" x2="172" y2="297"/>
+    <line x1="200" y1="327" x2="230" y2="364"/>
+    <line x1="200" y1="327" x2="172" y2="297"/>
+    <line x1="312" y1="327" x2="282" y2="364"/>
+    <line x1="312" y1="327" x2="340" y2="297"/>
+  </g>
+
+  <!-- Pulse rings around central node -->
+  <circle cx="256" cy="256" r="28" fill="none" stroke="#f43f5e" stroke-width="1.5" opacity="0.3"/>
+  <circle cx="256" cy="256" r="40" fill="none" stroke="#f43f5e" stroke-width="1" opacity="0.15"/>
+  <circle cx="256" cy="256" r="55" fill="none" stroke="#f43f5e" stroke-width="0.5" opacity="0.08"/>
+</svg>

@@ -1,0 +1,50 @@
+---
+title: クイックインストール
+description: git clone で OnyxAgent をクイックインストール・管理
+---
+
+リポジトリをクローンし、依存パッケージをインストールして起動するだけの簡単セットアップ。
+
+Linux、macOS、Windowsに対応しています。Python 3.7〜3.13が必要です（3.9を推奨）。
+
+## インストールコマンド
+
+GitHub クローンでインストール：
+
+```bash
+git clone https://github.com/AkshayCoder48/OnyxAgent.git
+cd OnyxAgent
+pip install -r requirements.txt
+cp config-template.json config.json
+python app.py
+```
+
+インストール手順：
+
+1. Python環境の確認（Python 3.7以上が必要）
+2. GitHub からプロジェクトをクローン
+3. Pythonの依存パッケージと Onyx CLI をインストール
+4. 設定テンプレートをコピー
+5. サービスの起動
+
+デフォルトでは、インストール後に Web コンソールが起動します。`http://localhost:9899` にアクセスしてチャットを開始できます。
+
+## 管理コマンド
+
+インストール後、`onyx` コマンドでサービスを管理できます：
+
+| コマンド | 説明 |
+| --- | --- |
+| `onyx start` | サービスを起動 |
+| `onyx stop` | サービスを停止 |
+| `onyx restart` | サービスを再起動 |
+| `onyx status` | 実行状態を確認 |
+| `onyx logs` | リアルタイムログを表示 |
+| `onyx update` | コードを更新して再起動 |
+| `onyx install-browser` | ブラウザツールの依存をインストール |
+
+詳細は[コマンドドキュメント](/ja/cli/index)を参照してください。
+
+<Note>
+  `onyx` コマンドが利用できない場合は、`./run.sh <コマンド>`（Linux/macOS）または `.\scripts\run.ps1 <コマンド>`（Windows）で代替できます。機能は同等です。
+</Note>

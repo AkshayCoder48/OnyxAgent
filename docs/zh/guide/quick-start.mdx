@@ -1,0 +1,54 @@
+---
+title: 快速安装
+description: 通过 git clone 快速安装和管理 OnyxAgent
+---
+
+克隆仓库、安装依赖、启动服务，只需几条命令。
+
+支持 Linux、macOS、Windows 操作系统，需安装 Python 3.7 ~ 3.13（推荐 3.9）。
+
+## 安装命令
+
+通过 GitHub 克隆安装：
+
+```bash
+git clone https://github.com/AkshayCoder48/OnyxAgent.git
+cd OnyxAgent
+pip install -r requirements.txt
+cp config-template.json config.json
+python app.py
+```
+
+安装流程：
+
+1. 检查 Python 环境（需要 Python 3.7+）
+2. 从 GitHub 克隆项目代码
+3. 安装 Python 依赖和 Onyx CLI
+4. 复制配置模板
+5. 启动服务
+
+运行后默认启动 Web 控制台，访问 `http://localhost:9899` 开始对话和管理Agent。
+
+<Note>
+  **服务器部署需要公网访问控制台时**，请在 `config.json` 中将 `web_host` 设为 `0.0.0.0`（默认仅监听 `127.0.0.1` 本机访问），同时强烈建议设置 `web_password` 启用鉴权。然后通过 `http://<server-ip>:9899` 访问，并确保防火墙/安全组放行 `9899` 端口。
+</Note>
+
+## 管理命令
+
+安装完成后，使用 `onyx` CLI 管理服务：
+
+| 命令 | 说明 |
+| --- | --- |
+| `onyx start` | 启动服务 |
+| `onyx stop` | 停止服务 |
+| `onyx restart` | 重启服务 |
+| `onyx status` | 查看运行状态 |
+| `onyx logs` | 查看实时日志 |
+| `onyx update` | 更新代码并重启 |
+| `onyx install-browser` | 安装浏览器工具依赖 |
+
+更多命令和用法参考 [命令文档](/zh/cli/index)。
+
+<Note>
+  如果 `onyx` 命令不可用，也可以使用 `./run.sh <命令>`（Linux/macOS）或 `.\scripts\run.ps1 <命令>`（Windows）作为替代，功能等效。
+</Note>

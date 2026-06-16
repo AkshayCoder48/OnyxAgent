@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="zh" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>OnyxAgent Console</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#F43F5E">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="OnyxAgent">
+    <meta name="application-name" content="OnyxAgent">
+    <meta name="msapplication-TileColor" content="#F43F5E">
+    <meta name="msapplication-navbutton-color" content="#F43F5E">
+
+    <!-- PWA Icons -->
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <!-- <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"> -->
+    <link rel="manifest" href="assets/manifest.json">
+    <!-- FontAwesome from CDN (webfonts are binary, can't push to HF) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+          integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+          crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Special fonts for enhanced UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="assets/vendor/tailwind/tailwind.min.js"></script>
+    <script src="assets/vendor/markdown-it/markdown-it.min.js"></script>
+    <link id="hljs-light" rel="stylesheet" href="assets/vendor/highlightjs/styles/github.min.css">
+    <link id="hljs-dark" rel="stylesheet" href="assets/vendor/highlightjs/styles/github-dark.min.css" disabled>
+    <script src="assets/vendor/highlightjs/highlight.min.js"></script>
+    <script src="assets/vendor/highlightjs/languages/python.min.js"></script>
+    <script src="assets/vendor/highlightjs/languages/javascript.min.js"></script>
+    <script src="assets/vendor/highlightjs/languages/java.min.js"></script>
+    <script src="assets/vendor/highlightjs/languages/go.min.js"></script>
+    <script src="assets/vendor/highlightjs/languages/bash.min.js"></script>
+    <script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                fontFamily: {
+                    sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    mono: ['"JetBrains Mono"', '"Fira Code"', 'Consolas', 'monospace'],
+                },
+                colors: {
+                    primary: {
+                        50: '#FFF1F2', 100: '#FFE4E6', 200: '#FECDD3', 300: '#FDA4AF',
+                        400: '#FB7185', 500: '#F43F5E', 600: '#E11D48', 700: '#BE123C',
+                        800: '#9F1239', 900: '#881337',
+                    }
+                },
+                animation: {
+                    'pulse-dot': 'pulseDot 1.4s infinite ease-in-out both',
+                }
+            }
+        }
+    }
+    </script>
+    <link rel="stylesheet" href="assets/css/console.css">
+    <!-- Apply theme/lang before first paint to avoid flash of unstyled content.
+         This runs synchronously in <head> so the correct class is on <html>
+         before any CSS or body rendering occurs. -->
+    <script>
+    // Map an arbitrary locale string (zh-CN, en-US, fr ...) to 'zh' / 'en',
+    // or '' when unrecognized so callers can fall through to the next source.
+    window.__onyxNormalizeLang__ = function(raw) {
+        if (!raw) return '';
+        var v = String(raw).trim().toLowerCase();
+        if (v === 'auto') return '';
+        if (v.indexOf('zh') === 0) return 'zh';
+        if (v.indexOf('en') === 0) return 'en';
+        return '';
+    };
+    // Resolve the console language by priority:
+    //   user choice (localStorage) -> backend-detected -> browser -> 'zh'.
+    window.__onyxResolveLang__ = function() {
+        return window.__onyxNormalizeLang__(localStorage.getItem('onyx_lang'))
+            || window.__onyxNormalizeLang__(window.__ONYX_DEFAULT_LANG__)
+            || window.__onyxNormalizeLang__(navigator.language || (navigator.languages && navigator.languages[0]))
+            || 'zh';
+    };
+    (function() {
+        // Backend-resolved default language (from onyx_lang config / auto-detect).
+        window.__ONYX_DEFAULT_LANG__ = '{{Onyx_DEFAULT_LANG}}';
+        var theme = localStorage.getItem('onyx_theme') || 'dark';
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('lang', window.__onyxResolveLang__());
+    })();
+    </script>
+</head>
+<body class="h-dvh overflow-hidden bg-gray-50 dark:bg-[#111111] text-slate-800 dark:text-slate-200 font-sans">
+
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="fixed inset-0 z-[200] bg-gray-50 dark:bg-[#111111] flex items-center justify-center hidden">
+        <div class="w-full max-w-sm mx-4">
+            <div class="flex flex-col items-center mb-8">
+                <img src="assets/logo.svg" alt="OnyxAgent" class="w-16 h-16 rounded-2xl mb-4 shadow-lg">
+                <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">OnyxAgent</h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" id="login-subtitle">请输入密码以访问控制台</p>
+            </div>
+            <form id="login-form" class="space-y-4" onsubmit="return false;">
+                <div class="relative">
+                    <input id="login-password" type="password" autocomplete="current-password"
+                           placeholder="Password"
+                           class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10
+                                  bg-white dark:bg-[#1A1A1A] text-slate-800 dark:text-slate-200
+                                  placeholder-slate-400 dark:placeholder-slate-500
+                                  focus:outline-none focus:ring-2 focus:ring-primary-400/50 focus:border-primary-400
+                                  transition-all duration-150 text-sm">
+                    <button type="button" id="login-toggle-pwd"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600
+                                   dark:hover:text-slate-300 cursor-pointer transition-colors"
+                            onclick="toggleLoginPassword()">
+                        <i class="fas fa-eye text-sm"></i>
+                    </button>
+                </div>
+                <p id="login-error" class="text-sm text-red-500 hidden"></p>
+                <button id="login-btn" type="submit"
+                        class="w-full py-3 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-medium
+                               text-sm cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed">
+                    登录
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app" class="flex h-dvh">
+
+        <!-- ================================================================ -->
+        <!-- SIDEBAR                                                          -->
+        <!-- ================================================================ -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-52 bg-[#0A0A0A] text-neutral-400 flex flex-col
+                                    transform -translate-x-full lg:relative lg:translate-x-0
+                                    transition-transform duration-300 ease-in-out">
+            <!-- Logo -->
+            <div class="flex items-center gap-3 px-5 h-14 border-b border-white/10 flex-shrink-0">
+                <img src="assets/logo.svg" alt="OnyxAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
+                <div class="flex flex-col min-w-0">
+                    <span class="text-white font-semibold text-sm truncate">OnyxAgent</span>
+                    <span class="text-neutral-500 text-xs" data-i18n="console">控制台</span>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+                <!-- Chat Group -->
+                <div class="menu-group open" data-group="chat">
+                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors duration-150">
+                        <i class="fas fa-chevron-right text-[10px] chevron"></i>
+                        <span data-i18n="nav_chat">对话</span>
+                    </button>
+                    <div class="menu-group-items pl-2">
+                        <a class="sidebar-item active flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="chat">
+                            <i class="fas fa-message item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_chat">对话</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Management Group -->
+                <div class="menu-group open" data-group="manage">
+                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors duration-150">
+                        <i class="fas fa-chevron-right text-[10px] chevron"></i>
+                        <span data-i18n="nav_manage">管理</span>
+                    </button>
+                    <div class="menu-group-items pl-2">
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="config">
+                            <i class="fas fa-sliders item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_config">配置</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="models">
+                            <i class="fas fa-microchip item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_models">模型</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="skills">
+                            <i class="fas fa-bolt item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_skills">技能</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="memory">
+                            <i class="fas fa-brain item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_memory">记忆</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="knowledge">
+                            <i class="fas fa-book item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_knowledge">知识</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="files">
+                            <i class="fas fa-folder-tree item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_files">Files</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="tasks">
+                            <i class="fas fa-clock item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_tasks">定时</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="fonts">
+                            <i class="fas fa-font item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_fonts">Fonts</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Monitor Group -->
+                <div class="menu-group open" data-group="monitor">
+                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors duration-150">
+                        <i class="fas fa-chevron-right text-[10px] chevron"></i>
+                        <span data-i18n="nav_monitor">监控</span>
+                    </button>
+                    <div class="menu-group-items pl-2">
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="logs">
+                            <i class="fas fa-terminal item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_logs">日志</span>
+                        </a>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Sidebar Footer -->
+            <div class="px-4 py-3 border-t border-white/10 flex-shrink-0">
+                <div class="flex items-center gap-2 text-xs text-neutral-600">
+                    <i class="fas fa-circle text-[6px] text-primary-400"></i>
+                    <a id="sidebar-version"
+                       href="https://github.com/AkshayCoder48/OnyxAgent/releases"
+                       target="_blank" rel="noopener noreferrer"
+                       class="hover:text-primary-400 transition-colors duration-150 cursor-pointer"></a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Mobile Overlay -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden cursor-pointer" onclick="toggleSidebar()"></div>
+
+        <!-- ================================================================ -->
+        <!-- SESSION PANEL (collapsible)                                      -->
+        <!-- ================================================================ -->
+        <aside id="session-panel" class="session-panel hidden">
+            <div class="session-panel-header">
+                <span class="session-panel-title" data-i18n="session_history">历史会话</span>
+                <button class="session-panel-close" onclick="toggleSessionPanel()" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <button class="session-panel-new" onclick="newChat()">
+                <i class="fas fa-plus"></i>
+                <span data-i18n="new_chat">新对话</span>
+            </button>
+            <div id="session-list" class="session-list"></div>
+        </aside>
+
+        <!-- Mobile overlay for session panel (click to close) -->
+        <div id="session-panel-overlay" class="session-panel-overlay hidden" onclick="closeSessionPanel()"></div>
+
+        <!-- ================================================================ -->
+        <!-- MAIN CONTENT                                                     -->
+        <!-- ================================================================ -->
+        <div id="main-content" class="flex-1 flex flex-col min-w-0 h-dvh">
+            <!-- Top Header -->
+            <header class="h-14 sm:h-14 flex items-center gap-2 sm:gap-3 px-2 sm:px-4 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] flex-shrink-0 z-10">
+                <!-- Mobile menu toggle -->
+                <button id="menu-toggle" class="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer transition-colors duration-150"
+                        onclick="toggleSidebar()">
+                    <i class="fas fa-bars text-slate-600 dark:text-slate-300"></i>
+                </button>
+
+                <!-- Session panel toggle -->
+                <button id="session-toggle-btn" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer transition-colors duration-150"
+                        onclick="toggleSessionPanel()">
+                    <i class="fas fa-clock-rotate-left text-slate-500 dark:text-slate-400"></i>
+                </button>
+
+                <!-- Breadcrumb (hidden on mobile) -->
+                <div class="hidden lg:flex items-center gap-2 text-sm min-w-0">
+                    <span id="breadcrumb-group" class="text-slate-400 dark:text-slate-500 truncate" data-i18n="nav_chat">对话</span>
+                    <i class="fas fa-chevron-right text-[10px] text-slate-300 dark:text-slate-600"></i>
+                    <span id="breadcrumb-page" class="font-medium text-slate-700 dark:text-slate-200 truncate" data-i18n="menu_chat">对话</span>
+                </div>
+
+                <div class="flex-1"></div>
+
+                <!-- Language Toggle -->
+                <button id="lang-toggle" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
+                                                 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
+                                                 cursor-pointer transition-colors duration-150"
+                        onclick="toggleLanguage()">
+                    <i class="fas fa-globe text-xs"></i>
+                    <span id="lang-label">EN</span>
+                </button>
+
+                <!-- Theme Toggle -->
+                <button id="theme-toggle" class="p-2 rounded-lg text-slate-500 dark:text-slate-400
+                                                  hover:bg-slate-100 dark:hover:bg-white/10
+                                                  cursor-pointer transition-colors duration-150"
+                        onclick="toggleTheme()">
+                    <i id="theme-icon" class="fas fa-moon"></i>
+                </button>
+
+                <!-- PWA Install Button (shown when installable) -->
+                <button id="pwa-install-btn" class="hidden p-2 rounded-lg text-primary-500
+                                                     hover:bg-primary-50 dark:hover:bg-primary-900/20
+                                                     cursor-pointer transition-colors duration-150"
+                        onclick="installPWA()" title="Install App">
+                    <i class="fas fa-download text-base"></i>
+                </button>
+
+                <!-- Docs Link (hidden on mobile) -->
+                <a id="docs-link" href="https://docs.onyxagent.ai" target="_blank" rel="noopener noreferrer"
+                   class="hidden sm:flex p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
+                          cursor-pointer transition-colors duration-150" title="Documentation">
+                    <i class="fas fa-book text-base"></i>
+                </a>
+
+                <!-- Website Link (hidden on mobile) -->
+                <a href="https://onyxagent.ai" target="_blank" rel="noopener noreferrer"
+                   class="hidden sm:flex p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
+                          cursor-pointer transition-colors duration-150" title="Website">
+                    <i class="fas fa-home text-base"></i>
+                </a>
+
+                <!-- GitHub Link (hidden on mobile) -->
+                <a href="https://github.com/AkshayCoder48/OnyxAgent" target="_blank" rel="noopener noreferrer"
+                   class="hidden sm:flex p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
+                          cursor-pointer transition-colors duration-150" title="GitHub">
+                    <i class="fab fa-github text-lg"></i>
+                </a>
+            </header>
+
+            <!-- Content Area -->
+            <div id="content-area" class="flex-1 overflow-hidden">
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Chat                                              -->
+                <!-- ====================================================== -->
+                <div id="view-chat" class="view active relative">
+                    <!-- Messages -->
+                    <div id="chat-messages" class="flex-1 overflow-y-auto">
+                        <!-- Welcome Screen -->
+                        <div id="welcome-screen" class="flex flex-col items-center justify-center h-full px-4 sm:px-6 pb-8 sm:pb-16" style="padding-top: 2vh">
+                            <img src="assets/logo.svg" alt="OnyxAgent" class="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl mb-3 sm:mb-6 shadow-lg shadow-primary-500/20">
+                            <h1 id="welcome-title" class="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2 sm:mb-3">OnyxAgent</h1>
+                            <p id="welcome-subtitle" class="text-slate-500 dark:text-slate-400 text-center max-w-lg mb-4 sm:mb-10 leading-relaxed text-sm sm:text-base"
+                               data-i18n-html="welcome_subtitle">我可以帮你解答问题、管理计算机、创造和执行技能，并通过<br>长期记忆和知识库不断成长</p>
+
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 w-full max-w-2xl">
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-3 sm:p-4
+                                            cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                                            <i class="fas fa-folder-open text-blue-500 text-xs"></i>
+                                        </div>
+                                        <span class="font-medium text-sm text-slate-700 dark:text-slate-200" data-i18n="example_sys_title">系统管理</span>
+                                    </div>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_sys_text">查看工作空间里有哪些文件</p>
+                                </div>
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
+                                            cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <div class="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
+                                            <i class="fas fa-clock text-amber-500 text-xs"></i>
+                                        </div>
+                                        <span class="font-medium text-sm text-slate-700 dark:text-slate-200" data-i18n="example_task_title">定时任务</span>
+                                    </div>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_task_text">1分钟后提醒我检查服务器</p>
+                                </div>
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
+                                            cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <div class="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
+                                            <i class="fas fa-code text-rose-500 text-xs"></i>
+                                        </div>
+                                        <span class="font-medium text-sm text-slate-700 dark:text-slate-200" data-i18n="example_code_title">编程助手</span>
+                                    </div>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_code_text">搜索AI资讯并生成可视化网页报告</p>
+                                </div>
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
+                                            cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <div class="w-7 h-7 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
+                                            <i class="fas fa-book text-violet-500 text-xs"></i>
+                                        </div>
+                                        <span class="font-medium text-sm text-slate-700 dark:text-slate-200" data-i18n="example_knowledge_title">知识库</span>
+                                    </div>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_knowledge_text">查看知识库当前文档情况</p>
+                                </div>
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
+                                            cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <div class="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
+                                            <i class="fas fa-puzzle-piece text-rose-500 text-xs"></i>
+                                        </div>
+                                        <span class="font-medium text-sm text-slate-700 dark:text-slate-200" data-i18n="example_skill_title">技能系统</span>
+                                    </div>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_skill_text">查看所有支持的工具和技能</p>
+                                </div>
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
+                                            cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200"
+                                     data-send="/help">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <div class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                            <i class="fas fa-terminal text-slate-500 text-xs"></i>
+                                        </div>
+                                        <span class="font-medium text-sm text-slate-700 dark:text-slate-200" data-i18n="example_web_title">指令中心</span>
+                                    </div>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_web_text">查看全部命令</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scroll-to-bottom FAB -->
+                    <button id="scroll-to-bottom-btn"
+                            class="hidden absolute right-5 bottom-[80px] z-10
+                                   w-9 h-9 rounded-full shadow-lg
+                                   bg-white dark:bg-[#2A2A2A] border border-slate-200 dark:border-white/15
+                                   text-slate-500 dark:text-slate-400 hover:text-primary-500 dark:hover:text-primary-400
+                                   flex items-center justify-center cursor-pointer transition-all duration-200
+                                   hover:shadow-xl hover:scale-105"
+                            onclick="_autoScrollEnabled = true; scrollChatToBottom(true);">
+                        <i class="fas fa-chevron-down text-sm"></i>
+                    </button>
+
+                    <!-- Chat Input -->
+                    <div class="flex-shrink-0 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] px-2 sm:px-4 py-2 sm:py-3">
+                        <div class="max-w-3xl mx-auto">
+                            <!-- Attachment preview bar -->
+                            <div id="attachment-preview" class="attachment-preview hidden"></div>
+                            <div class="flex items-center gap-1 sm:gap-2 relative">
+                                <div class="flex items-center flex-shrink-0">
+                                    <button id="new-chat-btn" class="w-8 h-9 sm:w-9 sm:h-10 flex items-center justify-center rounded-lg
+                                                                     text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20
+                                                                     cursor-pointer transition-colors duration-150"
+                                            onclick="newChat()">
+                                        <i class="fas fa-plus text-sm sm:text-base"></i>
+                                    </button>
+                                    <button id="clear-context-btn" class="hidden sm:flex w-9 h-10 items-center justify-center rounded-lg
+                                                                          text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20
+                                                                          cursor-pointer transition-colors duration-150"
+                                            onclick="clearContext()">
+                                        <i class="fas fa-trash-can text-base"></i>
+                                    </button>
+                                    <button id="attach-btn" class="w-8 h-9 sm:w-9 sm:h-10 flex items-center justify-center rounded-lg
+                                                                   text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20
+                                                                   cursor-pointer transition-colors duration-150"
+                                            type="button"
+                                            onclick="toggleAttachMenu(event)">
+                                        <i class="fas fa-paperclip text-sm sm:text-base"></i>
+                                    </button>
+                                </div>
+                                <input type="file" id="file-input" class="hidden" multiple
+                                       accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.json,.xml,.zip,.rar,.7z,.py,.js,.ts,.java,.c,.cpp,.go,.rs,.md">
+                                <input type="file" id="folder-input" class="hidden" multiple webkitdirectory directory>
+                                <div id="attach-menu" class="attach-menu hidden">
+                                    <button id="attach-file-option" type="button" class="attach-menu-item" onclick="triggerFileUpload()">
+                                        <i class="fas fa-file-arrow-up"></i>
+                                        <span data-i18n="attach_menu_file">上传文件</span>
+                                    </button>
+                                    <button id="attach-folder-option" type="button" class="attach-menu-item" onclick="triggerFolderUpload()">
+                                        <i class="fas fa-folder-plus"></i>
+                                        <span data-i18n="attach_menu_folder">上传文件夹</span>
+                                    </button>
+                                </div>
+                                <div id="slash-menu" class="slash-menu hidden"></div>
+                                <div class="flex-1 min-w-0 relative flex items-center">
+                                    <textarea id="chat-input"
+                                              class="w-full pl-3 sm:pl-4 pr-10 sm:pr-11 py-2 sm:py-[10px] rounded-xl border border-slate-200 dark:border-slate-600
+                                                     bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-100
+                                                     placeholder:text-slate-400 dark:placeholder:text-slate-500
+                                                     focus:outline-none focus:ring-0 focus:border-primary-600
+                                                     text-sm leading-relaxed"
+                                              rows="1"
+                                              data-i18n-placeholder="input_placeholder"
+                                              placeholder="输入消息，或输入 / 使用指令"></textarea>
+                                    <button id="mic-btn" type="button"
+                                            class="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg
+                                                   text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20
+                                                   cursor-pointer transition-colors duration-150"
+                                            data-i18n-title="mic_idle_title" title="点击录音 / 再按一次结束">
+                                        <i class="fas fa-microphone text-xs sm:text-sm"></i>
+                                    </button>
+                                </div>
+                                <button id="send-btn"
+                                        class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg
+                                               bg-primary-400 text-white hover:bg-primary-500
+                                               disabled:bg-slate-300 dark:disabled:bg-slate-600
+                                               disabled:cursor-not-allowed cursor-pointer transition-colors duration-150"
+                                        disabled>
+                                    <i class="fas fa-paper-plane text-xs sm:text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Files                                            -->
+                <!-- ====================================================== -->
+                <div id="view-files" class="view">
+                    <div class="flex-1 overflow-hidden flex flex-col">
+                        <!-- Files Header -->
+                        <div class="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200 dark:border-white/10">
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100" data-i18n="files_title">File Browser</h2>
+                                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="files_desc">Browse and manage workspace files</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button id="files-upload-btn" class="px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium cursor-pointer transition-colors duration-150"
+                                        onclick="showFileUploadDialog()">
+                                    <i class="fas fa-upload mr-1"></i> <span data-i18n="files_upload">Upload</span>
+                                </button>
+                                <button id="files-mkdir-btn" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors duration-150"
+                                        onclick="showMkdirDialog()">
+                                    <i class="fas fa-folder-plus mr-1"></i> <span data-i18n="files_new_folder">New Folder</span>
+                                </button>
+                                <button id="files-new-file-btn" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors duration-150"
+                                        onclick="showNewFileDialog()">
+                                    <i class="fas fa-file-plus mr-1"></i> <span data-i18n="files_new_file">New File</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Breadcrumb -->
+                        <div id="files-breadcrumb" class="flex items-center gap-1 px-4 sm:px-6 py-2 text-sm border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#151515]">
+                            <span class="cursor-pointer text-primary-500 hover:text-primary-600 font-medium" onclick="filesNavigateTo('.')">~</span>
+                        </div>
+
+                        <!-- File List -->
+                        <div id="files-list" class="flex-1 overflow-y-auto p-4 sm:p-6">
+                            <div class="max-w-4xl mx-auto">
+                                <div id="files-content" class="space-y-1">
+                                    <!-- File entries rendered by JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Editor Modal -->
+                    <div id="file-editor-modal" class="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center hidden">
+                        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col shadow-2xl">
+                            <div class="flex items-center justify-between p-4 border-b border-slate-200 dark:border-white/10">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <i class="fas fa-file-code text-primary-500"></i>
+                                    <span id="file-editor-title" class="font-semibold text-slate-800 dark:text-slate-100 truncate">Edit File</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button class="px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium cursor-pointer transition-colors duration-150"
+                                            onclick="saveFileContent()">
+                                        <i class="fas fa-save mr-1"></i> Save
+                                    </button>
+                                    <button class="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer transition-colors duration-150"
+                                            onclick="closeFileEditor()">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex-1 overflow-hidden p-4">
+                                <textarea id="file-editor-content" class="w-full h-full min-h-[400px] p-4 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-100 font-mono text-sm leading-relaxed resize-none focus:outline-none focus:border-primary-500 transition-colors" spellcheck="false"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Context Menu -->
+                    <div id="file-context-menu" class="fixed z-[150] bg-white dark:bg-[#2A2A2A] border border-slate-200 dark:border-white/10 rounded-xl shadow-xl py-1 hidden" style="min-width: 180px;">
+                        <button class="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors" onclick="fileAction('download')">
+                            <i class="fas fa-download text-xs w-4 text-center"></i> <span data-i18n="files_ctx_download">Download</span>
+                        </button>
+                        <button class="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors" onclick="fileAction('edit')">
+                            <i class="fas fa-pen text-xs w-4 text-center"></i> <span data-i18n="files_ctx_edit">Edit</span>
+                        </button>
+                        <button class="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors" onclick="fileAction('rename')">
+                            <i class="fas fa-i-cursor text-xs w-4 text-center"></i> <span data-i18n="files_ctx_rename">Rename</span>
+                        </button>
+                        <div class="border-t border-slate-100 dark:border-white/5 my-1"></div>
+                        <button class="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer transition-colors" onclick="fileAction('delete')">
+                            <i class="fas fa-trash text-xs w-4 text-center"></i> <span data-i18n="files_ctx_delete">Delete</span>
+                        </button>
+                    </div>
+
+                    <!-- Rename Dialog -->
+                    <div id="file-rename-dialog" class="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center hidden">
+                        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 w-full max-w-md mx-4 p-6 shadow-2xl">
+                            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4" data-i18n="files_rename_title">Rename</h3>
+                            <input id="file-rename-input" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-primary-500 transition-colors" placeholder="New name">
+                            <div class="flex justify-end gap-2 mt-4">
+                                <button class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer" onclick="closeRenameDialog()">Cancel</button>
+                                <button class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium cursor-pointer" onclick="confirmRename()">Rename</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mkdir Dialog -->
+                    <div id="file-mkdir-dialog" class="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center hidden">
+                        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 w-full max-w-md mx-4 p-6 shadow-2xl">
+                            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4" data-i18n="files_mkdir_title">New Folder</h3>
+                            <input id="file-mkdir-input" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-primary-500 transition-colors" placeholder="Folder name">
+                            <div class="flex justify-end gap-2 mt-4">
+                                <button class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer" onclick="closeMkdirDialog()">Cancel</button>
+                                <button class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium cursor-pointer" onclick="confirmMkdir()">Create</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New File Dialog -->
+                    <div id="file-newfile-dialog" class="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center hidden">
+                        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 w-full max-w-md mx-4 p-6 shadow-2xl">
+                            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4" data-i18n="files_newfile_title">New File</h3>
+                            <input id="file-newfile-input" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-primary-500 transition-colors" placeholder="File name (e.g. notes.txt)">
+                            <div class="flex justify-end gap-2 mt-4">
+                                <button class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer" onclick="closeNewFileDialog()">Cancel</button>
+                                <button class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium cursor-pointer" onclick="confirmNewFile()">Create</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="file" id="files-upload-input" class="hidden" multiple onchange="handleFileUpload(this)">
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Config                                            -->
+                <!-- ====================================================== -->
+                <div id="view-config" class="view">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100" data-i18n="config_title">配置管理</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="config_desc">管理模型和 Agent 配置</p>
+                                </div>
+                            </div>
+                            <div class="grid gap-6">
+
+                                <!-- Model Config Card -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <div class="flex items-center gap-3 mb-5">
+                                        <div class="w-9 h-9 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center">
+                                            <i class="fas fa-microchip text-primary-500 text-sm"></i>
+                                        </div>
+                                        <h3 class="font-semibold text-slate-800 dark:text-slate-100" data-i18n="config_model">模型配置</h3>
+                                        <a class="ml-auto text-xs text-slate-500 dark:text-slate-400 hover:text-primary-500 dark:hover:text-primary-400 cursor-pointer transition-colors flex items-center gap-1"
+                                           onclick="navigateTo('models')">
+                                            <span data-i18n="config_model_advanced">高级配置</span>
+                                            <i class="fas fa-arrow-right text-[10px]"></i>
+                                        </a>
+                                    </div>
+                                    <div class="space-y-5">
+                                        <!-- Provider -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5" data-i18n="config_provider">模型厂商</label>
+                                            <div id="cfg-provider" class="cfg-dropdown" tabindex="0">
+                                                <div class="cfg-dropdown-selected">
+                                                    <span class="cfg-dropdown-text">--</span>
+                                                    <i class="fas fa-chevron-down cfg-dropdown-arrow"></i>
+                                                </div>
+                                                <div class="cfg-dropdown-menu"></div>
+                                            </div>
+                                            <div id="cfg-custom-tip" class="mt-1.5 text-xs text-slate-400 dark:text-slate-500 hidden">
+                                                <i class="fas fa-info-circle mr-1"></i><span data-i18n="config_custom_tip">接口需遵循 OpenAI API 协议</span>
+                                            </div>
+                                        </div>
+                                        <!-- Model -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5" data-i18n="config_model_name">模型</label>
+                                            <div id="cfg-model-select" class="cfg-dropdown" tabindex="0">
+                                                <div class="cfg-dropdown-selected">
+                                                    <span class="cfg-dropdown-text">--</span>
+                                                    <i class="fas fa-chevron-down cfg-dropdown-arrow"></i>
+                                                </div>
+                                                <div class="cfg-dropdown-menu"></div>
+                                            </div>
+                                            <div id="cfg-model-custom-wrap" class="mt-2 hidden">
+                                                <input id="cfg-model-custom" type="text"
+                                                       class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                                              bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                                              focus:outline-none focus:border-primary-500 font-mono transition-colors"
+                                                       data-i18n-placeholder="config_custom_model_hint" placeholder="输入自定义模型名称">
+                                            </div>
+                                        </div>
+                                        <!-- API Key -->
+                                        <div id="cfg-api-key-wrap">
+                                            <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Key</label>
+                                            <div class="relative">
+                                                <input id="cfg-api-key" type="text" autocomplete="off" data-1p-ignore data-lpignore="true"
+                                                       class="w-full px-3 py-2 pr-10 rounded-lg border border-slate-200 dark:border-slate-600
+                                                              bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                                              focus:outline-none focus:border-primary-500 font-mono transition-colors cfg-key-masked"
+                                                       placeholder="sk-...">
+                                                <button type="button" id="cfg-api-key-toggle"
+                                                        class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600
+                                                               dark:hover:text-slate-300 cursor-pointer transition-colors p-1"
+                                                        onclick="toggleApiKeyVisibility()">
+                                                    <i class="fas fa-eye text-xs"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <!-- API Base -->
+                                        <div id="cfg-api-base-wrap" class="hidden">
+                                            <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Base</label>
+                                            <input id="cfg-api-base" type="text"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                                          focus:outline-none focus:border-primary-500 font-mono transition-colors"
+                                                   placeholder="https://...">
+                                        </div>
+                                        <!-- Save Model Button -->
+                                        <div class="flex items-center justify-end gap-3 pt-1">
+                                            <span id="cfg-model-status" class="text-xs text-primary-500 opacity-0 transition-opacity duration-300"></span>
+                                            <button id="cfg-model-save"
+                                                    class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium
+                                                           cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onclick="saveModelConfig()" data-i18n="config_save">保存</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Agent Config Card -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <div class="flex items-center gap-3 mb-5">
+                                        <div class="w-9 h-9 rounded-lg bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
+                                            <i class="fas fa-robot text-rose-500 text-sm"></i>
+                                        </div>
+                                        <h3 class="font-semibold text-slate-800 dark:text-slate-100" data-i18n="config_agent">Agent 配置</h3>
+                                    </div>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                                                <span data-i18n="config_max_tokens">最大上下文 Token</span>
+                                                <span class="cfg-tip" data-tip-key="config_max_tokens_hint"><i class="fas fa-circle-question"></i></span>
+                                            </label>
+                                            <input id="cfg-max-tokens" type="number" min="1000" max="200000" step="1000"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                                          focus:outline-none focus:border-primary-500 font-mono transition-colors">
+                                        </div>
+                                        <div>
+                                            <label class="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                                                <span data-i18n="config_max_turns">最大记忆轮次</span>
+                                                <span class="cfg-tip" data-tip-key="config_max_turns_hint"><i class="fas fa-circle-question"></i></span>
+                                            </label>
+                                            <input id="cfg-max-turns" type="number" min="1" max="100" step="1"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                                          focus:outline-none focus:border-primary-500 font-mono transition-colors">
+                                        </div>
+                                        <div>
+                                            <label class="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                                                <span data-i18n="config_max_steps">最大执行步数</span>
+                                                <span class="cfg-tip" data-tip-key="config_max_steps_hint"><i class="fas fa-circle-question"></i></span>
+                                            </label>
+                                            <input id="cfg-max-steps" type="number" min="1" max="50" step="1"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                                          focus:outline-none focus:border-primary-500 font-mono transition-colors">
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <label class="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400">
+                                                <span data-i18n="config_enable_thinking">Deep Thinking</span>
+                                                <span class="cfg-tip" data-tip-key="config_enable_thinking_hint"><i class="fas fa-circle-question"></i></span>
+                                            </label>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input id="cfg-enable-thinking" type="checkbox" class="sr-only peer">
+                                                <div class="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-checked:bg-primary-400 rounded-full
+                                                            after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white
+                                                            after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                                            </label>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <label class="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400">
+                                                <span data-i18n="config_self_evolution">Self-Evolution</span>
+                                                <span class="cfg-tip" data-tip-key="config_self_evolution_hint"><i class="fas fa-circle-question"></i></span>
+                                            </label>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input id="cfg-self-evolution" type="checkbox" class="sr-only peer">
+                                                <div class="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-checked:bg-primary-400 rounded-full
+                                                            after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white
+                                                            after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                                            </label>
+                                        </div>
+                                        <div class="flex items-center justify-end gap-3 pt-1">
+                                            <span id="cfg-agent-status" class="text-xs text-primary-500 opacity-0 transition-opacity duration-300"></span>
+                                            <button id="cfg-agent-save"
+                                                    class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium
+                                                           cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onclick="saveAgentConfig()" data-i18n="config_save">保存</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Security Config Card -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <div class="flex items-center gap-3 mb-5">
+                                        <div class="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
+                                            <i class="fas fa-lock text-amber-500 text-sm"></i>
+                                        </div>
+                                        <h3 class="font-semibold text-slate-800 dark:text-slate-100" data-i18n="config_security">安全设置</h3>
+                                    </div>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5" data-i18n="config_password">访问密码</label>
+                                            <input id="cfg-password" type="password" autocomplete="new-password"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                                          focus:outline-none focus:border-primary-500 font-mono transition-colors
+                                                          cfg-key-masked"
+                                                   data-masked="1">
+                                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5" data-i18n="config_password_hint">留空则不启用密码保护</p>
+                                        </div>
+                                        <div class="flex items-center justify-end gap-3 pt-1">
+                                            <span id="cfg-password-status" class="text-xs text-primary-500 opacity-0 transition-opacity duration-300"></span>
+                                            <button id="cfg-password-save"
+                                                    class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium
+                                                           cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onclick="savePasswordConfig()" data-i18n="config_save">保存</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Language Config Card -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <div class="flex items-center gap-3 mb-5">
+                                        <div class="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-900/30 flex items-center justify-center">
+                                            <i class="fas fa-language text-sky-500 text-sm"></i>
+                                        </div>
+                                        <h3 class="font-semibold text-slate-800 dark:text-slate-100" data-i18n="config_language">语言</h3>
+                                    </div>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                                                <span data-i18n="config_language">语言</span>
+                                                <span class="cfg-tip" data-tip-key="config_language_hint"><i class="fas fa-circle-question"></i></span>
+                                            </label>
+                                            <div id="cfg-lang-select" class="cfg-dropdown" tabindex="0">
+                                                <div class="cfg-dropdown-selected">
+                                                    <span class="cfg-dropdown-text">--</span>
+                                                    <i class="fas fa-chevron-down cfg-dropdown-arrow"></i>
+                                                </div>
+                                                <div class="cfg-dropdown-menu"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Skills                                            -->
+                <!-- ====================================================== -->
+                <div id="view-skills" class="view">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100" data-i18n="skills_title">技能管理</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="skills_desc">查看、启用或禁用 Agent 技能</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <a href="https://clawhub.ai/" target="_blank"
+                                       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary-500 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors">
+                                        <i class="fas fa-puzzle-piece text-[10px]"></i>
+                                        <span data-i18n="skills_hub_btn">ClawHub</span>
+                                    </a>
+                                    <button onclick="switchSkillsTab('add')"
+                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-primary-500 hover:bg-primary-600 transition-colors cursor-pointer">
+                                        <i class="fas fa-plus text-[10px]"></i>
+                                        <span data-i18n="skills_add_btn">Add Skill</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Skills Tabs: My Skills / Add Skill -->
+                            <div class="flex items-center bg-slate-100 dark:bg-white/10 rounded-lg p-0.5 mb-6 w-fit">
+                                <button id="skills-tab-my" onclick="switchSkillsTab('my')"
+                                        class="skills-tab px-4 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors duration-150 active">
+                                    <i class="fas fa-bolt mr-1.5"></i><span data-i18n="skills_tab_my">My Skills</span>
+                                </button>
+                                <button id="skills-tab-add" onclick="switchSkillsTab('add')"
+                                        class="skills-tab px-4 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors duration-150">
+                                    <i class="fas fa-plus mr-1.5"></i><span data-i18n="skills_tab_add">Add Skill</span>
+                                </button>
+                            </div>
+
+                            <!-- Panel: My Skills -->
+                            <div id="skills-panel-my">
+                                <!-- Built-in Tools Section -->
+                                <div class="mb-8">
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500" data-i18n="tools_section_title">内置工具</span>
+                                        <span id="tools-count-badge" class="hidden px-2 py-0.5 rounded-full text-xs bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400"></span>
+                                    </div>
+                                    <div id="tools-empty" class="flex items-center gap-2 py-4 text-slate-400 dark:text-slate-500 text-sm">
+                                        <i class="fas fa-spinner fa-spin text-xs"></i>
+                                        <span data-i18n="tools_loading">加载工具中...</span>
+                                    </div>
+                                    <div id="tools-list" class="grid gap-3 sm:grid-cols-2 hidden"></div>
+                                </div>
+
+                                <!-- Skills Section -->
+                                <div>
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500" data-i18n="skills_section_title">技能</span>
+                                        <span id="skills-count-badge" class="hidden px-2 py-0.5 rounded-full text-xs bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400"></span>
+                                    </div>
+                                    <div id="skills-empty" class="flex flex-col items-center justify-center py-12">
+                                        <div class="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center mb-3">
+                                            <i class="fas fa-bolt text-amber-400 text-lg"></i>
+                                        </div>
+                                        <p class="text-slate-500 dark:text-slate-400 font-medium" data-i18n="skills_loading">加载技能中...</p>
+                                        <p class="text-sm text-slate-400 dark:text-slate-500 mt-1" data-i18n="skills_loading_desc">技能加载后将显示在此处</p>
+                                    </div>
+                                    <div id="skills-list" class="grid gap-4 sm:grid-cols-2"></div>
+                                </div>
+                            </div>
+
+                            <!-- Panel: Add Skill -->
+                            <div id="skills-panel-add" class="hidden">
+                                <!-- Add method tabs -->
+                                <div class="grid gap-4 sm:grid-cols-3 mb-6">
+                                    <button onclick="switchAddSkillMethod('create')"
+                                            id="add-method-create"
+                                            class="add-method-btn group flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 transition-all cursor-pointer">
+                                        <div class="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                                            <i class="fas fa-pen-to-square text-primary-500 text-lg"></i>
+                                        </div>
+                                        <span class="text-sm font-medium" data-i18n="skills_method_create">Create</span>
+                                        <span class="text-xs text-slate-400 dark:text-slate-500" data-i18n="skills_method_create_desc">Write SKILL.md</span>
+                                    </button>
+                                    <button onclick="switchAddSkillMethod('upload')"
+                                            id="add-method-upload"
+                                            class="add-method-btn group flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] text-slate-600 dark:text-slate-400 hover:border-primary-300 dark:hover:border-primary-700 transition-all cursor-pointer">
+                                        <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
+                                            <i class="fas fa-file-zipper text-emerald-500 text-lg"></i>
+                                        </div>
+                                        <span class="text-sm font-medium" data-i18n="skills_method_upload">Upload</span>
+                                        <span class="text-xs text-slate-400 dark:text-slate-500" data-i18n="skills_method_upload_desc">Upload .zip file</span>
+                                    </button>
+                                    <button onclick="switchAddSkillMethod('url')"
+                                            id="add-method-url"
+                                            class="add-method-btn group flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] text-slate-600 dark:text-slate-400 hover:border-primary-300 dark:hover:border-primary-700 transition-all cursor-pointer">
+                                        <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                                            <i class="fas fa-link text-blue-500 text-lg"></i>
+                                        </div>
+                                        <span class="text-sm font-medium" data-i18n="skills_method_url">From URL</span>
+                                        <span class="text-xs text-slate-400 dark:text-slate-500" data-i18n="skills_method_url_desc">GitHub / .zip link</span>
+                                    </button>
+                                </div>
+
+                                <!-- Create Skill Form -->
+                                <div id="add-skill-create" class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <h3 class="text-base font-semibold text-slate-700 dark:text-slate-200 mb-4" data-i18n="skills_create_title">Create Custom Skill</h3>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5" data-i18n="skills_create_name_label">Skill Name</label>
+                                            <input id="skill-create-name" type="text" placeholder="my-custom-skill"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0F0F] text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5" data-i18n="skills_create_desc_label">Description (optional)</label>
+                                            <input id="skill-create-desc" type="text" placeholder="Brief description of the skill"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0F0F] text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                                                <span data-i18n="skills_create_content_label">SKILL.md Content</span>
+                                                <span class="text-slate-400 dark:text-slate-500 ml-1">(Markdown)</span>
+                                            </label>
+                                            <textarea id="skill-create-content" rows="12"
+                                                      placeholder="# My Custom Skill&#10;&#10;---&#10;name: my-custom-skill&#10;description: A custom skill for OnyxAgent&#10;---&#10;&#10;## Instructions&#10;&#10;Write your skill instructions here..."
+                                                      class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0F0F] text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors font-mono text-xs resize-y"></textarea>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <button onclick="createSkillFromContent()"
+                                                    id="skill-create-btn"
+                                                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 transition-colors cursor-pointer">
+                                                <i class="fas fa-plus text-xs"></i>
+                                                <span data-i18n="skills_create_btn">Create Skill</span>
+                                            </button>
+                                            <span id="skill-create-status" class="text-xs text-slate-400 dark:text-slate-500"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Upload Skill Form -->
+                                <div id="add-skill-upload" class="hidden bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <h3 class="text-base font-semibold text-slate-700 dark:text-slate-200 mb-4" data-i18n="skills_upload_title">Upload Skill Package</h3>
+                                    <div class="space-y-4">
+                                        <div id="skill-upload-dropzone"
+                                             class="border-2 border-dashed border-slate-300 dark:border-white/20 rounded-xl p-8 text-center hover:border-primary-400 dark:hover:border-primary-600 transition-colors cursor-pointer"
+                                             onclick="document.getElementById('skill-upload-file').click()"
+                                             ondragover="event.preventDefault(); this.classList.add('border-primary-400','dark:border-primary-600','bg-primary-50','dark:bg-primary-900/10')"
+                                             ondragleave="this.classList.remove('border-primary-400','dark:border-primary-600','bg-primary-50','dark:bg-primary-900/10')"
+                                             ondrop="event.preventDefault(); this.classList.remove('border-primary-400','dark:border-primary-600','bg-primary-50','dark:bg-primary-900/10'); handleSkillZipDrop(event)">
+                                            <input id="skill-upload-file" type="file" accept=".zip" class="hidden" onchange="handleSkillZipSelect(event)">
+                                            <div class="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mx-auto mb-3">
+                                                <i class="fas fa-cloud-arrow-up text-emerald-500 text-xl"></i>
+                                            </div>
+                                            <p class="text-sm font-medium text-slate-600 dark:text-slate-300" data-i18n="skills_upload_drag">Drag & drop .zip file here</p>
+                                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1" data-i18n="skills_upload_or">or click to browse</p>
+                                            <p id="skill-upload-filename" class="text-xs text-primary-500 font-medium mt-2 hidden"></p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5" data-i18n="skills_upload_name_label">Skill Name (optional, auto-detected from zip)</label>
+                                            <input id="skill-upload-name" type="text" placeholder="auto-detected"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0F0F] text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                                        </div>
+                                        <div class="bg-slate-50 dark:bg-white/5 rounded-lg p-3">
+                                            <p class="text-xs text-slate-500 dark:text-slate-400" data-i18n="skills_upload_hint">The zip should contain a folder with a SKILL.md file, or directly contain SKILL.md at the root.</p>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <button onclick="uploadSkillZip()"
+                                                    id="skill-upload-btn"
+                                                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition-colors cursor-pointer">
+                                                <i class="fas fa-upload text-xs"></i>
+                                                <span data-i18n="skills_upload_btn">Upload & Install</span>
+                                            </button>
+                                            <span id="skill-upload-status" class="text-xs text-slate-400 dark:text-slate-500"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- URL Install Form -->
+                                <div id="add-skill-url" class="hidden bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <h3 class="text-base font-semibold text-slate-700 dark:text-slate-200 mb-4" data-i18n="skills_url_title">Install from URL</h3>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5" data-i18n="skills_url_label">Package URL</label>
+                                            <input id="skill-url-input" type="url" placeholder="https://github.com/user/skill/archive/refs/heads/main.zip"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0F0F] text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5" data-i18n="skills_url_hint">Supports direct .zip links from GitHub, GitLab, or any URL</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5" data-i18n="skills_url_name_label">Skill Name (optional, auto-detected from URL)</label>
+                                            <input id="skill-url-name" type="text" placeholder="auto-detected"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0F0F] text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <button onclick="installSkillFromUrl()"
+                                                    id="skill-url-btn"
+                                                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 transition-colors cursor-pointer">
+                                                <i class="fas fa-download text-xs"></i>
+                                                <span data-i18n="skills_url_btn">Install Skill</span>
+                                            </button>
+                                            <span id="skill-url-status" class="text-xs text-slate-400 dark:text-slate-500"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Skill Delete Confirm Dialog -->
+                <div id="skill-delete-dialog" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+                    <div class="absolute inset-0 bg-black/50" onclick="closeSkillDeleteDialog()"></div>
+                    <div class="relative bg-white dark:bg-[#1A1A1A] rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-200 dark:border-white/10">
+                        <h3 class="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2" data-i18n="skills_delete_title">Delete Skill</h3>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mb-5" data-i18n="skills_delete_msg">Are you sure you want to delete this skill? This action cannot be undone.</p>
+                        <div class="flex items-center justify-end gap-3">
+                            <button onclick="closeSkillDeleteDialog()"
+                                    class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer" data-i18n="cancel">Cancel</button>
+                            <button onclick="confirmDeleteSkill()"
+                                    class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors cursor-pointer" data-i18n="ok">Delete</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Memory                                            -->
+                <!-- ====================================================== -->
+                <div id="view-memory" class="view">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+
+                            <!-- Panel: list -->
+                            <div id="memory-panel-list">
+                                <div class="flex items-center justify-between mb-6">
+                                    <div>
+                                        <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100" data-i18n="memory_title">记忆管理</h2>
+                                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="memory_desc">查看 Agent 记忆文件和内容</p>
+                                    </div>
+                                    <div class="flex items-center bg-slate-100 dark:bg-white/10 rounded-lg p-0.5">
+                                        <button id="memory-tab-files" onclick="switchMemoryTab('files')"
+                                                class="memory-tab px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors duration-150 active">
+                                            <i class="fas fa-file-lines mr-1.5"></i><span data-i18n="memory_tab_files">记忆文件</span>
+                                        </button>
+                                        <button id="memory-tab-dreams" onclick="switchMemoryTab('dreams')"
+                                                class="memory-tab px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors duration-150">
+                                            <i class="fas fa-seedling mr-1.5"></i><span data-i18n="memory_tab_dreams">自主进化</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="memory-empty" class="flex flex-col items-center justify-center py-20">
+                                    <div class="w-16 h-16 rounded-2xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center mb-4">
+                                        <i class="fas fa-brain text-purple-400 text-xl"></i>
+                                    </div>
+                                    <p class="text-slate-500 dark:text-slate-400 font-medium" data-i18n="memory_loading">加载记忆文件中...</p>
+                                    <p class="text-sm text-slate-400 dark:text-slate-500 mt-1" data-i18n="memory_loading_desc">记忆文件将显示在此处</p>
+                                </div>
+                                <div id="memory-list" class="hidden">
+                                    <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                                        <table class="w-full">
+                                            <thead>
+                                                <tr class="border-b border-slate-200 dark:border-white/10">
+                                                    <th class="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" data-i18n="memory_col_name">文件名</th>
+                                                    <th class="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" data-i18n="memory_col_type">类型</th>
+                                                    <th class="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" data-i18n="memory_col_size">大小</th>
+                                                    <th class="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" data-i18n="memory_col_updated">更新时间</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="memory-table-body"></tbody>
+                                        </table>
+                                    </div>
+                                    <div id="memory-pagination" class="flex items-center justify-between mt-4 text-sm text-slate-500 dark:text-slate-400"></div>
+                                </div>
+                            </div>
+
+                            <!-- Panel: file viewer (replaces list) -->
+                            <div id="memory-panel-viewer" class="hidden">
+                                <div class="flex items-center gap-3 mb-6">
+                                    <button onclick="closeMemoryViewer()"
+                                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm
+                                                   text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
+                                                   border border-slate-200 dark:border-white/10 transition-colors cursor-pointer">
+                                        <i class="fas fa-arrow-left text-xs"></i>
+                                        <span data-i18n="memory_back">返回列表</span>
+                                    </button>
+                                    <h2 id="memory-viewer-title"
+                                        class="text-base font-semibold text-slate-800 dark:text-slate-100 font-mono truncate"></h2>
+                                </div>
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                                    <div id="memory-viewer-content"
+                                         class="p-5 overflow-y-auto text-sm msg-content text-slate-700 dark:text-slate-200"
+                                         style="max-height: calc(100vh - 220px)"></div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Knowledge                                         -->
+                <!-- ====================================================== -->
+                <div id="view-knowledge" class="view">
+                    <div class="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10">
+                        <div class="w-full max-w-[1600px] mx-auto">
+
+                            <!-- Header -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100" data-i18n="knowledge_title">知识库</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="knowledge_desc">浏览和探索你的知识库</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span id="knowledge-stats" class="text-xs text-slate-400 dark:text-slate-500 hidden sm:inline"></span>
+                                    <div class="flex items-center bg-slate-100 dark:bg-white/10 rounded-lg p-0.5">
+                                        <button id="knowledge-tab-docs" onclick="switchKnowledgeTab('docs')"
+                                                class="knowledge-tab px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors duration-150 active">
+                                            <i class="fas fa-folder-tree mr-1.5"></i><span data-i18n="knowledge_tab_docs">文档</span>
+                                        </button>
+                                        <button id="knowledge-tab-graph" onclick="switchKnowledgeTab('graph')"
+                                                class="knowledge-tab px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors duration-150">
+                                            <i class="fas fa-diagram-project mr-1.5"></i><span data-i18n="knowledge_tab_graph">图谱</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Empty state -->
+                            <div id="knowledge-empty" class="flex flex-col items-center justify-center py-20">
+                                <div class="w-16 h-16 rounded-2xl bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center mb-4">
+                                    <i class="fas fa-book text-rose-400 text-xl"></i>
+                                </div>
+                                <p class="text-slate-500 dark:text-slate-400 font-medium" data-i18n="knowledge_loading">加载知识库中...</p>
+                                <p class="text-sm text-slate-400 dark:text-slate-500 mt-1" data-i18n="knowledge_loading_desc">知识页面将显示在这里</p>
+                                <div id="knowledge-empty-guide" class="hidden mt-6 max-w-sm text-center">
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-4" data-i18n="knowledge_empty_guide">在对话中发送文档、链接或主题给 Agent，它会自动整理到你的知识库中。</p>
+                                    <button onclick="navigateTo('chat')"
+                                            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600
+                                                   text-white text-sm font-medium cursor-pointer transition-colors duration-150">
+                                        <i class="fas fa-message text-xs"></i>
+                                        <span data-i18n="knowledge_go_chat">开始对话</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Documents panel -->
+                            <div id="knowledge-panel-docs" class="hidden">
+                                <div class="flex flex-col md:flex-row gap-4 md:gap-6" style="min-height: calc(100vh - 220px)">
+                                    <!-- File tree -->
+                                    <div id="knowledge-sidebar" class="w-full md:w-72 lg:w-80 flex-shrink-0">
+                                        <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                                            <div class="px-4 py-3 border-b border-slate-200 dark:border-white/10">
+                                                <div class="relative">
+                                                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                                    <input id="knowledge-search" type="text" placeholder="Search..."
+                                                           class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-400/50"
+                                                           oninput="filterKnowledgeTree(this.value)">
+                                                </div>
+                                            </div>
+                                            <div id="knowledge-tree" class="p-2 overflow-y-auto max-h-[50vh] md:max-h-[calc(100vh-300px)]"></div>
+                                        </div>
+                                    </div>
+                                    <!-- Content viewer -->
+                                    <div class="flex-1 min-w-0">
+                                        <div id="knowledge-content-placeholder"
+                                             class="flex flex-col items-center justify-center py-20 text-slate-400 dark:text-slate-500">
+                                            <i class="fas fa-file-lines text-3xl mb-3 opacity-40"></i>
+                                            <p class="text-sm" data-i18n="knowledge_select_hint">选择一个文档查看</p>
+                                        </div>
+                                        <div id="knowledge-content-viewer" class="hidden">
+                                            <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                                                <div class="flex items-center gap-3 px-4 md:px-5 py-3 border-b border-slate-200 dark:border-white/10">
+                                                    <button onclick="knowledgeMobileBack()" class="md:hidden p-1 -ml-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">
+                                                        <i class="fas fa-arrow-left text-xs"></i>
+                                                    </button>
+                                                    <i class="fas fa-file-lines text-slate-400 text-sm hidden md:inline"></i>
+                                                    <span id="knowledge-viewer-title" class="text-sm font-medium text-slate-700 dark:text-slate-200 truncate"></span>
+                                                    <span id="knowledge-viewer-path" class="text-xs text-slate-400 dark:text-slate-500 ml-auto font-mono truncate hidden md:inline"></span>
+                                                </div>
+                                                <div id="knowledge-viewer-body"
+                                                     class="p-4 md:p-5 overflow-y-auto text-sm msg-content text-slate-700 dark:text-slate-200"
+                                                     style="max-height: calc(100vh - 280px)"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Graph panel -->
+                            <div id="knowledge-panel-graph" class="hidden">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                                    <div id="knowledge-graph-container" class="w-full h-[60vh] md:h-[calc(100vh-220px)]"></div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Models                                            -->
+                <!-- ====================================================== -->
+                <div id="view-models" class="view">
+                    <!-- Tailwind JIT safelist: capability-card icon colors are
+                         emitted from JS template strings. Listing them here
+                         (display:none) guarantees the CDN-side compiler picks
+                         them up regardless of render timing. -->
+                    <div class="hidden bg-blue-50 dark:bg-blue-900/30 text-blue-500
+                                       bg-orange-50 dark:bg-orange-900/30 text-orange-500
+                                       bg-purple-50 dark:bg-purple-900/30 text-purple-500
+                                       bg-amber-50 dark:bg-amber-900/30 text-amber-500
+                                       bg-primary-50 dark:bg-primary-900/30 text-primary-500"></div>
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100" data-i18n="models_title">模型管理</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="models_desc">统一管理对话、视觉、语音、向量、图像、搜索能力</p>
+                                </div>
+                                <button id="models-add-vendor-btn" onclick="openVendorModal('')"
+                                        class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600
+                                               text-white text-sm font-medium cursor-pointer transition-colors duration-150">
+                                    <i class="fas fa-plus text-xs"></i>
+                                    <span data-i18n="models_add_vendor">添加厂商</span>
+                                </button>
+                            </div>
+                            <div id="models-loading" class="flex items-center gap-2 py-12 justify-center text-slate-400 dark:text-slate-500 text-sm">
+                                <i class="fas fa-spinner fa-spin text-xs"></i><span>Loading...</span>
+                            </div>
+                            <div id="models-content" class="grid gap-6 hidden"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Tasks                                             -->
+                <!-- ====================================================== -->
+                <div id="view-tasks" class="view">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100" data-i18n="tasks_title">定时任务</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="tasks_desc">查看和管理定时任务</p>
+                                </div>
+                            </div>
+                            <div id="tasks-empty" class="flex flex-col items-center justify-center py-20">
+                                <div class="w-16 h-16 rounded-2xl bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center mb-4">
+                                    <i class="fas fa-clock text-rose-400 text-xl"></i>
+                                </div>
+                                <p class="text-slate-500 dark:text-slate-400 font-medium">Loading...</p>
+                            </div>
+                            <div id="tasks-list" class="grid gap-4 hidden"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: Font Customization                                          -->
+                <!-- ====================================================== -->
+                <div id="view-fonts" class="view">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">✦ Fonts</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Customize fonts across your chat interface</p>
+                                </div>
+                                <button onclick="resetFonts()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                                    <i class="fas fa-rotate-left mr-1"></i> Reset
+                                </button>
+                            </div>
+
+                            <div class="space-y-6">
+                                <!-- Server Fonts -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-5">
+                                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                                        <i class="fas fa-server text-primary-400 text-xs"></i> Server Fonts
+                                    </h3>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Select from pre-loaded fonts on the server</p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="server-fonts-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+
+                                <!-- Import from URL -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-5">
+                                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                                        <i class="fas fa-link text-primary-400 text-xs"></i> Import from URL
+                                    </h3>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Paste a Google Fonts URL or any CSS @import URL</p>
+                                    <div class="flex gap-2">
+                                        <input type="text" id="font-url-input" placeholder="https://fonts.googleapis.com/css2?family=..." class="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-400">
+                                        <button onclick="importFontFromUrl()" class="px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors">
+                                            Import
+                                        </button>
+                                    </div>
+                                    <div id="imported-fonts-list" class="mt-3 space-y-2">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+
+                                <!-- Upload Font -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-5">
+                                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                                        <i class="fas fa-upload text-primary-400 text-xs"></i> Upload Font
+                                    </h3>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Upload TTF, OTF, or WOFF2 font files</p>
+                                    <div id="font-upload-zone" class="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl p-6 text-center cursor-pointer hover:border-primary-400 dark:hover:border-primary-500 transition-colors" onclick="document.getElementById('font-file-input').click()">
+                                        <i class="fas fa-cloud-arrow-up text-2xl text-slate-400 mb-2"></i>
+                                        <p class="text-sm text-slate-500 dark:text-slate-400">Click or drag & drop font files here</p>
+                                        <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">.ttf, .otf, .woff2</p>
+                                    </div>
+                                    <input type="file" id="font-file-input" accept=".ttf,.otf,.woff2" multiple class="hidden" onchange="handleFontUpload(this.files)">
+                                    <div id="uploaded-fonts-list" class="mt-3 space-y-2">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+
+                                <!-- Font Assignments -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-5">
+                                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                                        <i class="fas fa-text-height text-primary-400 text-xs"></i> Font Assignments
+                                    </h3>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Choose which font to use for each part of the interface</p>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="text-xs text-slate-500 dark:text-slate-400 mb-1.5 block font-medium">Body / Chat Text</label>
+                                            <select id="font-assign-body" onchange="applyFontAssignment('body', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-400">
+                                                <option value="Inter">Inter (Default)</option>
+                                            </select>
+                                            <p class="text-xs text-slate-400 mt-1 font-preview" style="font-family: var(--font-body)">Preview: The quick brown fox jumps over the lazy dog</p>
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-slate-500 dark:text-slate-400 mb-1.5 block font-medium">Display / Headings</label>
+                                            <select id="font-assign-display" onchange="applyFontAssignment('display', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-400">
+                                                <option value="Space Grotesk">Space Grotesk (Default)</option>
+                                            </select>
+                                            <p class="text-xs text-slate-400 mt-1 font-preview" style="font-family: var(--font-display)">Preview: The Quick Brown Fox</p>
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-slate-500 dark:text-slate-400 mb-1.5 block font-medium">Code / Monospace</label>
+                                            <select id="font-assign-mono" onchange="applyFontAssignment('mono', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-400">
+                                                <option value="JetBrains Mono">JetBrains Mono (Default)</option>
+                                            </select>
+                                            <p class="text-xs text-slate-400 mt-1 font-preview" style="font-family: var(--font-mono)">Preview: const x = 42;</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Font Size -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-5">
+                                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                                        <i class="fas fa-text-width text-primary-400 text-xs"></i> Font Size
+                                    </h3>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <div class="flex items-center justify-between mb-1.5">
+                                                <label class="text-xs text-slate-500 dark:text-slate-400 font-medium">Chat Message Size</label>
+                                                <span id="font-size-value" class="text-xs text-slate-400 font-mono">14px</span>
+                                            </div>
+                                            <input type="range" id="font-size-slider" min="12" max="20" value="14" step="1" oninput="applyFontSize(this.value)" class="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary-500">
+                                        </div>
+                                        <div>
+                                            <div class="flex items-center justify-between mb-1.5">
+                                                <label class="text-xs text-slate-500 dark:text-slate-400 font-medium">Code Block Size</label>
+                                                <span id="code-size-value" class="text-xs text-slate-400 font-mono">13px</span>
+                                            </div>
+                                            <input type="range" id="code-size-slider" min="11" max="18" value="13" step="1" oninput="applyCodeFontSize(this.value)" class="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary-500">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Logs                                              -->
+                <!-- ====================================================== -->
+                <div id="view-logs" class="view">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-5xl mx-auto">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100" data-i18n="logs_title">日志</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="logs_desc">实时日志输出 (run.log)</p>
+                                </div>
+                            </div>
+                            <!-- Log Terminal -->
+                            <div class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden shadow-lg">
+                                <div class="flex items-center gap-2 px-4 py-2.5 bg-slate-800 border-b border-slate-700">
+                                    <div class="flex gap-1.5">
+                                        <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
+                                        <span class="w-3 h-3 rounded-full bg-amber-500/80"></span>
+                                        <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
+                                    </div>
+                                    <span class="text-xs text-slate-400 ml-2 font-mono">run.log</span>
+                                    <div class="flex-1"></div>
+                                    <div class="flex items-center gap-3 mr-2">
+                                        <label class="flex items-center gap-1 cursor-pointer select-none">
+                                            <input type="checkbox" class="log-filter-cb" data-level="debug" checked>
+                                            <span class="text-xs text-slate-400">DEBUG</span>
+                                        </label>
+                                        <label class="flex items-center gap-1 cursor-pointer select-none">
+                                            <input type="checkbox" class="log-filter-cb" data-level="info" checked>
+                                            <span class="text-xs text-blue-400">INFO</span>
+                                        </label>
+                                        <label class="flex items-center gap-1 cursor-pointer select-none">
+                                            <input type="checkbox" class="log-filter-cb" data-level="warning" checked>
+                                            <span class="text-xs text-yellow-400">WARNING</span>
+                                        </label>
+                                        <label class="flex items-center gap-1 cursor-pointer select-none">
+                                            <input type="checkbox" class="log-filter-cb" data-level="error" checked>
+                                            <span class="text-xs text-red-400">ERROR</span>
+                                        </label>
+                                        <label class="flex items-center gap-1 cursor-pointer select-none">
+                                            <input type="checkbox" class="log-filter-cb" data-level="critical" checked>
+                                            <span class="text-xs text-white font-bold">CRITICAL</span>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                        <span class="text-xs text-slate-500" data-i18n="logs_live">实时</span>
+                                    </div>
+                                </div>
+                                <div id="log-output" class="p-4 overflow-y-auto font-mono text-xs leading-relaxed text-slate-300 whitespace-pre-wrap break-all" style="height: calc(100vh - 272px)">
+                                    <p class="text-slate-500" data-i18n="logs_coming_msg">日志流即将在此提供。将连接 run.log 实现类似 tail -f 的实时输出。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /content-area -->
+        </div><!-- /main-content -->
+    </div><!-- /app -->
+
+    <!-- Confirm Dialog -->
+    <div id="confirm-dialog-overlay" class="fixed inset-0 bg-black/50 z-[200] hidden flex items-center justify-center">
+        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl
+                    w-full max-w-sm mx-4 overflow-hidden">
+            <div class="p-6">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-triangle-exclamation text-red-500"></i>
+                    </div>
+                    <h3 id="confirm-dialog-title" class="font-semibold text-slate-800 dark:text-slate-100 text-base"></h3>
+                </div>
+                <p id="confirm-dialog-message" class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed ml-[52px]"></p>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 dark:border-white/5">
+                <button id="confirm-dialog-cancel"
+                        class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10
+                               text-slate-600 dark:text-slate-300 text-sm font-medium
+                               hover:bg-slate-50 dark:hover:bg-white/5
+                               cursor-pointer transition-colors duration-150"></button>
+                <button id="confirm-dialog-ok"
+                        class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium
+                               cursor-pointer transition-colors duration-150"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HTML Artifact Preview Overlay -->
+    <div id="artifact-overlay" class="fixed inset-0 z-[150] hidden">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="dismissArtifactOverlay()"></div>
+        <div id="artifact-card" class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-4xl h-[75vh] bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col" style="perspective: 1200px; transform-style: preserve-3d;">
+            <!-- Header -->
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center">
+                        <i class="fas fa-eye text-primary-500 text-xs"></i>
+                    </div>
+                    <span id="artifact-title" class="text-sm font-medium text-slate-700 dark:text-slate-200">Preview</span>
+                    <span id="artifact-lang-badge" class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="artifactOpenInNewTab()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer" title="Open in new tab">
+                        <i class="fas fa-external-link-alt text-[10px]"></i>
+                        <span data-i18n="artifact_open_tab">Open</span>
+                    </button>
+                    <button onclick="artifactCopyCode()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer" title="Copy code">
+                        <i class="fas fa-copy text-[10px]"></i>
+                        <span data-i18n="artifact_copy">Copy</span>
+                    </button>
+                    <button onclick="dismissArtifactOverlay()" class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                        <i class="fas fa-xmark text-sm"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- Scroll-to-dismiss pull bar -->
+            <div id="artifact-pull-bar" class="flex justify-center py-1.5 bg-slate-50 dark:bg-white/5 cursor-grab active:cursor-grabbing select-none">
+                <div class="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></div>
+            </div>
+            <!-- Preview iframe -->
+            <div class="flex-1 overflow-hidden bg-white dark:bg-[#0F0F0F]">
+                <iframe id="artifact-iframe" class="w-full h-full border-0" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-same-origin"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vendor Credentials Modal -->
+    <div id="vendor-modal-overlay" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-center justify-center">
+        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl
+                    w-full max-w-md mx-4">
+            <div class="p-6">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-key text-primary-500"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h3 id="vendor-modal-title" class="font-semibold text-slate-800 dark:text-slate-100 text-base"></h3>
+                        <p id="vendor-modal-subtitle" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono"></p>
+                    </div>
+                </div>
+
+                <!-- Provider selector (only visible when adding via top button) -->
+                <div id="vendor-modal-picker-wrap" class="mb-4 hidden">
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5" data-i18n="models_provider">厂商</label>
+                    <div id="vendor-modal-picker" class="cfg-dropdown" tabindex="0">
+                        <div class="cfg-dropdown-selected">
+                            <span class="cfg-dropdown-text">--</span>
+                            <i class="fas fa-chevron-down cfg-dropdown-arrow"></i>
+                        </div>
+                        <div class="cfg-dropdown-menu"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Key</label>
+                        <input id="vendor-modal-key" type="text" autocomplete="off" data-1p-ignore data-lpignore="true"
+                               class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                      bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                      focus:outline-none focus:border-primary-500 font-mono transition-colors"
+                               placeholder="sk-...">
+                    </div>
+                    <div id="vendor-modal-base-wrap">
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Base</label>
+                        <input id="vendor-modal-base" type="text"
+                               class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                      bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                      focus:outline-none focus:border-primary-500 font-mono transition-colors"
+                               placeholder="https://...../v1">
+                        <p id="vendor-modal-base-hint" class="mt-1.5 text-xs text-slate-400 dark:text-slate-500 hidden">
+                            <i class="fas fa-info-circle mr-1"></i><span data-i18n="models_base_default_hint">留空将使用官方默认地址</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-100 dark:border-white/5 rounded-b-2xl">
+                <button id="vendor-modal-clear"
+                        class="px-3 py-2 rounded-lg text-xs
+                               text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20
+                               cursor-pointer transition-colors duration-150 hidden"
+                        data-i18n="models_clear_credential">清除凭据</button>
+                <span id="vendor-modal-status"
+                      class="flex-1 text-xs text-primary-500 opacity-0 transition-opacity duration-300 text-center"></span>
+                <button id="vendor-modal-cancel"
+                        class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10
+                               text-slate-600 dark:text-slate-300 text-sm font-medium
+                               hover:bg-slate-50 dark:hover:bg-white/5
+                               cursor-pointer transition-colors duration-150"
+                        data-i18n="cancel">取消</button>
+                <button id="vendor-modal-save"
+                        class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium
+                               cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                        data-i18n="save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Provider Modal (multiple OpenAI-compatible providers) -->
+    <div id="custom-provider-modal-overlay" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-center justify-center">
+        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl
+                    w-full max-w-md mx-4">
+            <div class="p-6">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-sliders text-primary-500"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h3 id="custom-provider-modal-title" class="font-semibold text-slate-800 dark:text-slate-100 text-base"></h3>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5" data-i18n="models_custom_name">名称</label>
+                        <input id="custom-provider-name" type="text" autocomplete="off" data-1p-ignore data-lpignore="true"
+                               class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                      bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                      focus:outline-none focus:border-primary-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Base</label>
+                        <input id="custom-provider-base" type="text"
+                               class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                      bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                      focus:outline-none focus:border-primary-500 font-mono transition-colors"
+                               placeholder="https://...../v1">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Key</label>
+                        <input id="custom-provider-key" type="text" autocomplete="off" data-1p-ignore data-lpignore="true"
+                               class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                      bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                      focus:outline-none focus:border-primary-500 font-mono transition-colors">
+                    </div>
+                    <!-- Custom Request Headers (optional) -->
+                    <div>
+                        <button id="custom-provider-headers-toggle" type="button"
+                                class="flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer">
+                            <i class="fas fa-chevron-right text-[10px] transition-transform duration-200" id="custom-provider-headers-chevron"></i>
+                            <span data-i18n="models_custom_headers_label">Custom Headers</span>
+                            <span class="text-xs text-slate-400 dark:text-slate-500" data-i18n="models_custom_headers_optional">(optional)</span>
+                        </button>
+                        <div id="custom-provider-headers-section" class="hidden mt-2 space-y-2">
+                            <div id="custom-provider-headers-list" class="space-y-2"></div>
+                            <button id="custom-provider-headers-add" type="button"
+                                    class="flex items-center gap-1.5 text-xs font-medium text-primary-500 hover:text-primary-600 transition-colors cursor-pointer py-1">
+                                <i class="fas fa-plus text-[10px]"></i>
+                                <span data-i18n="models_custom_headers_add">Add Header</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-100 dark:border-white/5 rounded-b-2xl">
+                <button id="custom-provider-modal-delete"
+                        class="px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20
+                               cursor-pointer transition-colors duration-150 hidden"
+                        data-i18n="models_custom_delete">删除</button>
+                <span id="custom-provider-modal-status"
+                      class="flex-1 text-xs text-primary-500 opacity-0 transition-opacity duration-300 text-left"></span>
+                <button id="custom-provider-modal-cancel"
+                        class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10
+                               text-slate-600 dark:text-slate-300 text-sm font-medium
+                               hover:bg-slate-50 dark:hover:bg-white/5
+                               cursor-pointer transition-colors duration-150"
+                        data-i18n="cancel">取消</button>
+                <button id="custom-provider-modal-save"
+                        class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium
+                               cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                        data-i18n="save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile viewport fix: handle virtual keyboard on phones -->
+    <script>
+    (function() {
+        function setVH() {
+            var vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', vh + 'px');
+            // Also update --app-height for our CSS fallback
+            document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+        }
+        setVH();
+        window.addEventListener('resize', setVH);
+        // Use visualViewport for better mobile keyboard handling
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', function() {
+                var vv = window.visualViewport;
+                document.documentElement.style.setProperty('--app-height', vv.height + 'px');
+                // When keyboard opens, scroll input into view
+                var chatInput = document.getElementById('chat-input');
+                if (chatInput && document.activeElement === chatInput) {
+                    chatInput.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            });
+        }
+    })();
+    </script>
+    <script defer src="assets/js/onyx-icons.js"></script>
+    <script defer src="assets/js/console.js"></script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('assets/sw.js', { scope: '/' })
+                .then(function(reg) {
+                    console.log('[PWA] Service Worker registered:', reg.scope);
+                    // Check for updates periodically
+                    setInterval(function() { reg.update(); }, 30 * 60 * 1000);
+                })
+                .catch(function(err) {
+                    console.warn('[PWA] Service Worker registration failed:', err);
+                });
+        });
+
+        // Handle PWA install prompt
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            window.__onyxInstallPrompt = e;
+            // Show install button after a short delay
+            setTimeout(function() {
+                var btn = document.getElementById('pwa-install-btn');
+                if (btn) btn.classList.remove('hidden');
+            }, 3000);
+        });
+
+        window.addEventListener('appinstalled', function() {
+            console.log('[PWA] App installed');
+            var btn = document.getElementById('pwa-install-btn');
+            if (btn) btn.classList.add('hidden');
+            window.__onyxInstallPrompt = null;
+        });
+    }
+    </script>
+</body>
+</html>
