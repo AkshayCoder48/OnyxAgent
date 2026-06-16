@@ -8324,14 +8324,17 @@ function _onyxPhaseClass(idx) {
 }
 
 // ── Card cache: preserves rendered cards across innerHTML resets during streaming ──
+// NOTE: We cache the cardData (not the DOM element) because cloneNode(true) does
+// NOT copy event listeners — cloning a cached card would produce buttons that
+// don't respond to taps/clicks. Rebuilding from cardData re-attaches listeners.
 window._onyxCardCache = window._onyxCardCache || new Map();
 // Limit cache to 50 entries to prevent memory leaks
-function _cacheCard(key, cardEl) {
+function _cacheCard(key, cardData) {
     if (window._onyxCardCache.size > 50) {
         const firstKey = window._onyxCardCache.keys().next().value;
         window._onyxCardCache.delete(firstKey);
     }
-    window._onyxCardCache.set(key, cardEl);
+    window._onyxCardCache.set(key, cardData);
 }
 
 // ── Fast brace-balance check: determines if JSON appears structurally complete ──
@@ -8393,9 +8396,14 @@ function _restoreCachedCards(container) {
         const cacheKey = code.trim();
         if (window._onyxCardCache.has(cacheKey)) {
             wrapper.dataset.onyxCardProcessed = 'true';
-            const cached = window._onyxCardCache.get(cacheKey);
-            const card = cached.cloneNode(true);
-            wrapper.replaceWith(card);
+            const cardData = window._onyxCardCache.get(cacheKey);
+            try {
+                const card = _buildOnyxCard(cardData);
+                card.classList.add('onyx-card-appear');
+                wrapper.replaceWith(card);
+            } catch (e) {
+                console.warn('[OnyxCard] Failed to restore cached card:', e);
+            }
         }
     });
 }
@@ -10031,12 +10039,18 @@ function _addCustomJsonCards(container) {
         const code = codeEl.textContent || '';
         const cacheKey = code.trim();
 
-        // Check cache first — if we already rendered this exact JSON, clone it
+        // Check cache first — rebuild from cardData so event listeners are
+        // properly re-attached (cloneNode would lose them).
         if (window._onyxCardCache.has(cacheKey)) {
             wrapper.dataset.onyxCardProcessed = 'true';
-            const cached = window._onyxCardCache.get(cacheKey);
-            const card = cached.cloneNode(true);
-            wrapper.replaceWith(card);
+            const cardData = window._onyxCardCache.get(cacheKey);
+            try {
+                const card = _buildOnyxCard(cardData);
+                card.classList.add('onyx-card-appear');
+                wrapper.replaceWith(card);
+            } catch (e) {
+                console.warn('[OnyxCard] Failed to rebuild cached card:', e);
+            }
             return;
         }
 
@@ -10058,8 +10072,9 @@ function _addCustomJsonCards(container) {
             const card = _buildOnyxCard(cardData);
             // Add fade-in animation class
             card.classList.add('onyx-card-appear');
-            // Cache the card so it survives innerHTML resets during streaming
-            _cacheCard(cacheKey, card.cloneNode(true));
+            // Cache the cardData (not the DOM element) so it survives innerHTML
+            // resets during streaming — rebuilding re-attaches event listeners.
+            _cacheCard(cacheKey, cardData);
             wrapper.replaceWith(card);
         } catch (e) {
             console.warn('[OnyxCard] Failed to render card:', e);
@@ -10079,12 +10094,17 @@ function _addCustomJsonCards(container) {
         const code = codeEl.textContent || '';
         const cacheKey = code.trim();
 
-        // Check cache
+        // Check cache — rebuild from cardData so event listeners are attached
         if (window._onyxCardCache.has(cacheKey)) {
             wrapper.dataset.onyxCardProcessed = 'true';
-            const cached = window._onyxCardCache.get(cacheKey);
-            const card = cached.cloneNode(true);
-            wrapper.replaceWith(card);
+            const cardData = window._onyxCardCache.get(cacheKey);
+            try {
+                const card = _buildOnyxCard(cardData);
+                card.classList.add('onyx-card-appear');
+                wrapper.replaceWith(card);
+            } catch (e) {
+                console.warn('[OnyxCard] Failed to rebuild pending cached card:', e);
+            }
             return;
         }
 
@@ -10094,7 +10114,7 @@ function _addCustomJsonCards(container) {
             try {
                 const card = _buildOnyxCard(cardData);
                 card.classList.add('onyx-card-appear');
-                _cacheCard(cacheKey, card.cloneNode(true));
+                _cacheCard(cacheKey, cardData);
                 wrapper.replaceWith(card);
             } catch (e) {
                 console.warn('[OnyxCard] Failed to render pending card:', e);

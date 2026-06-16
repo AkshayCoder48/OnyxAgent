@@ -2716,19 +2716,29 @@ body, #app, #main-content {
    Interactive Q&A Card
    ===================================================================== */
 
-/* Outer card — inherits the standard .onyx-card look */
+/* Outer card — no outline, slightly lighter than the message bubble */
 .onyx-qa-card {
   border-radius: 16px;
   overflow: hidden;
   margin: 8px 0;
   padding: 18px 20px;
   font-family: var(--font-body);
-  background: rgba(0,0,0,0.02);
-  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(0,0,0,0.03);
+  border: none;
 }
 .dark .onyx-qa-card {
-  border: 1px solid rgba(255,255,255,0.06);
-  background: rgba(255,255,255,0.03);
+  border: none;
+  background: rgba(255,255,255,0.05);
+}
+/* When the outer .onyx-card wraps a QA card, make it transparent so only
+   the inner .onyx-qa-card styling shows (no double outline). */
+.onyx-card:has(.onyx-qa-card) {
+  border: none;
+  background: transparent;
+}
+.dark .onyx-card:has(.onyx-qa-card) {
+  border: none;
+  background: transparent;
 }
 
 /* Fade-in animation for Q&A cards */
@@ -2753,36 +2763,36 @@ body, #app, #main-content {
   min-height: 40px;
 }
 
-/* Context / mode badge */
+/* Context / mode badge — plain text, no pink background */
 .onyx-qa-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 10px;
-  border-radius: 8px;
-  font-size: 11px;
+  padding: 0;
+  border-radius: 0;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.2px;
-  background: rgba(244,63,94,0.08);
-  color: #e11d48;
+  background: transparent;
+  color: #64748b;
   margin-bottom: 10px;
 }
 .dark .onyx-qa-badge {
-  background: rgba(244,63,94,0.12);
-  color: #fb7185;
+  background: transparent;
+  color: #94a3b8;
 }
 
-/* Question block */
+/* Question block — no outline */
 .onyx-qa-question {
   margin-bottom: 16px;
   padding: 14px 16px;
   border-radius: 12px;
-  background: rgba(0,0,0,0.015);
-  border: 1px solid rgba(0,0,0,0.04);
+  background: rgba(0,0,0,0.02);
+  border: none;
 }
 .dark .onyx-qa-question {
-  background: rgba(255,255,255,0.02);
-  border-color: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.03);
+  border: none;
 }
 .onyx-qa-question:last-child {
   margin-bottom: 0;
