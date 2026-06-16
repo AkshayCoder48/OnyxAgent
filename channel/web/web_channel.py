@@ -858,13 +858,13 @@ class WebChannel(ChatChannel):
                     if not fpath:
                         continue
                     if ftype == "image":
-                        file_refs.append(f"[{i18n.t('图片', 'Image')}: {fpath}]")
+                        file_refs.append(f"[Image: {fpath}]")
                     elif ftype == "video":
-                        file_refs.append(f"[{i18n.t('视频', 'Video')}: {fpath}]")
+                        file_refs.append(f"[Video: {fpath}]")
                     elif ftype == "directory":
-                        file_refs.append(f"[{i18n.t('目录', 'Directory')}: {fpath}]")
+                        file_refs.append(f"[Directory: {fpath}]")
                     else:
-                        file_refs.append(f"[{i18n.t('文件', 'File')}: {fpath}]")
+                        file_refs.append(f"[File: {fpath}]")
                 if file_refs:
                     prompt = prompt + "\n" + "\n".join(file_refs)
                     logger.info(f"[WebChannel] Attached {len(file_refs)} file(s) to message")

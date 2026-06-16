@@ -11,234 +11,6 @@ let APP_VERSION = '';
 // i18n
 // =====================================================================
 const I18N = {
-    zh: {
-        console: '控制台',
-        nav_chat: '对话', nav_manage: '管理', nav_monitor: '监控',
-        menu_chat: '对话', menu_config: '配置', menu_models: '模型', menu_skills: '技能',
-        menu_memory: '记忆', menu_knowledge: '知识', menu_files: '文件', menu_tasks: '定时',
-        menu_fonts: '字体',
-        files_title: '文件浏览器',
-        files_desc: '浏览和管理工作空间文件',
-        files_upload: '上传',
-        files_new_folder: '新建文件夹',
-        files_new_file: '新建文件',
-        files_ctx_download: '下载',
-        files_ctx_edit: '编辑',
-        files_ctx_rename: '重命名',
-        files_ctx_delete: '删除',
-        files_rename_title: '重命名',
-        files_mkdir_title: '新建文件夹',
-        files_newfile_title: '新建文件',
-        menu_logs: '日志',
-        models_title: '模型管理',
-        models_desc: '统一管理对话、图像、语音、向量、搜索能力',
-        models_section_vendors: '厂商凭据',
-        models_section_vendors_desc: '一处配置，多个模型能力共享',
-        models_section_capabilities: '模型能力',
-        models_add_vendor: '添加厂商',
-        models_provider: '厂商',
-        models_model: '模型',
-        models_voice: '音色',
-        models_configured: '已配置',
-        models_not_configured: '未配置',
-        models_pick_to_configure: '选择以配置',
-        models_clear_credential: '清除凭据',
-        models_base_default_hint: '留空将使用官方默认地址',
-        models_base_default: '默认',
-        models_custom_vendor_label: '自定义',
-        models_custom_name: '名称',
-        models_custom_delete: '删除',
-        models_custom_delete_confirm_title: '删除自定义厂商',
-        models_custom_delete_confirm_msg: '确定删除该自定义厂商吗？此操作无法撤销。',
-        models_custom_name_required: '请填写名称',
-        models_custom_base_required: '请填写 API Base',
-        models_custom_edit_title: '编辑自定义厂商',
-        models_custom_add_title: '添加自定义厂商',
-        models_custom_headers_label: '自定义请求头',
-        models_custom_headers_optional: '（可选）',
-        models_custom_headers_add: '添加请求头',
-        models_custom_headers_key: 'Header 名称',
-        models_custom_headers_value: '值',
-        models_capability_chat: '主模型',
-        models_capability_chat_desc: '用于基础对话和 Agent 推理',
-        models_capability_vision: '图像理解',
-        models_capability_vision_desc: '识别图片内容，用于图像识别工具',
-        models_capability_image: '图像生成',
-        models_capability_image_desc: '生成图片，用于图像生成技能',
-        models_auto_using: '当前优先使用',
-        models_capability_asr: '语音识别',
-        models_capability_asr_desc: '语音转文字',
-        models_capability_tts: '语音合成',
-        models_capability_tts_desc: '文字转语音',
-        models_capability_embedding: '向量',
-        models_capability_embedding_desc: '用于记忆与知识的向量化检索',
-        models_capability_search: '联网搜索',
-        models_capability_search_desc: '实时网页检索能力，用于搜索工具',
-        models_strategy_auto: '自动',
-        models_search_strategy_label: '策略',
-        models_search_strategy_fixed: '指定',
-        models_search_strategy_auto_hint: '从已配置厂商中自动选择',
-        models_search_strategy_fixed_hint: '指定使用搜索厂商',
-        models_pending_config: '待配置',
-        models_search_available_label: '可用搜索厂商：',
-        models_search_none_configured: '暂未启用任何搜索厂商，点击添加',
-        models_search_add_provider: '添加厂商',
-        models_search_add_desc: '选择一个搜索厂商进行配置',
-        models_search_bocha_title: '配置博查 API Key',
-        models_search_bocha_desc: '前往博查开放平台创建 API Key',
-        models_search_edit_hint: '点击修改配置',
-        models_unavailable: '不可用',
-        models_set_via_env: '通过环境变量启用',
-        models_dim_label: '维度',
-        models_save_success: '已保存',
-        models_save_failed: '保存失败',
-        models_cleared: '已清除',
-        models_clear_failed: '清除失败',
-        models_embedding_change_title: '更改向量模型',
-        models_embedding_change_msg: '切换向量模型后，已有索引将失效，需要重建。是否继续？',
-        models_embedding_saved_title: '向量模型已更新',
-        models_embedding_saved_msg: '请在聊天框输入 /memory rebuild-index 重建索引。',
-        models_embedding_saved_ok: '去执行',
-        models_pick_provider: '待选择',
-        models_clear_confirm_title: '清除厂商凭据',
-        models_clear_confirm_msg: '确认清除该厂商的 API Key 与 Base URL 吗？相关能力将不再可用。',
-        cancel: '取消',
-        save: '保存',
-        ok: '确定',
-        knowledge_title: '知识库', knowledge_desc: '浏览和探索你的知识库',
-        knowledge_tab_docs: '文档', knowledge_tab_graph: '图谱',
-        knowledge_loading: '加载知识库中...', knowledge_loading_desc: '知识页面将显示在这里',
-        knowledge_select_hint: '选择一个文档查看', knowledge_empty_hint: '暂无知识页面',
-        knowledge_empty_guide: '在对话中发送文档、链接或主题给 Agent，它会自动整理到你的知识库中。',
-        knowledge_go_chat: '开始对话',
-        welcome_subtitle: '我可以帮你解答问题、管理计算机、创造和执行技能，并通过<br>长期记忆和知识库不断成长',
-        example_sys_title: '系统管理', example_sys_text: '查看工作空间里有哪些文件',
-        example_task_title: '定时任务', example_task_text: '1分钟后提醒我检查服务器',
-        example_code_title: '编程助手', example_code_text: '搜索AI资讯并生成可视化网页报告',
-        example_knowledge_title: '知识库', example_knowledge_text: '查看知识库当前文档情况',
-        example_skill_title: '技能系统', example_skill_text: '查看所有支持的工具和技能',
-        example_web_title: '指令中心', example_web_text: '查看全部命令',
-        slash_help: '显示命令帮助',
-        slash_status: '查看运行状态',
-        slash_context: '查看对话上下文',
-        slash_context_clear: '清除对话上下文',
-        slash_skill_list: '查看已安装技能',
-        slash_skill_list_remote: '浏览技能广场',
-        slash_skill_search: '搜索技能',
-        slash_skill_install: '安装技能 (名称或 GitHub URL)',
-        slash_skill_uninstall: '卸载技能',
-        slash_skill_info: '查看技能详情',
-        slash_skill_enable: '启用技能',
-        slash_skill_disable: '禁用技能',
-        slash_memory_dream: '手动触发记忆蒸馏 (可指定天数, 默认3)',
-        slash_knowledge: '查看知识库统计',
-        slash_knowledge_list: '查看知识库文件树',
-        slash_knowledge_on: '开启知识库',
-        slash_knowledge_off: '关闭知识库',
-        slash_config: '查看当前配置',
-        slash_cancel: '中止当前正在运行的 Agent 任务',
-        slash_logs: '查看最近日志',
-        slash_version: '查看版本',
-        input_placeholder: '输入消息，或输入 / 使用指令',
-        config_title: '配置管理', config_desc: '管理模型和 Agent 配置',
-        config_model: '模型配置', config_agent: 'Agent 配置',
-        config_language: '语言', config_language_hint: '界面展示、命令文案、系统提示词等使用的语言（与右上角切换同步）',
-        config_model_advanced: '高级配置',
-        config_channel: '通道配置',
-        config_agent_enabled: 'Agent 模式',
-        config_max_tokens: '最大上下文 Token', config_max_tokens_hint: '对话中 Agent 能输入的最大 Token 长度，超过后会智能压缩处理',
-        config_max_turns: '最大记忆轮次', config_max_turns_hint: '一问一答为一轮，超过后会智能压缩处理',
-        config_max_steps: '最大执行步数', config_max_steps_hint: '单次对话中 Agent 最多调用工具的次数',
-        config_enable_thinking: '深度思考', config_enable_thinking_hint: '是否启用深度思考模式',
-        config_self_evolution: '自主进化', config_self_evolution_hint: '会话空闲后自动复盘，沉淀记忆、优化技能、处理未完成事项',
-        evolution_badge: '自主学习',
-        config_channel_type: '通道类型',
-        config_provider: '模型厂商', config_model_name: '模型',
-        config_custom_model_hint: '输入自定义模型名称',
-        config_save: '保存', config_saved: '已保存',
-        config_save_error: '保存失败',
-        config_custom_option: '自定义',
-        config_custom_tip: '接口需遵循 OpenAI API 协议',
-        config_security: '安全设置', config_password: '访问密码',
-        config_password_hint: '留空则不启用密码保护',
-        config_password_changed: '密码已更新，请重新登录',
-        config_password_cleared: '密码已清除',
-        skills_title: '技能管理', skills_desc: '查看、启用或禁用 Agent 工具和技能', skills_hub_btn: 'ClawHub',
-        skills_add_btn: '添加技能', skills_tab_my: '我的技能', skills_tab_add: '添加技能',
-        skills_method_create: '创建', skills_method_create_desc: '编写 SKILL.md',
-        skills_method_upload: '上传', skills_method_upload_desc: '上传 .zip 文件',
-        skills_method_url: '从链接', skills_method_url_desc: 'GitHub / .zip 链接',
-        skills_create_title: '创建自定义技能', skills_create_name_label: '技能名称',
-        skills_create_desc_label: '描述（可选）', skills_create_content_label: 'SKILL.md 内容',
-        skills_create_btn: '创建技能', skills_create_success: '技能创建成功！',
-        skills_create_error: '创建失败', skills_create_name_required: '请输入技能名称',
-        skills_create_content_required: '请输入技能内容',
-        skills_upload_title: '上传技能包', skills_upload_drag: '拖放 .zip 文件到此处',
-        skills_upload_or: '或点击浏览', skills_upload_name_label: '技能名称（可选，从 zip 自动检测）',
-        skills_upload_hint: 'zip 包应包含一个带有 SKILL.md 文件的文件夹，或根目录直接包含 SKILL.md。',
-        skills_upload_btn: '上传并安装', skills_upload_success: '技能上传安装成功！',
-        skills_upload_error: '上传失败', skills_upload_no_file: '请选择 .zip 文件',
-        skills_url_title: '从链接安装', skills_url_label: '包链接',
-        skills_url_hint: '支持 GitHub、GitLab 或任何直接 .zip 链接',
-        skills_url_name_label: '技能名称（可选，从链接自动检测）',
-        skills_url_btn: '安装技能', skills_url_success: '技能安装成功！',
-        skills_url_error: '安装失败', skills_url_required: '请输入链接地址',
-        skills_delete_title: '删除技能', skills_delete_msg: '确定要删除此技能吗？此操作无法撤销。',
-        skills_delete_success: '技能已删除', skills_delete_error: '删除失败',
-        skills_loading: '加载技能中...', skills_loading_desc: '技能加载后将显示在此处',
-        tools_section_title: '内置工具', tools_loading: '加载工具中...',
-        skills_section_title: '技能', skill_enable: '启用', skill_disable: '禁用',
-        skill_toggle_error: '操作失败，请稍后再试',
-        memory_title: '记忆管理', memory_desc: '查看 Agent 记忆文件和内容',
-        memory_tab_files: '记忆文件', memory_tab_dreams: '自主进化',
-        memory_loading: '加载记忆文件中...', memory_loading_desc: '记忆文件将显示在此处',
-        memory_back: '返回列表',
-        memory_col_name: '文件名', memory_col_type: '类型', memory_col_size: '大小', memory_col_updated: '更新时间',
-        artifact_preview: '预览', artifact_open_tab: '打开', artifact_copy: '复制',
-        artifact_copied: '已复制！', artifact_html: 'HTML 预览', artifact_svg: 'SVG 图表',
-        artifact_chart: '数据可视化', artifact_mermaid: 'Mermaid 图表',
-        artifact_preview_btn: '预览', artifact_fullscreen: '全屏',
-
-        tasks_title: '定时任务', tasks_desc: '查看和管理定时任务',
-        tasks_coming: '即将推出', tasks_coming_desc: '定时任务管理功能即将在此提供',
-        logs_title: '日志', logs_desc: '实时日志输出 (run.log)',
-        logs_live: '实时', logs_coming_msg: '日志流即将在此提供。将连接 run.log 实现类似 tail -f 的实时输出。',
-        new_chat: '新对话',
-        session_history: '历史会话',
-        today: '今天', yesterday: '昨天', earlier: '更早',
-        delete_session_confirm: '确认删除该会话？所有消息将被清除。',
-        delete_session_title: '删除会话',
-        delete_message_confirm: '确认删除这条消息？',
-        delete_message_title: '删除消息',
-        edit_disabled_reply_active: '正在生成回复，暂时无法编辑。',
-        delete_disabled_reply_active: '正在生成回复，暂时无法删除。',
-        untitled_session: '新对话',
-        context_cleared: '— 以上内容已从上下文中移除 —',
-        tip_new_chat: '新建对话',
-        tip_clear_context: '清除上下文',
-        tip_attach: '添加附件',
-        attach_menu_file: '上传文件',
-        mic_idle_title: '点击录音 / 再按一次结束',
-        mic_recording_title: '录音中，再次点击结束',
-        mic_busy_title: '识别中…',
-        mic_permission_denied: '无法访问麦克风，请检查浏览器权限',
-        mic_too_short: '录音太短，请重试',
-        mic_error: '语音识别失败',
-        speak_msg: '朗读这段回复',
-        voice_reply_mode_label: '语音回复策略',
-        voice_reply_off: '关闭',
-        voice_reply_if_voice: '仅语音问/语音答',
-        voice_reply_always: '总是语音回复',
-        attach_menu_folder: '上传文件夹',
-        confirm_yes: '确认',
-        confirm_cancel: '取消',
-        error_send: '发送失败，请稍后再试。', error_timeout: '请求超时，请再试一次。',
-        thinking_in_progress: '思考中...', thinking_done: '已深度思考', thinking_duration: '耗时',
-        edit_message: '编辑消息',
-        regenerate_response: '重新生成',
-        edit_save: '保存并发送',
-        edit_cancel: '取消',
-    },
     en: {
         console: 'Console',
         nav_chat: 'Chat', nav_manage: 'Management', nav_monitor: 'Monitor',
@@ -469,35 +241,21 @@ const I18N = {
     }
 };
 
-// Resolve language by priority: user choice (localStorage) -> backend-detected
-// (onyx_lang) -> browser language -> 'zh'. Shares __onyxResolveLang__ defined in
-// chat.html; falls back to a local resolver if loaded standalone.
-let currentLang = (typeof window.__onyxResolveLang__ === 'function')
-    ? window.__onyxResolveLang__()
-    : (function () {
-        const norm = (raw) => {
-            if (!raw) return '';
-            const v = String(raw).trim().toLowerCase();
-            if (v === 'auto') return '';
-            if (v.indexOf('zh') === 0) return 'zh';
-            if (v.indexOf('en') === 0) return 'en';
-            return '';
-        };
-        return norm(localStorage.getItem('onyx_lang'))
-            || norm(window.__ONYX_DEFAULT_LANG__)
-            || norm(navigator.language)
-            || 'zh';
-    })();
+// Language is locked to English. The app is English-only — all Chinese and
+// other language references have been removed. `currentLang` is kept as a
+// constant so the rest of the file (which references it in a few places)
+// continues to work without further edits, but it always resolves to 'en'.
+let currentLang = 'en';
 
 function t(key) {
-    return (I18N[currentLang] && I18N[currentLang][key]) || (I18N.en[key]) || key;
+    return (I18N.en && I18N.en[key]) || key;
 }
 
 // Resolve a localized label that may be either a plain string or
-// a {zh, en} object returned by the backend.
+// a {zh, en} object returned by the backend. English-only.
 function localizedLabel(label) {
     if (label && typeof label === 'object') {
-        return label[currentLang] || label.en || label.zh || '';
+        return label.en || '';
     }
     return label || '';
 }
@@ -516,68 +274,32 @@ function applyI18n() {
         el.setAttribute('data-tooltip', t(el.dataset.tipKey));
     });
     installCfgTipPortal();
-    const langLabel = document.getElementById('lang-label');
-    if (langLabel) langLabel.textContent = currentLang === 'zh' ? '中文' : 'EN';
-    // Point the docs link to the locale-specific documentation site.
-    const docsLink = document.getElementById('docs-link');
-    if (docsLink) docsLink.href = currentLang === 'zh' ? 'https://docs.onyxagent.ai/zh' : 'https://docs.onyxagent.ai';
 }
 
-// Single entry point for switching language. Updates the in-memory language,
-// persists the user choice locally, re-renders the UI, and binds the choice to
-// the backend `onyx_lang` config so logs / agent replies / CLI follow suit.
-function setLanguage(lang) {
-    const next = (lang === 'en') ? 'en' : 'zh';
-    if (next === currentLang) {
-        // Still persist + sync in case storage/backend drifted from the UI.
-        syncLanguageToBackend(next);
-        return;
-    }
-    currentLang = next;
-    localStorage.setItem('onyx_lang', currentLang);
+// No-op language setter — the app is English-only. Kept for backward
+// compatibility with any code that still calls setLanguage().
+function setLanguage(_lang) {
+    currentLang = 'en';
     applyI18n();
-    _applyInputTooltips();
-    // Re-render views whose DOM is built in JS (data-i18n alone does not
-    // cover strings interpolated via t() into innerHTML).
-    try { rerenderDynamicViews(); } catch (e) {}
-    // Keep the language switch button and config selector visually in sync.
-    try { updateLangControls(); } catch (e) {}
-    syncLanguageToBackend(currentLang);
 }
 
-// Persist the language to the backend `onyx_lang` config (best-effort; the UI
-// has already switched locally, so a network failure is non-blocking).
-function syncLanguageToBackend(lang) {
+// Persist the language to the backend `onyx_lang` config (best-effort).
+// Always sends 'en' since the app is English-only.
+function syncLanguageToBackend(_lang) {
     try {
         fetch('/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ updates: { onyx_lang: lang } })
+            body: JSON.stringify({ updates: { onyx_lang: 'en' } })
         }).catch(() => {});
     } catch (e) {}
 }
 
-// Reflect the current language on both the top-right toggle and the config
-// selector (if present), so the two entry points stay synchronized.
-function updateLangControls() {
-    const langLabel = document.getElementById('lang-label');
-    if (langLabel) langLabel.textContent = currentLang === 'zh' ? '中文' : 'EN';
-    // The config language picker is the custom .cfg-dropdown component. Only
-    // sync it once it has been initialized (i.e. the config panel was opened).
-    const sel = document.getElementById('cfg-lang-select');
-    if (sel && sel._ddValue !== undefined && sel._ddValue !== currentLang) {
-        sel._ddValue = currentLang;
-        const textEl = sel.querySelector('.cfg-dropdown-text');
-        if (textEl) textEl.textContent = currentLang === 'zh' ? '中文' : 'English';
-        sel.querySelectorAll('.cfg-dropdown-item').forEach(i => {
-            i.classList.toggle('active', i.dataset.value === currentLang);
-        });
-    }
-}
+// No-op: language controls were removed from the UI (English-only app).
+function updateLangControls() {}
 
-function toggleLanguage() {
-    setLanguage(currentLang === 'zh' ? 'en' : 'zh');
-}
+// No-op: language toggle was removed from the header.
+function toggleLanguage() {}
 
 // Refresh JS-rendered views after a language switch. Each branch uses the
 // lightweight in-memory re-render path (no extra network round-trips).
@@ -915,6 +637,11 @@ function renderMarkdown(text) {
         // don't blow up the chat bubble.  We preserve the prefix so the user
         // can still see what it is, but collapse the payload.
         let processed = _truncateDataUris(text);
+        // Pre-process: wrap bare JSON card objects (not already in code fences)
+        // in ```json fences so the card processor can render them as cards.
+        // This catches cases where the AI outputs `json { "component": ... }`
+        // or just `{ "component": ... }` without proper markdown fencing.
+        processed = _wrapBareCardJson(processed);
         let html = md.render(processed);
         html = _rewriteLocalImgSrc(html);
         // Order matters: video first (more specific), then image.
@@ -926,6 +653,105 @@ function renderMarkdown(text) {
         return html;
     }
     catch (e) { return text.replace(/\n/g, '<br>'); }
+}
+
+/**
+ * Pre-process raw markdown: find bare JSON objects containing a "component"
+ * field that are NOT already inside a fenced code block, and wrap them in
+ * ```json fences so markdown-it renders them as <pre><code class="language-json">
+ * blocks — which the Onyx card processor then turns into interactive cards.
+ *
+ * Handles these AI output patterns:
+ *   1. `json { "component": ... }`        (word "json" as prefix)
+ *   2. `{ "component": ... }`              (bare object)
+ *   3. ```json\n{ ... }\n```               (already fenced — left alone)
+ */
+function _wrapBareCardJson(text) {
+    // Remove fenced code blocks temporarily so we don't touch their contents.
+    // Match ```lang ... ``` blocks (including the json ones).
+    const fencePattern = /```[\s\S]*?```/g;
+    const placeholders = [];
+    let working = text.replace(fencePattern, (m) => {
+        const ph = `\x00FENCE${placeholders.length}\x00`;
+        placeholders.push(m);
+        return ph;
+    });
+
+    // Pattern 1: `json { ... }` — the word "json" (possibly with colon) before a brace.
+    // Capture the JSON object that follows.
+    working = working.replace(/(?:^|\n)\s*json\s*:?\s*(\{[\s\S]*?"component"[\s\S]*?\})\s*(?=\n|$)/g,
+        (match, jsonObj) => {
+            return '\n```json\n' + jsonObj.trim() + '\n```\n';
+        });
+
+    // Pattern 2: bare `{ "component": ... }` on its own (not after "json").
+    // We scan line by line and find balanced JSON objects containing "component".
+    working = _wrapBareComponentObjects(working);
+
+    // Restore fenced code blocks
+    working = working.replace(/\x00FENCE(\d+)\x00/g, (m, idx) => placeholders[parseInt(idx)]);
+
+    return working;
+}
+
+/**
+ * Scan text for bare `{ ... "component" ... }` JSON objects that are NOT
+ * inside a code fence, and wrap each one in a ```json fence.
+ * Uses brace-matching to find the complete object.
+ */
+function _wrapBareComponentObjects(text) {
+    let result = '';
+    let i = 0;
+    while (i < text.length) {
+        // Look for a '{' that might start a card JSON
+        if (text[i] === '{') {
+            // Try to find a balanced JSON object starting here
+            const obj = _tryExtractJsonObject(text, i);
+            if (obj && obj.json.includes('"component"')) {
+                // Verify it parses and has a component field
+                try {
+                    const parsed = JSON.parse(obj.json);
+                    if (parsed && parsed.component && typeof parsed.component === 'string') {
+                        // Check we're not already inside a code fence placeholder
+                        result += '```json\n' + obj.json + '\n```';
+                        i = obj.endIndex;
+                        continue;
+                    }
+                } catch (_) {
+                    // Not valid JSON — fall through and keep the char
+                }
+            }
+        }
+        result += text[i];
+        i++;
+    }
+    return result;
+}
+
+/**
+ * Starting at index `start` (which must point at '{'), attempt to extract a
+ * balanced JSON object string. Returns { json, endIndex } or null.
+ */
+function _tryExtractJsonObject(text, start) {
+    if (text[start] !== '{') return null;
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+        if (esc) { esc = false; continue; }
+        if (ch === '\\' && inStr) { esc = true; continue; }
+        if (ch === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (ch === '{') depth++;
+        if (ch === '}') {
+            depth--;
+            if (depth === 0) {
+                return { json: text.slice(start, i + 1), endIndex: i + 1 };
+            }
+        }
+    }
+    return null;
 }
 
 /**
@@ -1397,7 +1223,7 @@ function setSendBtnCancelMode(requestId) {
     sendBtnMode = 'cancel';
     sendBtn.disabled = false;
     sendBtn.classList.add('send-btn-cancel');
-    sendBtn.title = (currentLang === 'zh' ? '中止' : 'Cancel');
+    sendBtn.title = ('Cancel');
     sendBtn.innerHTML = '<i class="fas fa-stop text-sm"></i>';
 }
 
@@ -1423,7 +1249,7 @@ function requestCancel() {
     // Optimistic UI lock so the click visibly registers before the SSE
     // "cancelled" event arrives.
     sendBtn.disabled = true;
-    sendBtn.title = (currentLang === 'zh' ? '已中止' : 'Cancelled');
+    sendBtn.title = ('Cancelled');
 }
 
 // Button click is the only path to Cancel. Pressing Enter still calls
@@ -1994,7 +1820,7 @@ chatInput.addEventListener('blur', () => {
 
 document.querySelectorAll('.example-card').forEach(card => {
     card.addEventListener('click', () => {
-        // data-send overrides the visible text (e.g. show "查看全部命令" but send "/help")
+        // data-send overrides the visible text (e.g. show "View all commands" but send "/help")
         const sendText = card.dataset.send;
         if (sendText) {
             chatInput.value = sendText;
@@ -2435,7 +2261,7 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                 </div>
                 <div class="flex items-center gap-2 mt-1.5">
                     <span class="text-xs text-slate-400 dark:text-slate-500">${formatTime(timestamp)}</span>
-                    <button class="copy-msg-btn text-xs text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer" title="${currentLang === 'zh' ? '复制' : 'Copy'}" style="display:none">
+                    <button class="copy-msg-btn text-xs text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer" title="${'Copy'}" style="display:none">
                         <i class="fas fa-copy"></i>
                     </button>
                     <button class="speak-msg-btn text-xs text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer" title="${t('speak_msg')}" style="display:none;">
@@ -2691,7 +2517,7 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                 if (!botEl.querySelector('.agent-cancelled-tag')) {
                     const tag = document.createElement('div');
                     tag.className = 'agent-cancelled-tag text-xs text-amber-600 dark:text-amber-400 mt-1';
-                    tag.textContent = (currentLang === 'zh') ? '已中止' : 'Cancelled';
+                    tag.textContent = 'Cancelled';
                     stepsEl.appendChild(tag);
                 }
                 resetSendBtnSendMode();
@@ -3143,8 +2969,8 @@ function localizeCancelMarker(text) {
     if (!text) return text;
     if (currentLang !== 'zh') return text;
     return text
-        .replace(/_\(Cancelled by user\)_/g, '_(用户已中止)_')
-        .replace(/_\(Cancelled\)_/g, '_(已中止)_');
+        
+        ;
 }
 
 function createBotMessageEl(content, timestamp, requestId, msg) {
@@ -3191,7 +3017,7 @@ function createBotMessageEl(content, timestamp, requestId, msg) {
             </div>
             <div class="flex items-center gap-2 mt-1.5">
                 <span class="text-xs text-slate-400 dark:text-slate-500">${formatTime(timestamp)}</span>
-                <button class="copy-msg-btn text-xs text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer" title="${currentLang === 'zh' ? '复制' : 'Copy'}">
+                <button class="copy-msg-btn text-xs text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer" title="${'Copy'}">
                     <i class="fas fa-copy"></i>
                 </button>
                 <button class="speak-msg-btn text-xs text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors cursor-pointer" title="${t('speak_msg')}" style="display:none;">
@@ -4222,7 +4048,7 @@ function initConfigView(data) {
     if (langSel) {
         initDropdown(
             langSel,
-            [{ value: 'zh', label: '中文' }, { value: 'en', label: 'English' }],
+            [{ value: 'en', label: 'English' }],
             currentLang,
             (val) => setLanguage(val)
         );
@@ -4606,7 +4432,7 @@ function loadToolsSection() {
         emptyEl.classList.add('hidden');
         if (tools.length === 0) {
             emptyEl.classList.remove('hidden');
-            emptyEl.innerHTML = `<span class="text-sm text-slate-400 dark:text-slate-500">${currentLang === 'zh' ? '暂无内置工具' : 'No built-in tools'}</span>`;
+            emptyEl.innerHTML = `<span class="text-sm text-slate-400 dark:text-slate-500">${'No built-in tools'}</span>`;
             return;
         }
         badge.textContent = tools.length;
@@ -4631,7 +4457,7 @@ function loadToolsSection() {
         toolsLoaded = true;
     }).catch(() => {
         emptyEl.classList.remove('hidden');
-        emptyEl.innerHTML = `<span class="text-sm text-slate-400 dark:text-slate-500">${currentLang === 'zh' ? '加载失败' : 'Failed to load'}</span>`;
+        emptyEl.innerHTML = `<span class="text-sm text-slate-400 dark:text-slate-500">${'Failed to load'}</span>`;
     });
 }
 
@@ -4646,7 +4472,7 @@ function loadSkillsSection() {
         const skills = data.skills || [];
         if (skills.length === 0) {
             const p = emptyEl.querySelector('p');
-            if (p) p.textContent = currentLang === 'zh' ? '暂无技能' : 'No skills found';
+            if (p) p.textContent = 'No skills found';
             return;
         }
         badge.textContent = skills.length;
@@ -4686,14 +4512,14 @@ function renderSkillCard(card, sk) {
                     aria-checked="${enabled}"
                     onclick="toggleSkill('${escapeHtml(sk.name)}', ${enabled})"
                     class="relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${trackClass}"
-                    title="${enabled ? (currentLang === 'zh' ? '点击禁用' : 'Click to disable') : (currentLang === 'zh' ? '点击启用' : 'Click to enable')}"
+                    title="${enabled ? ('Click to disable') : ('Click to enable')}"
                 >
                     <span class="inline-block h-3 w-3 mt-0.5 rounded-full bg-white shadow transform transition-transform duration-200 ease-in-out ${thumbTranslate}"></span>
                 </button>
                 <button
                     onclick="showSkillDeleteDialog('${escapeHtml(sk.name)}')"
                     class="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-slate-300 dark:text-slate-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
-                    title="${currentLang === 'zh' ? '删除技能' : 'Delete skill'}"
+                    title="${'Delete skill'}"
                 >
                     <i class="fas fa-trash-can text-[10px]"></i>
                 </button>
@@ -4801,7 +4627,7 @@ function createSkillFromContent() {
 
     btn.disabled = true;
     btn.style.opacity = '0.5';
-    statusEl.textContent = currentLang === 'zh' ? '创建中...' : 'Creating...';
+    statusEl.textContent = 'Creating...';
     statusEl.className = 'text-xs text-slate-400 dark:text-slate-500';
 
     fetch('/api/skills/create', {
@@ -4875,7 +4701,7 @@ function uploadSkillZip() {
 
     btn.disabled = true;
     btn.style.opacity = '0.5';
-    statusEl.textContent = currentLang === 'zh' ? '上传中...' : 'Uploading...';
+    statusEl.textContent = 'Uploading...';
     statusEl.className = 'text-xs text-slate-400 dark:text-slate-500';
 
     const formData = new FormData();
@@ -4926,7 +4752,7 @@ function installSkillFromUrl() {
 
     btn.disabled = true;
     btn.style.opacity = '0.5';
-    statusEl.textContent = currentLang === 'zh' ? '安装中...' : 'Installing...';
+    statusEl.textContent = 'Installing...';
     statusEl.className = 'text-xs text-slate-400 dark:text-slate-500';
 
     fetch('/api/skills/install', {
@@ -4987,10 +4813,10 @@ function loadMemoryView(page) {
             const emptyTitle = emptyEl.querySelector('p');
             if (memoryCategory === 'evolution') {
                 emptyIcon.className = 'fas fa-seedling text-rose-400 text-xl';
-                emptyTitle.textContent = currentLang === 'zh' ? '暂无进化记录' : 'No evolution records yet';
+                emptyTitle.textContent = 'No evolution records yet';
             } else {
                 emptyIcon.className = 'fas fa-brain text-purple-400 text-xl';
-                emptyTitle.textContent = currentLang === 'zh' ? '暂无记忆文件' : 'No memory files';
+                emptyTitle.textContent = 'No memory files';
             }
             emptyEl.classList.remove('hidden');
             listEl.classList.add('hidden');
@@ -5359,7 +5185,7 @@ function renderSearchCapability(def, cap, body) {
     `;
 
     // Strategy dropdown — when no provider is configured the strategy
-    // value is meaningless, so we show a "待配置" placeholder instead of
+    // value is meaningless, so we show a "Not configured" placeholder instead of
     // a default selection. Once any provider gets configured the saved
     // strategy (or "auto") becomes the active value.
     initDropdown(
@@ -5467,7 +5293,7 @@ function _renderSearchSummary(body, cap) {
     });
 }
 
-// Two-step add flow: click "+ 添加厂商" -> chooser dialog -> per-provider
+// Two-step add flow: click "+ Add Vendor" -> chooser dialog -> per-provider
 // credential editor. Bocha lands on the dedicated key modal; the others
 // piggy-back on the existing vendor credential modal.
 function openSearchAddProviderPicker(missingProviders) {
@@ -5799,7 +5625,7 @@ function renderCapabilityBody(def, cap, body) {
     // Pending-config takes priority over both "auto" and "pick provider":
     // when no real (non-sentinel) configured option exists, surfacing
     // "auto" or "pick" misleads the user — there's nothing to auto-route
-    // to or pick from. Force a "待配置" placeholder instead so all
+    // to or pick from. Force a "Not configured" placeholder instead so all
     // capabilities behave consistently on a fresh environment.
     const hasConfiguredOpt = providerOpts.some(o => !o._isAuto && o._configured);
     const noSelectionAndNoHint = !cap.current_provider && !cap.suggested_provider;
@@ -5990,7 +5816,7 @@ function buildCapabilityProviderOptions(def, cap) {
     // value so the existing save handler propagates it untouched to the
     // backend, which interprets "" as "fall back to the main model".
     // Skip the sentinel when no real vendor is configured — "auto" would
-    // route to nothing useful and the renderer will show "待配置" instead.
+    // route to nothing useful and the renderer will show "Not configured" instead.
     const hasAnyConfigured = opts.some(o => o._configured);
     if ((cap.strategy === 'auto' || cap.strategy === 'specified') && hasAnyConfigured) {
         if (capabilitySupportsAuto(def.id)) {
@@ -6141,7 +5967,7 @@ function rebuildCapabilityModelDropdown(def, providerId, selectedModel, scope) {
         modelValues.push(entry.value);
         return { value: entry.value, label: entry.label || entry.value, hint: entry.hint || '' };
     });
-    opts.push({ value: '__custom__', label: currentLang === 'zh' ? '自定义' : 'Custom' });
+    opts.push({ value: '__custom__', label: 'Custom' });
 
     let initialValue = selectedModel || '';
     if (initialValue && !modelValues.includes(initialValue)) {
@@ -6224,7 +6050,7 @@ function rebuildCapabilityVoiceDropdown(providerId, selectedVoice, scope, modelI
             hint: desc === code ? '' : code,
         };
     });
-    opts.push({ value: '__custom__', label: currentLang === 'zh' ? '自定义' : 'Custom' });
+    opts.push({ value: '__custom__', label: 'Custom' });
 
     // Off-catalog values route through the custom branch.
     let initial = selectedVoice || '';
@@ -6835,7 +6661,7 @@ function loadTasksView() {
         // Only show active (enabled) tasks
         const tasks = allTasks.filter(t => t.enabled !== false);
         if (tasks.length === 0) {
-            emptyEl.querySelector('p').textContent = currentLang === 'zh' ? '暂无定时任务' : 'No scheduled tasks';
+            emptyEl.querySelector('p').textContent = 'No scheduled tasks';
             return;
         }
         emptyEl.classList.add('hidden');
@@ -6863,7 +6689,7 @@ function loadTasksView() {
                 </div>
                 <p class="text-xs text-slate-500 dark:text-slate-400 mb-2 line-clamp-2">${escapeHtml(task.prompt || task.description || '')}</p>
                 <div class="flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
-                    <span><i class="fas fa-clock mr-1"></i>${currentLang === 'zh' ? '下次执行' : 'Next run'}: ${nextRun}</span>
+                    <span><i class="fas fa-clock mr-1"></i>${'Next run'}: ${nextRun}</span>
                 </div>`;
             listEl.appendChild(card);
         });
@@ -7500,8 +7326,8 @@ function showLoginScreen() {
         subtitle.textContent = 'Enter password to access the console';
         loginBtn.textContent = 'Login';
     } else {
-        subtitle.textContent = '请输入密码以访问控制台';
-        loginBtn.textContent = '登录';
+        subtitle.textContent = 'Enter password to access the console';
+        loginBtn.textContent = 'Log In';
     }
 
     const form = document.getElementById('login-form');
@@ -7527,14 +7353,14 @@ function showLoginScreen() {
                 document.getElementById('app').classList.remove('hidden');
                 initApp();
             } else {
-                errEl.textContent = currentLang === 'zh' ? '密码错误' : 'Wrong password';
+                errEl.textContent = 'Wrong password';
                 errEl.classList.remove('hidden');
                 pwdInput.value = '';
                 pwdInput.focus();
             }
             btn.disabled = false;
         }).catch(() => {
-            errEl.textContent = currentLang === 'zh' ? '网络错误，请重试' : 'Network error, please retry';
+            errEl.textContent = 'Network error, please retry';
             errEl.classList.remove('hidden');
             btn.disabled = false;
         });
@@ -8355,28 +8181,125 @@ function _isJsonBalanced(str) {
     return depth === 0 && !inStr;
 }
 
+/**
+ * Normalize a raw JSON string from an AI response so it has a fighting chance
+ * of parsing. Handles the most common LLM-induced malformations:
+ *   - Markdown code fences (``` ```json ... ``` ```) — stripped if present
+ *   - Curly/smart quotes (" " ' ' „ " ‚ ') → straight (" ')
+ *   - Markdown links [text](url) → text
+ *   - Control characters (except \n \t)
+ *   - "json" prefix word before the object (e.g. "json { ... }")
+ *   - Trailing prose after the closing brace
+ *   - Trailing commas
+ */
+function _normalizeCardJson(raw) {
+    if (!raw || typeof raw !== 'string') return '';
+    let s = raw;
+
+    // 1. Strip markdown code fences if present (``` ```json\n ... ``` ```)
+    const fenceMatch = s.match(/```(?:json|JSON|Json)?\s*\n?([\s\S]*?)\n?```/);
+    if (fenceMatch) {
+        s = fenceMatch[1];
+    }
+
+    // 2. Trim leading "json" word (e.g. "json { ... }")
+    s = s.replace(/^\s*json\s*:?\s*/i, '');
+
+    // 3. Replace curly/smart quotes with straight quotes
+    s = s
+        .replace(/[\u201C\u201D\u201E\u201F\u00AB\u00BB]/g, '"')   // " " „ « »
+        .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'");        // ' ' ‚ ‛ ′
+
+    // 4. Strip markdown links: [text](url) → text
+    s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+    // 5. Remove control characters except newline, tab, carriage return
+    s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+    // 6. Trim
+    s = s.trim();
+
+    return s;
+}
+
+/**
+ * Try multiple strategies to extract a JSON object containing "component"
+ * from a raw string. Returns the parsed object or null.
+ */
 function _detectCustomCardType(jsonStr) {
-    // Quick filter: must contain "component" keyword
-    if (!jsonStr.includes('"component"')) return null;
+    if (!jsonStr || typeof jsonStr !== 'string') return null;
+
+    // Normalize first — fixes curly quotes, markdown links, fences, etc.
+    const normalized = _normalizeCardJson(jsonStr);
+
+    // Quick filter: must contain "component" keyword (after normalization)
+    if (!normalized.includes('"component"')) return null;
+
+    // Try to extract just the JSON object (in case there's trailing prose)
+    const braceStart = normalized.indexOf('{');
+    if (braceStart === -1) return null;
+
+    // Find balanced object starting at braceStart
+    const extracted = _tryExtractJsonObject(normalized, braceStart);
+    const candidate = extracted ? extracted.json : normalized.slice(braceStart);
+
     // Fast check: is the JSON structurally complete (balanced braces)?
-    if (!_isJsonBalanced(jsonStr)) return null;
+    if (!_isJsonBalanced(candidate)) return null;
+
+    // Attempt 1: parse as-is
     try {
-        const obj = JSON.parse(jsonStr);
+        const obj = JSON.parse(candidate);
         if (obj && typeof obj === 'object' && obj.component && typeof obj.component === 'string') {
             return obj;
         }
-    } catch (_) {
-        // Try to repair common JSON issues: trailing commas, unquoted keys, etc.
-        try {
-            // Remove trailing commas before } or ]
-            let repaired = jsonStr.replace(/,\s*([}\]])/g, '$1');
-            // Try parsing again
+    } catch (_) {}
+
+    // Attempt 2: remove trailing commas
+    try {
+        const repaired = candidate.replace(/,\s*([}\]])/g, '$1');
+        const obj = JSON.parse(repaired);
+        if (obj && typeof obj === 'object' && obj.component && typeof obj.component === 'string') {
+            return obj;
+        }
+    } catch (_) {}
+
+    // Attempt 3: remove trailing commas + add missing closing braces
+    try {
+        let repaired = candidate.replace(/,\s*([}\]])/g, '$1');
+        // Count unbalanced braces and append closes
+        let depth = 0, inStr = false, esc = false;
+        for (let i = 0; i < repaired.length; i++) {
+            const ch = repaired[i];
+            if (esc) { esc = false; continue; }
+            if (ch === '\\' && inStr) { esc = true; continue; }
+            if (ch === '"') { inStr = !inStr; continue; }
+            if (inStr) continue;
+            if (ch === '{') depth++;
+            if (ch === '}') depth--;
+        }
+        while (depth > 0) { repaired += '}'; depth--; }
+        const obj = JSON.parse(repaired);
+        if (obj && typeof obj === 'object' && obj.component && typeof obj.component === 'string') {
+            return obj;
+        }
+    } catch (_) {}
+
+    // Attempt 4: aggressive — extract just the component field via regex
+    try {
+        const compMatch = candidate.match(/"component"\s*:\s*"([^"]+)"/);
+        if (compMatch) {
+            // Try to find the boundaries of the outermost object and parse it
+            // after replacing all problematic characters in string values
+            let repaired = candidate
+                .replace(/,\s*([}\]])/g, '$1');            // trailing commas
+            // Last-ditch: if still fails, return a minimal object
             const obj = JSON.parse(repaired);
-            if (obj && typeof obj === 'object' && obj.component && typeof obj.component === 'string') {
+            if (obj && typeof obj === 'object' && obj.component) {
                 return obj;
             }
-        } catch (_) {}
-    }
+        }
+    } catch (_) {}
+
     return null;
 }
 
@@ -8390,9 +8313,15 @@ function _restoreCachedCards(container) {
         if (wrapper.closest('.onyx-tool-card')) return;
         const codeEl = wrapper.querySelector('pre code');
         if (!codeEl) return;
+        // Case-insensitive match for json/jsonc/javascript/js language classes,
+        // OR no language class at all (the code itself might be a card JSON).
         const langClass = Array.from(codeEl.classList).find(c => c.startsWith('language-'));
-        if (!langClass || !langClass.includes('json')) return;
+        const lang = langClass ? langClass.replace('language-', '').toLowerCase() : '';
+        const isCardLang = !lang || ['json', 'jsonc', 'javascript', 'js'].includes(lang);
+        if (!isCardLang) return;
         const code = codeEl.textContent || '';
+        // Must look like a card (contain "component") to bother checking the cache
+        if (!code.includes('"component"')) return;
         const cacheKey = code.trim();
         if (window._onyxCardCache.has(cacheKey)) {
             wrapper.dataset.onyxCardProcessed = 'true';
@@ -10033,10 +9962,17 @@ function _addCustomJsonCards(container) {
         if (wrapper.closest('.onyx-tool-card')) return;
         const codeEl = wrapper.querySelector('pre code');
         if (!codeEl) return;
+        // Case-insensitive match for json/jsonc/javascript/js language classes,
+        // OR no language class at all (the code itself might be a card JSON).
         const langClass = Array.from(codeEl.classList).find(c => c.startsWith('language-'));
-        if (!langClass || !langClass.includes('json')) return;
+        const lang = langClass ? langClass.replace('language-', '').toLowerCase() : '';
+        const isCardLang = !lang || ['json', 'jsonc', 'javascript', 'js'].includes(lang);
+        if (!isCardLang) return;
 
         const code = codeEl.textContent || '';
+        // Fast pre-filter: must look like a card (contain "component" keyword)
+        if (!code.includes('"component"')) return;
+
         const cacheKey = code.trim();
 
         // Check cache first — rebuild from cardData so event listeners are
@@ -10057,11 +9993,11 @@ function _addCustomJsonCards(container) {
         const cardData = _detectCustomCardType(code);
         if (!cardData) {
             // Not a valid card JSON yet — hide the code block during streaming
-            // so user doesn't see raw JSON being typed
-            if (code.includes('"component"')) {
-                wrapper.style.display = 'none';
-                wrapper.dataset.onyxCardPending = 'true';
-            }
+            // so user doesn't see raw JSON being typed.
+            // The pending re-check loop below will retry on each render pass
+            // and reveal it as a card once the JSON is complete & parseable.
+            wrapper.style.display = 'none';
+            wrapper.dataset.onyxCardPending = 'true';
             return;
         }
 

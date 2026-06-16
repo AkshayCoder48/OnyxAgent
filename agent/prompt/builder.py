@@ -77,7 +77,7 @@ class PromptBuilder:
 
 def build_agent_system_prompt(
     workspace_dir: str,
-    language: str = "zh",
+    language: str = "en",
     base_persona: Optional[str] = None,
     user_identity: Optional[Dict[str, str]] = None,
     tools: Optional[List[Any]] = None,
@@ -89,6 +89,10 @@ def build_agent_system_prompt(
 ) -> str:
     """
     Build the agent system prompt.
+
+    The app is English-only. The ``language`` argument is accepted for
+    backward compatibility but is always forced to ``"en"`` so no Chinese
+    or other non-English text ever reaches the prompt.
 
     Section order (by importance and logical flow):
     1. Tooling - core capabilities, introduced first
@@ -102,7 +106,7 @@ def build_agent_system_prompt(
 
     Args:
         workspace_dir: workspace directory
-        language: language ("zh" or "en")
+        language: ignored — always forced to "en" (English-only app)
         base_persona: base persona description (deprecated, defined by AGENT.md)
         user_identity: user identity info
         tools: tool list
@@ -113,8 +117,10 @@ def build_agent_system_prompt(
         **kwargs: extra args
 
     Returns:
-        The full system prompt.
+        The full system prompt (English only).
     """
+    # Force English — the app is English-only.
+    language = "en"
     sections = []
 
     # 1. Tooling (most important, goes first)
