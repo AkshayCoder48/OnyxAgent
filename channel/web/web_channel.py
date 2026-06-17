@@ -1147,6 +1147,7 @@ class WebChannel(ChatChannel):
             '/api/agents', 'AgentsHandler',
             '/api/agents/update', 'AgentUpdateHandler',
             '/api/agents/delegate', 'AgentDelegateHandler',
+            '/api/agents/save_message', 'AgentSaveMessageHandler',
             '/api/memory', 'MemoryHandler',
             '/api/memory/content', 'MemoryContentHandler',
             '/api/knowledge/list', 'KnowledgeListHandler',
@@ -4932,6 +4933,57 @@ class AgentDelegateHandler:
             logger.error(f"[WebChannel] Agent delegate stream error: {e}")
             err = json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False)
             yield f"data: {err}\n\n".encode("utf-8")
+
+
+class AgentSaveMessageHandler:
+    """POST /api/agents/save_message — persist a sub-agent's response into
+    the conversation store so it survives page refresh.
+
+    Body: {session_id, role, content, agent_id, agent_name, agent_role, svg_logo}
+
+    The message is stored with role='assistant' and an `extras.agent` field
+    carrying the agent identity, so history replay can render the identity
+    chip when the page is reloaded.
+    """
+
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or b"{}")
+            session_id = (body.get("session_id") or "").strip()
+            role = (body.get("role") or "assistant").strip()
+            content = body.get("content") or ""
+            if not session_id:
+                return json.dumps({"status": "error", "message": "session_id is required"})
+
+            from agent.memory import get_conversation_store
+            store = get_conversation_store()
+
+            extras = {
+                "agent": {
+                    "id": body.get("agent_id", ""),
+                    "name": body.get("agent_name", ""),
+                    "role": body.get("agent_role", ""),
+                    "svg_logo": body.get("svg_logo", ""),
+                }
+            }
+            # Also store the user's message (with the @mention) if provided,
+            # so the user-side of the conversation persists too.
+            messages_to_save = []
+            user_msg = body.get("user_message")
+            if user_msg:
+                messages_to_save.append({"role": "user", "content": user_msg, "extras": {}})
+            messages_to_save.append({
+                "role": role,
+                "content": content,
+                "extras": extras,
+            })
+            store.append_messages(session_id, messages_to_save, channel_type="web")
+            return json.dumps({"status": "success"}, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Agent save_message error: {e}")
+            return json.dumps({"status": "error", "message": str(e)})
 
 
 class MemoryHandler:

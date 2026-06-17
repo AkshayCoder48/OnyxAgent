@@ -45,27 +45,69 @@ def _load_agent(workspace: Optional[str], agent_id: str) -> Optional[Dict[str, A
 
 
 def _get_api_config() -> Dict[str, str]:
-    """Pull the OpenAI-compatible API config from the running config."""
+    """Pull the OpenAI-compatible API config from the running config.
+
+    OnyxAgent uses MODEL-SPECIFIC api key names (deepseek_api_key,
+    claude_api_key, moonshot_api_key, etc.) rather than a single
+    open_ai_api_key. We map the configured model → the right key + base,
+    falling back to open_ai_api_key if the model is unknown.
+    """
     try:
         from config import conf
         cfg = conf()
-        # Try common key names. The orchestrator uses one of these.
-        api_key = (
-            cfg.get("open_ai_api_key")
-            or cfg.get("api_key")
-            or ""
-        )
-        api_base = (
-            cfg.get("open_ai_api_base")
-            or cfg.get("api_base")
-            or "https://api.openai.com/v1"
-        )
-        model = (
-            cfg.get("model")
-            or cfg.get("model_aka")
-            or "gpt-3.5-turbo"
-        )
-        return {"api_key": api_key, "api_base": api_base, "model": model}
+        model = (cfg.get("model") or "").lower()
+
+        # Map model prefix → (api_key_field, api_base_default)
+        # Order matters: longest prefix first so "deepseek" doesn't shadow
+        # a hypothetical "deepseek-custom".
+        MODEL_MAP = [
+            ("deepseek",  ("deepseek_api_key",  "https://api.deepseek.com/v1")),
+            ("claude",    ("claude_api_key",    "https://api.anthropic.com/v1")),
+            ("moonshot",  ("moonshot_api_key",  "https://api.moonshot.cn/v1")),
+            ("kimi",      ("moonshot_api_key",  "https://api.moonshot.cn/v1")),
+            ("gemini",    ("gemini_api_key",    "https://generativelanguage.googleapis.com/v1beta/openai")),
+            ("glm",       ("zhipu_ai_api_key",  "https://open.bigmodel.cn/api/paas/v4")),
+            ("qwen",      ("dashscope_api_key", "https://dashscope.aliyuncs.com/compatible-mode/v1")),
+            ("qwq",       ("dashscope_api_key", "https://dashscope.aliyuncs.com/compatible-mode/v1")),
+            ("doubao",    ("ark_api_key",       "https://ark.cn-beijing.volces.com/api/v3")),
+            ("minimax",   ("minimax_api_key",   "https://api.minimax.chat/v1")),
+            ("ernie",     ("qianfan_api_key",   "https://qianfan.baidubce.com/v2")),
+            ("qianfan",   ("qianfan_api_key",   "https://qianfan.baidubce.com/v2")),
+        ]
+
+        api_key = ""
+        api_base = ""
+        for prefix, (key_field, base_default) in MODEL_MAP:
+            if model.startswith(prefix):
+                api_key = cfg.get(key_field, "") or ""
+                api_base = cfg.get(f"{prefix}_api_base", "") or base_default
+                break
+
+        # Fallback to open_ai_api_key if no model matched OR if the matched key is empty
+        if not api_key:
+            api_key = cfg.get("open_ai_api_key", "") or ""
+            api_base = api_base or cfg.get("open_ai_api_base", "") or "https://api.openai.com/v1"
+
+        # As a last resort, scan all *_api_key fields for any non-empty value.
+        # This handles cases where the user set a provider-specific key but the
+        # model field doesn't match any prefix (e.g. a custom model name).
+        if not api_key:
+            try:
+                # conf() may return a dict or a ConfigParser-like object; handle both.
+                items = cfg.items() if hasattr(cfg, 'items') else []
+                for k, v in items:
+                    if isinstance(k, str) and k.endswith("_api_key") and v:
+                        api_key = v
+                        provider = k[:-8]  # strip "_api_key"
+                        api_base = cfg.get(f"{provider}_api_base", "") or api_base
+                        break
+            except Exception:
+                pass
+
+        if not api_base:
+            api_base = "https://api.openai.com/v1"
+
+        return {"api_key": api_key, "api_base": api_base, "model": cfg.get("model") or "gpt-3.5-turbo"}
     except Exception as e:
         logger.error(f"[SubAgentRunner] config load failed: {e}")
         return {"api_key": "", "api_base": "https://api.openai.com/v1", "model": "gpt-3.5-turbo"}

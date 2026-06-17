@@ -2312,12 +2312,17 @@ function _sendToSubAgent(agent, cleanMessage, originalText) {
             es.close();
             sendBtn.disabled = false;
             scrollChatToBottom();
+            // Persist the sub-agent's message + the user's @mention message
+            // to the conversation store so they survive page refresh.
+            _saveSubAgentMessage(agentMeta, accumulatedText, originalText);
         } else if (event.type === 'error') {
             _onyxHideStillThinking(contentEl);
             contentEl.innerHTML = `<div class="text-red-500 text-sm">⚠ ${_onyxEscHtml(event.message || 'Sub-agent error')}</div>`;
             contentEl.classList.remove('sse-streaming');
             es.close();
             sendBtn.disabled = false;
+            // Even on error, persist what we have so the user's message doesn't vanish on refresh.
+            _saveSubAgentMessage(agentMeta, accumulatedText || contentEl.textContent, originalText);
         }
     };
 
@@ -2331,6 +2336,141 @@ function _sendToSubAgent(agent, cleanMessage, originalText) {
         }
         es.close();
         sendBtn.disabled = false;
+        // Persist partial response if we got anything.
+        if (accumulatedText) {
+            _saveSubAgentMessage(agentMeta, accumulatedText, originalText);
+        }
+    };
+}
+
+/**
+ * Persist a sub-agent's response (and the user's @mention message) to the
+ * conversation store via /api/agents/save_message. Best-effort — failures
+ * are logged but don't break the chat UX.
+ */
+function _saveSubAgentMessage(agentMeta, content, userMessage) {
+    if (!sessionId || !content) return;
+    fetch('/api/agents/save_message', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            session_id: sessionId,
+            role: 'assistant',
+            content: content,
+            agent_id: agentMeta.id,
+            agent_name: agentMeta.name,
+            agent_role: agentMeta.role,
+            svg_logo: agentMeta.svg_logo,
+            user_message: userMessage || '',
+        }),
+    }).then(r => r.json()).then(data => {
+        if (data.status !== 'success') {
+            console.warn('[sub-agent] save_message failed:', data.message);
+        }
+    }).catch(err => {
+        console.warn('[sub-agent] save_message network error:', err);
+    });
+}
+
+/**
+ * Inspect an orchestration tool's `delegate` result. If it carries a
+ * delegation task, automatically open a sub-agent stream so the sub-agent's
+ * response appears as a NEW chat bubble. This lets the orchestrator invoke
+ * sub-agents programmatically (via the orchestration tool) without the user
+ * needing to @mention them.
+ *
+ * The result can be either a JSON object or a JSON string (since tool
+ * results are often serialized). We parse defensively.
+ */
+function _maybeAutoStreamSubAgent(result) {
+    let payload = result;
+    if (typeof result === 'string') {
+        try { payload = JSON.parse(result); }
+        catch (e) { return; }  // not JSON — not a delegation
+    }
+    if (!payload || typeof payload !== 'object') return;
+    // Only trigger for delegation results (component=agent-card + delegation field)
+    if (payload.component !== 'agent-card' || !payload.delegation) return;
+    const taskId = payload.delegation.task;
+    const agentId = payload.id;
+    if (!taskId || !agentId) return;
+
+    // Build the agent meta from the payload
+    const agentMeta = {
+        id: agentId,
+        name: payload.name || agentId,
+        role: payload.role || '',
+        svg_logo: payload.svg_logo || '',
+    };
+
+    // Add a small "delegating to..." notice, then stream the sub-agent's response.
+    // We DON'T add a user message here (the user didn't send one to the sub-agent —
+    // the orchestrator delegated). We pass the delegation task as the message.
+    const timestamp = new Date();
+    const botEl = createBotMessageEl('', timestamp, 'subagent_delegate_' + Date.now(), null, agentMeta);
+    messagesDiv.appendChild(botEl);
+    scrollChatToBottom();
+
+    const contentEl = botEl.querySelector('.answer-content');
+    contentEl.classList.add('sse-streaming');
+    contentEl.innerHTML = '<span class="onyx-still-thinking"><span class="onyx-dot"></span><span class="onyx-dot"></span><span class="onyx-dot"></span></span>';
+    contentEl._onyxLastDeltaTs = Date.now();
+
+    const url = `/api/agents/delegate?agent_id=${encodeURIComponent(agentId)}&message=${encodeURIComponent(taskId)}`;
+    const es = new EventSource(url);
+    let accumulatedText = '';
+
+    es.onmessage = function(e) {
+        let event;
+        try { event = JSON.parse(e.data); }
+        catch (err) { return; }
+
+        if (event.type === 'agent_start') {
+            contentEl._onyxLastDeltaTs = Date.now();
+            _onyxHideStillThinking(contentEl);
+            contentEl.innerHTML = '';
+        } else if (event.type === 'delta') {
+            contentEl._onyxLastDeltaTs = Date.now();
+            _onyxHideStillThinking(contentEl);
+            accumulatedText += event.content || '';
+            contentEl.innerHTML = renderMarkdown(accumulatedText);
+            _onyxTriggerTypewriterFade(contentEl);
+            scrollChatToBottom();
+        } else if (event.type === 'agent_end') {
+            _onyxHideStillThinking(contentEl);
+            contentEl.classList.remove('sse-streaming');
+            _addCodeBlockHeaders(contentEl);
+            _restoreCachedCards(contentEl);
+            _addCustomJsonCards(contentEl);
+            contentEl.dataset.rawMd = accumulatedText;
+            es.close();
+            scrollChatToBottom();
+            // Persist the delegated sub-agent response. No user_message since
+            // this was an orchestrator-initiated delegation, not a user mention.
+            _saveSubAgentMessage(agentMeta, accumulatedText, '');
+        } else if (event.type === 'error') {
+            _onyxHideStillThinking(contentEl);
+            contentEl.innerHTML = `<div class="text-red-500 text-sm">⚠ ${_onyxEscHtml(event.message || 'Sub-agent error')}</div>`;
+            contentEl.classList.remove('sse-streaming');
+            es.close();
+            if (accumulatedText) {
+                _saveSubAgentMessage(agentMeta, accumulatedText, '');
+            }
+        }
+    };
+
+    es.onerror = function() {
+        _onyxHideStillThinking(contentEl);
+        if (contentEl.classList.contains('sse-streaming')) {
+            contentEl.classList.remove('sse-streaming');
+            if (!accumulatedText) {
+                contentEl.innerHTML = '<div class="text-red-500 text-sm">⚠ Connection lost. The sub-agent may be unavailable.</div>';
+            }
+        }
+        es.close();
+        if (accumulatedText) {
+            _saveSubAgentMessage(agentMeta, accumulatedText, '');
+        }
     };
 }
 
@@ -2722,6 +2862,18 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                 _updateToolIndicator(toolEl, item, isError);
                 toolElements.delete(item.tool_call_id);
                 scrollChatToBottom();
+
+                // ── AUTO-STREAM SUB-AGENT ON DELEGATION ──
+                // When the orchestrator calls the orchestration tool with
+                // action='delegate', the tool returns a JSON payload like:
+                //   {component: 'agent-card', id, name, role, svg_logo,
+                //    delegation: {task, status, note}}
+                // We detect this and automatically open a sub-agent stream
+                // so the sub-agent's response appears as a NEW chat bubble,
+                // without the user needing to @mention it.
+                if (toolName === 'orchestration' && !isError && result) {
+                    _maybeAutoStreamSubAgent(result);
+                }
 
             } else if (item.type === 'image') {
                 ensureBotEl();
@@ -3243,6 +3395,11 @@ function createBotMessageEl(content, timestamp, requestId, msg, agentMeta) {
     const el = document.createElement('div');
     el.className = 'flex gap-3 px-4 sm:px-6 py-3 bot-message-group';
     if (requestId) el.dataset.requestId = requestId;
+    // Agent identity can come from the explicit agentMeta param (live stream)
+    // OR from msg.extras.agent (history replay from the conversation store).
+    if (!agentMeta && msg && msg.extras && msg.extras.agent && msg.extras.agent.id) {
+        agentMeta = msg.extras.agent;
+    }
     if (agentMeta && agentMeta.id) el.dataset.agentId = agentMeta.id;
 
     let stepsHtml = '';
@@ -5567,7 +5724,7 @@ function marketplaceShowDetail(slug) {
                         </div>
                         <button class="marketplace-detail-back" onclick="marketplaceBackToList()">← Back</button>
                     </div>
-                    <div class="marketplace-detail-desc">${_onyxEscHtml(s.description || s.summary || 'No description available.')}</div>
+                    <div class="marketplace-detail-desc skill-md-render">${_renderSkillMarkdown(s.description || s.summary || 'No description available.')}</div>
                     ${tags ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${tags}</div>` : ''}
                     <div class="marketplace-detail-actions">
                         <button class="marketplace-install-btn ${data.installed ? 'installed' : ''}"
@@ -5585,6 +5742,23 @@ function marketplaceShowDetail(slug) {
         .catch(err => {
             grid.innerHTML = `<div class="marketplace-empty">Network error: ${_onyxEscHtml(String(err))}</div>`;
         });
+}
+
+/**
+ * Render a SKILL.md markdown string as HTML.
+ * Strips YAML frontmatter (--- ... ---) and renders the rest through the
+ * existing markdown-it pipeline. Falls back to escaped plain text on error.
+ */
+function _renderSkillMarkdown(raw) {
+    if (!raw) return '<p class="onyx-empty-hint">No description available.</p>';
+    let text = raw;
+    // Strip YAML frontmatter (---\n...\n---) at the start of the file
+    text = text.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '');
+    try {
+        return renderMarkdown(text);
+    } catch (e) {
+        return _onyxEscHtml(text);
+    }
 }
 
 function marketplaceBackToList() {

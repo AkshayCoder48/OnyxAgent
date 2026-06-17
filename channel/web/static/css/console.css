@@ -4691,4 +4691,104 @@ button:not(:disabled):active,
   font-size: 14px;
 }
 
+/* =====================================================================
+   SKILL.MD MARKDOWN RENDERING — marketplace detail view
+   =====================================================================
+   When a skill's SKILL.md content is shown in the marketplace detail
+   view, render it as proper markdown (headings, code blocks, lists,
+   tables) instead of a wall of escaped plain text.
+*/
+.skill-md-render {
+  font-size: 13px;
+  line-height: 1.6;
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+.dark .skill-md-render {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.skill-md-render h1,
+.skill-md-render h2,
+.skill-md-render h3,
+.skill-md-render h4 {
+  font-weight: 600;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: inherit;
+  line-height: 1.3;
+}
+.skill-md-render h1 { font-size: 18px; }
+.skill-md-render h2 { font-size: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.15); padding-bottom: 4px; }
+.skill-md-render h3 { font-size: 14px; }
+.skill-md-render h4 { font-size: 13px; opacity: 0.9; }
+.skill-md-render p {
+  margin: 8px 0;
+}
+.skill-md-render ul,
+.skill-md-render ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+.skill-md-render li {
+  margin: 3px 0;
+}
+.skill-md-render code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  background: rgba(148, 163, 184, 0.15);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.skill-md-render pre {
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 10px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.dark .skill-md-render pre {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.skill-md-render pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+}
+.skill-md-render a {
+  color: #f43f5e;
+  text-decoration: underline;
+}
+.skill-md-render strong { font-weight: 600; }
+.skill-md-render blockquote {
+  border-left: 3px solid rgba(244, 63, 94, 0.3);
+  padding-left: 12px;
+  margin: 10px 0;
+  opacity: 0.85;
+}
+.skill-md-render table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+  font-size: 12px;
+}
+.skill-md-render th,
+.skill-md-render td {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  padding: 6px 10px;
+  text-align: left;
+}
+.skill-md-render th {
+  background: rgba(148, 163, 184, 0.1);
+  font-weight: 600;
+}
+
 
