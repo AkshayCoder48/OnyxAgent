@@ -4615,4 +4615,80 @@ button:not(:disabled):active,
 }
 .onyx-free-arr-row:last-child { border-bottom: none; }
 
+/* =====================================================================
+   AGENT IDENTITY CHIP — on each sub-agent's chat bubble
+   =====================================================================
+   Shows the agent's SVG logo + name above the bubble content, so the
+   user can clearly see WHICH agent responded. Orchestrator bubbles
+   don't get a chip (they keep the default AI avatar).
+*/
+.agent-identity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 4px;
+  margin-bottom: 6px;
+  background: rgba(244, 63, 94, 0.08);
+  border: 1px solid rgba(244, 63, 94, 0.20);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f43f5e;
+  animation: onyxCardAppear 0.2s var(--onyx-ease);
+}
+.dark .agent-identity-chip {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.25);
+}
+.agent-chip-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(244, 63, 94, 0.10);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.agent-chip-logo svg { width: 100%; height: 100%; }
+.agent-chip-name {
+  white-space: nowrap;
+}
+.agent-chip-role {
+  font-weight: 400;
+  opacity: 0.7;
+  font-size: 10px;
+  border-left: 1px solid rgba(244, 63, 94, 0.25);
+  padding-left: 6px;
+  margin-left: 2px;
+}
+.bot-avatar-agent {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  background: rgba(244, 63, 94, 0.10);
+  border: 1px solid rgba(244, 63, 94, 0.30);
+  overflow: hidden;
+}
+.bot-avatar-agent svg { width: 100%; height: 100%; }
+.bot-avatar-agent-fallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  background: rgba(244, 63, 94, 0.10);
+  border: 1px solid rgba(244, 63, 94, 0.30);
+  font-size: 14px;
+}
+
 

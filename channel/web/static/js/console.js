@@ -710,36 +710,12 @@ function renderMarkdown(text) {
         // don't blow up the chat bubble.  We preserve the prefix so the user
         // can still see what it is, but collapse the payload.
         let processed = _truncateDataUris(text);
-        // Pre-process: extract <thinking>…</thinking> blocks BEFORE markdown runs.
-        // We replace each block with a unique placeholder token, run markdown on
-        // the rest of the text, then splice the styled collapsible block back in.
-        // This means markdown is "paused" inside <thinking> (raw text shown) and
-        // "resumes" cleanly after the closing tag.
-        const thinkingBlocks = [];
-        processed = processed.replace(/<thinking>([\s\S]*?)<\/thinking>/g,
-            (m, inner) => {
-                const idx = thinkingBlocks.length;
-                thinkingBlocks.push(inner);
-                return `\x00THINKING_BLOCK_${idx}\x00`;
-            });
-        // Also handle an unclosed <thinking> tag mid-stream — auto-close at end
-        // so the user sees the partial thought rather than raw tag text.
-        processed = processed.replace(/<thinking>([\s\S]*)$/, (m, inner) => {
-            const idx = thinkingBlocks.length;
-            thinkingBlocks.push(inner + '\n\n_(streaming — closing tag pending)_');
-            return `\x00THINKING_BLOCK_${idx}\x00`;
-        });
         // Pre-process: wrap bare JSON card objects (not already in code fences)
         // in ```json fences so the card processor can render them as cards.
         // This catches cases where the AI outputs `json { "component": ... }`
         // or just `{ "component": ... }` without proper markdown fencing.
         processed = _wrapBareCardJson(processed);
         let html = md.render(processed);
-        // Restore <thinking> blocks as styled collapsible divs.
-        html = html.replace(/\x00THINKING_BLOCK_(\d+)\x00/g, (m, idx) => {
-            const inner = thinkingBlocks[parseInt(idx, 10)] || '';
-            return _buildThinkingBlockHtml(inner);
-        });
         html = _rewriteLocalImgSrc(html);
         // Order matters: video first (more specific), then image.
         html = injectImagePreviews(injectVideoPlayers(html));
@@ -751,40 +727,6 @@ function renderMarkdown(text) {
     }
     catch (e) { return text.replace(/\n/g, '<br>'); }
 }
-
-/**
- * Build a styled collapsible "Thinking..." block.
- *
- * Markdown is paused inside this block — the inner text is shown escaped and
- * preformatted, NOT re-rendered through markdown. This matches the agent's
- * intent: <thinking> is internal reasoning, not user-facing prose.
- *
- * Default state: collapsed. Click the header to expand.
- * Color: text color only, slightly lighter than the message bar background.
- */
-function _buildThinkingBlockHtml(innerText) {
-    // Escape the inner text so it renders as plain preformatted text.
-    const escaped = _onyxEscHtml(innerText.replace(/^\n+/, '').replace(/\n+$/, ''));
-    // Truncate very long thinking blocks in the collapsed view (full text on expand).
-    const preview = escaped.length > 140 ? escaped.slice(0, 140) + '…' : escaped;
-    return `<div class="onyx-thinking-block" data-collapsed="1">
-        <div class="onyx-thinking-header" onclick="onyxToggleThinkingBlock(this)">
-            <i class="fas fa-lightbulb onyx-thinking-icon"></i>
-            <span class="onyx-thinking-label">Thinking</span>
-            <span class="onyx-thinking-preview">${preview}</span>
-            <i class="fas fa-chevron-right onyx-thinking-chevron"></i>
-        </div>
-        <div class="onyx-thinking-body"><pre class="onyx-thinking-pre">${escaped}</pre></div>
-    </div>`;
-}
-
-// Toggle a thinking block between collapsed and expanded.
-window.onyxToggleThinkingBlock = function(headerEl) {
-    const block = headerEl.parentElement;
-    if (!block) return;
-    const collapsed = block.getAttribute('data-collapsed') === '1';
-    block.setAttribute('data-collapsed', collapsed ? '0' : '1');
-};
 
 /**
  * Pre-process raw markdown: find bare JSON objects containing a "component"
@@ -2243,6 +2185,155 @@ async function regenerateResponse(botMsgEl) {
     postWithRetry(0);
 }
 
+// =====================================================================
+// SUB-AGENT MESSAGE ROUTING
+// =====================================================================
+// When the user @mentions a sub-agent in their message, we route the
+// message to /api/agents/delegate (which streams the sub-agent's
+// response via SSE) instead of the normal /message endpoint (which
+// always goes to the orchestrator).
+//
+// The sub-agent's response appears as a NEW chat bubble tagged with
+// the agent's SVG logo + name, so the user can clearly see which agent
+// responded.
+
+/**
+ * Scan the message text for an @mention that matches a known sub-agent.
+ * Returns the agent object if found, else null.
+ * Matches on agent.name (with spaces → hyphens), agent.id, or exact name.
+ * Tries the longest match first so "Backend Dev" beats "Backend".
+ */
+function _detectMentionedAgent(text) {
+    if (!text) return null;
+    const agents = agentsState.agents || [];
+    if (!agents.length) return null;
+
+    // Build a list of (pattern, agent) for all enabled agents, sorted by
+    // pattern length descending so we try the longest first.
+    const candidates = [];
+    agents.forEach(a => {
+        if (a.enabled === false) return;
+        const names = new Set([
+            a.name.toLowerCase(),
+            a.id.toLowerCase(),
+            a.name.toLowerCase().replace(/\s+/g, '-'),
+        ]);
+        names.forEach(n => {
+            if (n) candidates.push({pattern: n, agent: a});
+        });
+    });
+    candidates.sort((a, b) => b.pattern.length - a.pattern.length);
+
+    // For each candidate, check if the text contains @<pattern> as a word.
+    for (const c of candidates) {
+        // Escape regex special chars in the pattern
+        const escaped = c.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Match @<pattern> where pattern can contain spaces (agent names like "Backend Dev").
+        // The pattern must be preceded by start-of-string or whitespace, and followed by
+        // whitespace, end-of-string, or punctuation.
+        const re = new RegExp('(?:^|\\s)@(' + escaped + ')(?=\\s|$|[,.;:!?])', 'i');
+        if (re.test(text)) {
+            return c.agent;
+        }
+    }
+    return null;
+}
+
+/**
+ * Send a message to a sub-agent. Creates a NEW chat bubble tagged with
+ * the agent's identity, then opens an EventSource to /api/agents/delegate
+ * and streams the response into that bubble.
+ */
+function _sendToSubAgent(agent, cleanMessage, originalText) {
+    // Add the user's message (with the @mention visible) to the chat
+    const timestamp = new Date();
+    addUserMessage(originalText, timestamp, []);
+
+    // Clear the input
+    chatInput.value = '';
+    chatInput.style.height = '42px';
+    chatInput.style.overflowY = 'hidden';
+    sendBtn.disabled = true;
+
+    // Hide the welcome screen if present
+    const ws = document.getElementById('welcome-screen');
+    if (ws) ws.remove();
+
+    // Create a NEW bot bubble for the sub-agent's response, tagged with
+    // the agent's identity (logo + name).
+    const agentMeta = {
+        id: agent.id,
+        name: agent.name,
+        role: agent.role,
+        svg_logo: agent.svg_logo,
+    };
+    const botEl = createBotMessageEl('', timestamp, 'subagent_' + Date.now(), null, agentMeta);
+    messagesDiv.appendChild(botEl);
+    scrollChatToBottom();
+
+    const contentEl = botEl.querySelector('.answer-content');
+    contentEl.classList.add('sse-streaming');
+    contentEl.innerHTML = '<span class="onyx-still-thinking"><span class="onyx-dot"></span><span class="onyx-dot"></span><span class="onyx-dot"></span></span>';
+    contentEl._onyxLastDeltaTs = Date.now();
+
+    // Build the SSE URL
+    const url = `/api/agents/delegate?agent_id=${encodeURIComponent(agent.id)}&message=${encodeURIComponent(cleanMessage)}`;
+    const es = new EventSource(url);
+
+    let accumulatedText = '';
+
+    es.onmessage = function(e) {
+        let event;
+        try { event = JSON.parse(e.data); }
+        catch (err) { return; }
+
+        if (event.type === 'agent_start') {
+            // The agent is starting — update the bubble's identity if needed
+            contentEl._onyxLastDeltaTs = Date.now();
+            _onyxHideStillThinking(contentEl);
+            // Remove the placeholder dots
+            contentEl.innerHTML = '';
+        } else if (event.type === 'delta') {
+            contentEl._onyxLastDeltaTs = Date.now();
+            _onyxHideStillThinking(contentEl);
+            accumulatedText += event.content || '';
+            contentEl.innerHTML = renderMarkdown(accumulatedText);
+            _onyxTriggerTypewriterFade(contentEl);
+            scrollChatToBottom();
+        } else if (event.type === 'agent_end') {
+            _onyxHideStillThinking(contentEl);
+            contentEl.classList.remove('sse-streaming');
+            // Final render with card pipeline
+            _addCodeBlockHeaders(contentEl);
+            _restoreCachedCards(contentEl);
+            _addCustomJsonCards(contentEl);
+            // Store the raw markdown for copy/regenerate
+            contentEl.dataset.rawMd = accumulatedText;
+            es.close();
+            sendBtn.disabled = false;
+            scrollChatToBottom();
+        } else if (event.type === 'error') {
+            _onyxHideStillThinking(contentEl);
+            contentEl.innerHTML = `<div class="text-red-500 text-sm">⚠ ${_onyxEscHtml(event.message || 'Sub-agent error')}</div>`;
+            contentEl.classList.remove('sse-streaming');
+            es.close();
+            sendBtn.disabled = false;
+        }
+    };
+
+    es.onerror = function() {
+        _onyxHideStillThinking(contentEl);
+        if (contentEl.classList.contains('sse-streaming')) {
+            contentEl.classList.remove('sse-streaming');
+            if (!accumulatedText) {
+                contentEl.innerHTML = '<div class="text-red-500 text-sm">⚠ Connection lost. The sub-agent may be unavailable.</div>';
+            }
+        }
+        es.close();
+        sendBtn.disabled = false;
+    };
+}
+
 function sendMessage() {
     // Do NOT branch on sendBtnMode here: Enter should always send (so
     // typing "/cancel" submits normally). Cancel is wired only to the
@@ -2250,6 +2341,37 @@ function sendMessage() {
 
     const text = chatInput.value.trim();
     if (!text && pendingAttachments.length === 0) return;
+
+    // ── SUB-AGENT ROUTING ──
+    // If the message @mentions a known sub-agent, route to the sub-agent
+    // delegate endpoint instead of the normal orchestrator /message endpoint.
+    // The sub-agent streams its response as a NEW chat bubble tagged with
+    // the agent's identity (name + SVG logo).
+    const mentionedAgent = _detectMentionedAgent(text);
+    if (mentionedAgent) {
+        // Strip the @mention token from the message before sending to sub-agent.
+        // Try the agent name first (with spaces), then id, then hyphenated name.
+        const patterns = [
+            mentionedAgent.name,
+            mentionedAgent.id,
+            mentionedAgent.name.replace(/\s+/g, '-'),
+        ];
+        let cleanMessage = text;
+        for (const p of patterns) {
+            const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp('(?:^|\\s)@' + escaped + '(?=\\s|$|[,.;:!?])', 'i');
+            if (re.test(cleanMessage)) {
+                cleanMessage = cleanMessage.replace(re, ' ');
+                break;
+            }
+        }
+        cleanMessage = cleanMessage.replace(/\s+/g, ' ').trim();
+        if (cleanMessage) {
+            // Run the sub-agent flow and return — don't fall through to orchestrator
+            _sendToSubAgent(mentionedAgent, cleanMessage, text);
+            return;
+        }
+    }
 
     if (text) {
         inputHistory.push(text);
@@ -3117,10 +3239,11 @@ function localizeCancelMarker(text) {
         ;
 }
 
-function createBotMessageEl(content, timestamp, requestId, msg) {
+function createBotMessageEl(content, timestamp, requestId, msg, agentMeta) {
     const el = document.createElement('div');
     el.className = 'flex gap-3 px-4 sm:px-6 py-3 bot-message-group';
     if (requestId) el.dataset.requestId = requestId;
+    if (agentMeta && agentMeta.id) el.dataset.agentId = agentMeta.id;
 
     let stepsHtml = '';
     let displayContent = localizeCancelMarker(content);
@@ -3150,9 +3273,32 @@ function createBotMessageEl(content, timestamp, requestId, msg) {
            </div>`
         : '';
 
+    // Agent identity chip — shows the agent's SVG logo + name above the bubble.
+    // For the orchestrator (default), no chip is shown (keeps existing UX).
+    // For sub-agents, a colorful chip with their logo + name identifies them.
+    let agentIdentityHtml = '';
+    let avatarHtml = `<img src="assets/ai-avatar.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-0.5 shadow-sm ring-1 ring-slate-200/60 dark:ring-white/10">`;
+    if (agentMeta && agentMeta.id && agentMeta.id !== 'orchestrator') {
+        const logoHtml = agentMeta.svg_logo
+            ? `<span class="agent-chip-logo">${agentMeta.svg_logo}</span>`
+            : `<i class="fas fa-robot text-primary-500"></i>`;
+        agentIdentityHtml = `
+            <div class="agent-identity-chip" data-agent-id="${_onyxEscHtml(agentMeta.id)}">
+                ${logoHtml}
+                <span class="agent-chip-name">${_onyxEscHtml(agentMeta.name || agentMeta.id)}</span>
+                ${agentMeta.role ? `<span class="agent-chip-role">${_onyxEscHtml(agentMeta.role)}</span>` : ''}
+            </div>
+        `;
+        // Replace the avatar with the agent's logo too
+        avatarHtml = agentMeta.svg_logo
+            ? `<span class="bot-avatar-agent">${agentMeta.svg_logo}</span>`
+            : `<div class="bot-avatar-agent-fallback"><i class="fas fa-robot text-primary-500"></i></div>`;
+    }
+
     el.innerHTML = `
-        <img src="assets/ai-avatar.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-0.5 shadow-sm ring-1 ring-slate-200/60 dark:ring-white/10">
+        ${avatarHtml}
         <div class="min-w-0 flex-1 max-w-[85%]">
+            ${agentIdentityHtml}
             <div class="bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content text-slate-700 dark:text-slate-200">
                 ${evolutionBadge}
                 ${stepsHtml ? `<div class="agent-steps">${stepsHtml}</div>` : ''}
@@ -5060,23 +5206,14 @@ function agentDelete(agentId) {
 // =====================================================================
 // SPEAKER BAR + @ MENTION AUTOCOMPLETE
 // =====================================================================
-// Shows the current speaker at the top of the message bar (Orchestrator
-// by default; switches to the @mentioned sub-agent when the user types
-// @name in the chat input). The mention menu auto-suggests agent names.
+// The speaker bar above the chat input has been removed per user request.
+// Agent identity is now shown ON each chat bubble instead (see createBotMessageEl).
+// The @ mention autocomplete dropdown is still active — it inserts the
+// agent name into the input, and sendMessage() detects the mention and
+// routes to /api/agents/delegate.
 
 function _updateSpeakerBar() {
-    const nameEl = document.getElementById('speaker-name');
-    const roleEl = document.getElementById('speaker-role');
-    const logoEl = document.getElementById('speaker-logo');
-    if (!nameEl) return;
-    // Default: Orchestrator
-    nameEl.textContent = 'Orchestrator';
-    roleEl.textContent = 'Main coordinator';
-    if (logoEl && agentsState.orchestrator && agentsState.orchestrator.svg_logo) {
-        logoEl.innerHTML = agentsState.orchestrator.svg_logo;
-    } else if (logoEl) {
-        logoEl.innerHTML = '<i class="fas fa-circle-nodes text-primary-500"></i>';
-    }
+    // No-op: speaker bar removed. Agent identity now lives on chat bubbles.
 }
 
 // Watch the chat input for @ mentions and show the autocomplete menu.
@@ -5093,7 +5230,6 @@ function _attachMentionAutocomplete() {
         const atMatch = before.match(/(?:^|\s)@([a-zA-Z0-9_\- ]*)$/);
         if (!atMatch) {
             _hideMentionMenu();
-            _updateSpeakerFromText(text);
             return;
         }
         const query = atMatch[1].toLowerCase().trim();
@@ -5170,7 +5306,7 @@ function _insertMention(agent, input) {
     const caret = input.selectionStart;
     const before = text.slice(0, caret);
     const after = text.slice(caret);
-    // Replace the @query with @agent-name
+    // Replace the @query with @agent-name (use the agent's name, even if it has spaces)
     const newBefore = before.replace(/(?:^|\s)@([a-zA-Z0-9_\- ]*)$/, ` @${agent.name} `);
     input.value = newBefore + after;
     // Move caret to end of inserted mention
@@ -5178,30 +5314,10 @@ function _insertMention(agent, input) {
     input.setSelectionRange(newCaret, newCaret);
     input.focus();
     _hideMentionMenu();
-    _updateSpeakerFromText(input.value);
 }
 
 function _updateSpeakerFromText(text) {
-    // Find @agent-name in the text; if found, switch speaker bar to that agent.
-    const m = text.match(/(?:^|\s)@([a-zA-Z0-9_\-]+)(?:\s|$)/);
-    if (!m) {
-        _updateSpeakerBar();
-        return;
-    }
-    const mentionedName = m[1];
-    const agent = (agentsState.agents || []).find(a =>
-        a.name.toLowerCase().replace(/\s+/g, '-') === mentionedName.toLowerCase() ||
-        a.id.toLowerCase() === mentionedName.toLowerCase() ||
-        a.name.toLowerCase() === mentionedName.toLowerCase()
-    );
-    if (agent) {
-        const nameEl = document.getElementById('speaker-name');
-        const roleEl = document.getElementById('speaker-role');
-        const logoEl = document.getElementById('speaker-logo');
-        if (nameEl) nameEl.textContent = agent.name;
-        if (roleEl) roleEl.textContent = agent.role || 'Sub-agent';
-        if (logoEl) logoEl.innerHTML = agent.svg_logo || '<i class="fas fa-robot text-primary-500"></i>';
-    }
+    // No-op: speaker bar removed.
 }
 
 // Attach on load + when input becomes available
@@ -5216,7 +5332,6 @@ if (typeof window !== 'undefined') {
                     agentsState.orchestrator = data.orchestrator;
                     agentsState.agents = data.agents || [];
                     agentsState.loaded = true;
-                    _updateSpeakerBar();
                 }
             }).catch(() => {});
         }

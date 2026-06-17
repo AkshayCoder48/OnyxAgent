@@ -1146,6 +1146,7 @@ class WebChannel(ChatChannel):
             '/api/todos', 'TodosHandler',
             '/api/agents', 'AgentsHandler',
             '/api/agents/update', 'AgentUpdateHandler',
+            '/api/agents/delegate', 'AgentDelegateHandler',
             '/api/memory', 'MemoryHandler',
             '/api/memory/content', 'MemoryContentHandler',
             '/api/knowledge/list', 'KnowledgeListHandler',
@@ -4887,6 +4888,50 @@ class AgentUpdateHandler:
         except Exception as e:
             logger.error(f"[WebChannel] Agent update error: {e}")
             return json.dumps({"status": "error", "message": str(e)})
+
+
+class AgentDelegateHandler:
+    """GET /api/agents/delegate?agent_id=...&message=...
+    Streams a sub-agent's response as SSE events.
+
+    The frontend opens this URL as an EventSource when the user @mentions
+    a sub-agent. Each event is a JSON dict:
+      - {type: "agent_start", agent_id, agent_name, agent_role, svg_logo}
+      - {type: "delta", content}
+      - {type: "agent_end"}
+      - {type: "error", message}
+
+    The frontend creates a NEW chat bubble tagged with the sub-agent's
+    identity on "agent_start", streams tokens into it on "delta", and
+    finalizes on "agent_end".
+    """
+
+    def GET(self):
+        _require_auth()
+        params = web.input(agent_id='', message='')
+        agent_id = (params.agent_id or '').strip()
+        message = (params.message or '').strip()
+        if not agent_id or not message:
+            raise web.badrequest()
+
+        web.header('Content-Type', 'text/event-stream; charset=utf-8')
+        web.header('Cache-Control', 'no-cache')
+        web.header('X-Accel-Buffering', 'no')
+        web.header('Access-Control-Allow-Origin', '*')
+
+        return self._stream(agent_id, message)
+
+    def _stream(self, agent_id, message):
+        from agent.orchestration.runner import stream_sub_agent_response
+        workspace_root = _get_workspace_root()
+        try:
+            for event in stream_sub_agent_response(agent_id, message, workspace_root):
+                payload = json.dumps(event, ensure_ascii=False)
+                yield f"data: {payload}\n\n".encode("utf-8")
+        except Exception as e:
+            logger.error(f"[WebChannel] Agent delegate stream error: {e}")
+            err = json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False)
+            yield f"data: {err}\n\n".encode("utf-8")
 
 
 class MemoryHandler:
