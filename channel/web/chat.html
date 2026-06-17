@@ -185,6 +185,11 @@
                             <span data-i18n="menu_skills">Skills</span>
                         </a>
                         <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="workflows">
+                            <i class="fas fa-diagram-project item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_workflows">Workflows</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="memory">
                             <i class="fas fa-brain item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_memory">Memory</span>
@@ -1084,6 +1089,69 @@
                                     class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer" data-i18n="cancel">Cancel</button>
                             <button onclick="confirmDeleteSkill()"
                                     class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors cursor-pointer" data-i18n="ok">Delete</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Workflows                                         -->
+                <!-- ====================================================== -->
+                <div id="view-workflows" class="view">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">AI Workflows</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                        Multi-step pipelines created by the AI. Ask the agent to create a workflow in chat.
+                                    </p>
+                                </div>
+                                <button onclick="loadWorkflowsView()"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                                    <i class="fas fa-rotate-right text-[10px]"></i>
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+
+                            <!-- Workflow count -->
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Workflows</span>
+                                <span id="workflows-count-badge" class="hidden px-2 py-0.5 rounded-full text-xs bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400"></span>
+                            </div>
+
+                            <!-- Empty state -->
+                            <div id="workflows-empty" class="flex flex-col items-center justify-center py-12">
+                                <div class="w-14 h-14 rounded-2xl bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center mb-3">
+                                    <i class="fas fa-diagram-project text-violet-400 text-lg"></i>
+                                </div>
+                                <p class="text-slate-500 dark:text-slate-400 font-medium">No workflows yet</p>
+                                <p class="text-sm text-slate-400 dark:text-slate-500 mt-1 text-center max-w-md">
+                                    Ask the AI in chat: <em>"Create a workflow called 'Code Review' with steps: 1) read the file, 2) review the code, 3) write fixes"</em>
+                                </p>
+                            </div>
+
+                            <!-- Workflow list -->
+                            <div id="workflows-list" class="grid gap-4 sm:grid-cols-2 hidden"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Workflow detail dialog (modal) -->
+                <div id="workflow-detail-dialog" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+                    <div class="absolute inset-0 bg-black/50" onclick="closeWorkflowDetail()"></div>
+                    <div class="relative bg-white dark:bg-[#1A1A1A] rounded-2xl shadow-2xl p-6 w-full max-w-2xl mx-4 border border-slate-200 dark:border-white/10 max-h-[85vh] overflow-y-auto">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex-1 min-w-0">
+                                <h3 id="workflow-detail-title" class="text-lg font-bold text-slate-800 dark:text-slate-100"></h3>
+                                <p id="workflow-detail-desc" class="text-sm text-slate-500 dark:text-slate-400 mt-1"></p>
+                            </div>
+                            <button onclick="closeWorkflowDetail()" class="ml-3 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer flex-shrink-0">
+                                <i class="fas fa-times text-slate-400"></i>
+                            </button>
+                        </div>
+                        <div id="workflow-detail-steps" class="space-y-3"></div>
+                        <div class="mt-4 pt-4 border-t border-slate-200 dark:border-white/10 text-xs text-slate-400 dark:text-slate-500">
+                            <span id="workflow-detail-meta"></span>
                         </div>
                     </div>
                 </div>

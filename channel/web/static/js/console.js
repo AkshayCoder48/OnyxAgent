@@ -166,6 +166,7 @@ const I18N = {
         skills_title: 'Skills', skills_desc: 'View, enable, or disable agent tools and skills', skills_hub_btn: 'ClawHub',
         skills_add_btn: 'Add Skill', skills_tab_my: 'My Skills', skills_tab_add: 'Add Skill',
         skills_tab_marketplace: 'Marketplace',
+        menu_workflows: 'Workflows',
         skills_method_create: 'Create', skills_method_create_desc: 'Write SKILL.md',
         skills_method_upload: 'Upload', skills_method_upload_desc: 'Upload .zip file',
         skills_method_url: 'From URL', skills_method_url_desc: 'GitHub / .zip link',
@@ -417,6 +418,7 @@ const VIEW_META = {
     config:   { group: 'nav_manage',  page: 'menu_config' },
     models:   { group: 'nav_manage',  page: 'menu_models' },
     skills:   { group: 'nav_manage',  page: 'menu_skills' },
+    workflows:{ group: 'nav_manage',  page: 'menu_workflows' },
     memory:   { group: 'nav_manage',  page: 'menu_memory' },
     knowledge:{ group: 'nav_manage',  page: 'menu_knowledge' },
     files:    { group: 'nav_manage',  page: 'menu_files' },
@@ -443,6 +445,7 @@ function navigateTo(viewId) {
     currentView = viewId;
     if (window.innerWidth < 1024) closeSidebar();
     if (viewId === 'files') filesLoadDirectory();
+    if (viewId === 'workflows') loadWorkflowsView();
 }
 
 function toggleSidebar() {
@@ -4466,6 +4469,146 @@ const TOOL_ICONS = {
 
 function getToolIcon(name) {
     return TOOL_ICONS[name] || 'fa-wrench';
+}
+
+// =====================================================================
+// Workflows view — shows all AI-created workflows in a sidebar panel
+// (mirrors the Skills view layout). Each workflow renders as a card
+// with name, description, step count, and step previews.
+// =====================================================================
+
+let _workflowsLoaded = false;
+let _workflowsLoading = false;
+
+function loadWorkflowsView() {
+    if (_workflowsLoading) return;
+    _workflowsLoading = true;
+    const listEl = document.getElementById('workflows-list');
+    const emptyEl = document.getElementById('workflows-empty');
+    const badge = document.getElementById('workflows-count-badge');
+
+    // Show loading state
+    if (listEl) listEl.innerHTML = '';
+    if (emptyEl) {
+        emptyEl.classList.remove('hidden');
+        emptyEl.innerHTML = `<div class="w-14 h-14 rounded-2xl bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center mb-3"><i class="fas fa-spinner fa-spin text-violet-400 text-lg"></i></div><p class="text-slate-500 dark:text-slate-400 font-medium">Loading workflows…</p>`;
+    }
+
+    fetch('/api/workflows')
+        .then(r => r.json())
+        .then(data => {
+            _workflowsLoading = false;
+            _workflowsLoaded = true;
+            if (data.status !== 'success') {
+                if (emptyEl) {
+                    emptyEl.innerHTML = `<div class="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-3"><i class="fas fa-circle-exclamation text-red-400 text-lg"></i></div><p class="text-red-500 font-medium">Failed to load</p><p class="text-sm text-slate-400 mt-1">${_onyxEscHtml(data.message || 'Unknown error')}</p>`;
+                }
+                return;
+            }
+            _renderWorkflowsList(data.workflows || []);
+        })
+        .catch(err => {
+            _workflowsLoading = false;
+            if (emptyEl) {
+                emptyEl.innerHTML = `<div class="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-3"><i class="fas fa-circle-exclamation text-red-400 text-lg"></i></div><p class="text-red-500 font-medium">Network error</p><p class="text-sm text-slate-400 mt-1">${_onyxEscHtml(String(err))}</p>`;
+            }
+        });
+}
+
+function _renderWorkflowsList(workflows) {
+    const listEl = document.getElementById('workflows-list');
+    const emptyEl = document.getElementById('workflows-empty');
+    const badge = document.getElementById('workflows-count-badge');
+    if (!listEl || !emptyEl) return;
+
+    if (!workflows.length) {
+        listEl.classList.add('hidden');
+        emptyEl.classList.remove('hidden');
+        emptyEl.innerHTML = `
+            <div class="w-14 h-14 rounded-2xl bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center mb-3">
+                <i class="fas fa-diagram-project text-violet-400 text-lg"></i>
+            </div>
+            <p class="text-slate-500 dark:text-slate-400 font-medium">No workflows yet</p>
+            <p class="text-sm text-slate-400 dark:text-slate-500 mt-1 text-center max-w-md">
+                Ask the AI in chat: <em>"Create a workflow called 'Code Review' with steps: 1) read the file, 2) review the code, 3) write fixes"</em>
+            </p>`;
+        if (badge) badge.classList.add('hidden');
+        return;
+    }
+
+    emptyEl.classList.add('hidden');
+    listEl.classList.remove('hidden');
+    if (badge) {
+        badge.textContent = String(workflows.length);
+        badge.classList.remove('hidden');
+    }
+
+    listEl.innerHTML = '';
+    workflows.forEach((wf, i) => {
+        const card = document.createElement('div');
+        card.className = 'workflow-card';
+        card.onclick = () => showWorkflowDetail(wf);
+        const stepIcons = (wf.steps || []).map(s => s.type === 'ai' ? '🤖' : '🔧').join(' → ');
+        const stepCount = wf.step_count || (wf.steps || []).length;
+        card.innerHTML = `
+            <div class="workflow-card-head">
+                <div class="workflow-card-icon">
+                    <i class="fas fa-diagram-project"></i>
+                </div>
+                <div class="workflow-card-title-wrap">
+                    <div class="workflow-card-title">${_onyxEscHtml(wf.name || wf.id)}</div>
+                    <div class="workflow-card-id">${_onyxEscHtml(wf.id)}</div>
+                </div>
+                <div class="workflow-card-count">${stepCount} step${stepCount === 1 ? '' : 's'}</div>
+            </div>
+            ${wf.description ? `<div class="workflow-card-desc">${_onyxEscHtml(wf.description)}</div>` : ''}
+            <div class="workflow-card-flow">${stepIcons || '<span class="opacity-50">No steps</span>'}</div>
+        `;
+        listEl.appendChild(card);
+    });
+}
+
+function showWorkflowDetail(wf) {
+    const dialog = document.getElementById('workflow-detail-dialog');
+    if (!dialog) return;
+    document.getElementById('workflow-detail-title').textContent = wf.name || wf.id;
+    document.getElementById('workflow-detail-desc').textContent = wf.description || '';
+    const stepsEl = document.getElementById('workflow-detail-steps');
+    const steps = wf.steps || [];
+    if (!steps.length) {
+        stepsEl.innerHTML = '<p class="text-sm text-slate-400">No steps defined.</p>';
+    } else {
+        stepsEl.innerHTML = steps.map((s, i) => {
+            const isAI = s.type === 'ai';
+            const icon = isAI ? '🤖' : '🔧';
+            const typeLabel = isAI ? 'AI Prompt' : `Tool: ${_onyxEscHtml(s.tool_name || '')}`;
+            let detailHtml = '';
+            if (isAI) {
+                detailHtml = `<div class="workflow-step-prompt">${_onyxEscHtml(s.prompt || '')}</div>`;
+            } else {
+                const argsStr = JSON.stringify(s.tool_args || {}, null, 2);
+                detailHtml = `<pre class="workflow-step-args">${_onyxEscHtml(argsStr)}</pre>`;
+            }
+            return `
+                <div class="workflow-step">
+                    <div class="workflow-step-head">
+                        <span class="workflow-step-num">${i + 1}</span>
+                        <span class="workflow-step-icon">${icon}</span>
+                        <span class="workflow-step-type">${typeLabel}</span>
+                        <span class="workflow-step-var">→ ${_onyxEscHtml(s.output_var || `step_${i+1}_output`)}</span>
+                    </div>
+                    ${detailHtml}
+                </div>`;
+        }).join('');
+    }
+    document.getElementById('workflow-detail-meta').textContent =
+        `ID: ${wf.id} · ${steps.length} step${steps.length === 1 ? '' : 's'} · Updated: ${wf.updated_at || 'unknown'}`;
+    dialog.classList.remove('hidden');
+}
+
+function closeWorkflowDetail() {
+    const dialog = document.getElementById('workflow-detail-dialog');
+    if (dialog) dialog.classList.add('hidden');
 }
 
 function loadSkillsView() {

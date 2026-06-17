@@ -1144,6 +1144,7 @@ class WebChannel(ChatChannel):
             '/api/skills/marketplace/detail', 'SkillMarketplaceDetailHandler',
             '/api/skills/marketplace/install', 'SkillMarketplaceInstallHandler',
             '/api/todos', 'TodosHandler',
+            '/api/workflows', 'WorkflowsHandler',
             '/api/memory', 'MemoryHandler',
             '/api/memory/content', 'MemoryContentHandler',
             '/api/knowledge/list', 'KnowledgeListHandler',
@@ -4676,6 +4677,81 @@ class TodosHandler:
         except Exception as e:
             logger.error(f"[WebChannel] Todos API error: {e}")
             return json.dumps({"status": "error", "message": str(e), "lists": []})
+
+
+# =====================================================================
+# Workflows — exposes the WorkflowTool's JSON store so the sidebar
+# view can render all workflows (like the Skills view).
+# =====================================================================
+
+class WorkflowsHandler:
+    """GET /api/workflows — return all workflows for the sidebar view."""
+
+    def GET(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            import json as _json
+            workspace_root = _get_workspace_root()
+            workflows_dir = os.path.join(workspace_root, "workflows")
+            index_path = os.path.join(workflows_dir, "_index.json")
+
+            index = {}
+            if os.path.exists(index_path):
+                try:
+                    with open(index_path, "r", encoding="utf-8") as f:
+                        index = _json.load(f) or {}
+                except Exception:
+                    index = {}
+
+            workflows = []
+            # Use index if available; else scan the directory.
+            if index:
+                for wid, meta in index.items():
+                    wf_path = os.path.join(workflows_dir, f"{wid}.json")
+                    steps = []
+                    if os.path.exists(wf_path):
+                        try:
+                            with open(wf_path, "r", encoding="utf-8") as f:
+                                data = _json.load(f) or {}
+                            steps = data.get("steps", []) or []
+                        except Exception:
+                            pass
+                    workflows.append({
+                        "id": wid,
+                        "name": meta.get("name", wid),
+                        "description": meta.get("description", ""),
+                        "steps": steps,
+                        "step_count": len(steps),
+                        "updated_at": meta.get("updated_at"),
+                    })
+            else:
+                if os.path.isdir(workflows_dir):
+                    for name in sorted(os.listdir(workflows_dir)):
+                        if not name.endswith(".json") or name.startswith("_"):
+                            continue
+                        wf_path = os.path.join(workflows_dir, name)
+                        try:
+                            with open(wf_path, "r", encoding="utf-8") as f:
+                                data = _json.load(f) or {}
+                            steps = data.get("steps", []) or []
+                            workflows.append({
+                                "id": data.get("id", name[:-5]),
+                                "name": data.get("name", name[:-5]),
+                                "description": data.get("description", ""),
+                                "steps": steps,
+                                "step_count": len(steps),
+                                "updated_at": data.get("updated_at"),
+                            })
+                        except Exception:
+                            continue
+
+            return json.dumps({"status": "success", "workflows": workflows,
+                               "count": len(workflows)}, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Workflows API error: {e}")
+            return json.dumps({"status": "error", "message": str(e),
+                               "workflows": []})
 
 
 class MemoryHandler:
