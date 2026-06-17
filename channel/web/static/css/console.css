@@ -2444,6 +2444,26 @@ body, #app, #main-content {
   background: rgba(255,255,255,0.12);
 }
 
+/* Image used as an icon (when icon value is a URL/path) — sized to match emoji icons */
+.onyx-icon-img {
+  width: 1.2em;
+  height: 1.2em;
+  object-fit: contain;
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
+/* Placeholder shown when a markdown <img> fails to load — prevents broken-image
+   glyph and stops the alt text from leaking into the layout as duplicate headings. */
+.onyx-broken-img {
+  display: inline-block;
+  font-size: 0.85em;
+  opacity: 0.55;
+  font-style: italic;
+  padding: 0 2px;
+}
+
 /* Card appear animation — smooth fade-in (no blur to avoid text collision) */
 .onyx-card-appear {
   animation: onyxCardAppear 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;

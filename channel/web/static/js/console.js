@@ -627,7 +627,13 @@ function _rewriteLocalImgSrc(html) {
         const safeSrc = webSrc.replace(/"/g, '&quot;');
         const hasClick = /onclick/i.test(pre + post);
         const clickAttr = hasClick ? '' : ` onclick="_openImageLightbox(this.src)" style="cursor:zoom-in;"`;
-        return `<img ${pre}src="${safeSrc}"${post}${clickAttr}>`;
+        // If this <img> fails to load, swap it for an inline placeholder instead of showing
+        // the broken-image glyph (or leaking the alt text into the layout). This stops
+        // AI-generated markdown like `![About Me](fake-file.png)` from rendering the alt
+        // text as a duplicate heading.
+        const hasOnerror = /onerror/i.test(pre + post);
+        const onerrorAttr = hasOnerror ? '' : ` onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'onyx-broken-img',textContent:this.alt||''}))"`;
+        return `<img ${pre}src="${safeSrc}"${post}${clickAttr}${onerrorAttr}>`;
     });
 }
 
@@ -8107,26 +8113,56 @@ const ONYX_CARD_ICONS = {
     printer: '🖨️', speaker: '🔊', mic: '🎤', headphones: '🎧',
 };
 
-// Resolve an icon: check emoji map first, then SVG registry, then fallback to styled initial
+// Resolve an icon: emoji map → SVG registry → URL/HTML/emoji passthrough → styled initial fallback.
+// NEVER returns the raw text name (so a missing icon doesn't leak "book"/"code"/etc. as text).
 function _onyxResolveIcon(iconName) {
-    if (!iconName) return '';
-    // Check emoji map
-    if (ONYX_CARD_ICONS[iconName]) return ONYX_CARD_ICONS[iconName];
-    // Check SVG icons registry
-    if (window.ONYX_SVG_ICONS && window.ONYX_SVG_ICONS[iconName]) {
-        return `<span class="onyx-svg-icon">${window.ONYX_SVG_ICONS[iconName]}</span>`;
+    if (!iconName || typeof iconName !== 'string') return '';
+    const raw = iconName.trim();
+    if (!raw) return '';
+
+    // Already an HTML fragment (SVG / span / img) — pass through untouched.
+    if (raw.startsWith('<')) return raw;
+
+    // Already an image URL — render as a real <img> with graceful onerror fallback.
+    if (/^(https?:\/\/|\/|data:image\/|blob:)/i.test(raw) ||
+        /\.(?:png|jpe?g|gif|webp|bmp|svg|avif|ico)(\?.*)?$/i.test(raw)) {
+        const safe = raw.replace(/"/g, '&quot;');
+        return `<img src="${safe}" alt="" class="onyx-icon-img" ` +
+               `onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'onyx-icon-letter',textContent:'?'}))">`;
     }
-    // If it starts with an emoji or is already HTML, return as-is
-    if (/[\u{1F300}-\u{1F9FF}]/u.test(iconName) || iconName.startsWith('<')) return iconName;
-    // Try kebab-case to underscore lookup
-    const underscoreKey = iconName.replace(/-/g, '_');
+
+    // Check emoji map first (e.g. "book" → "📚").
+    if (ONYX_CARD_ICONS[raw]) return ONYX_CARD_ICONS[raw];
+
+    // Check SVG icons registry.
+    if (window.ONYX_SVG_ICONS && window.ONYX_SVG_ICONS[raw]) {
+        return `<span class="onyx-svg-icon">${window.ONYX_SVG_ICONS[raw]}</span>`;
+    }
+
+    // If the input is itself an emoji (broad Unicode coverage), pass through.
+    // Covers Misc Symbols (☀⚡), Dingbats (✅), Transport (🚀), Pictographs (📚), etc.
+    const emojiRe = /[\u{2190}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{FE0F}\u{1F1E6}-\u{1F1FF}]/u;
+    if (emojiRe.test(raw)) return raw;
+
+    // Try kebab-case → underscore lookup (e.g. "brain-icon" → "brain").
+    const underscoreKey = raw.replace(/-/g, '_');
     if (ONYX_CARD_ICONS[underscoreKey]) return ONYX_CARD_ICONS[underscoreKey];
     if (window.ONYX_SVG_ICONS && window.ONYX_SVG_ICONS[underscoreKey]) {
         return `<span class="onyx-svg-icon">${window.ONYX_SVG_ICONS[underscoreKey]}</span>`;
     }
-    // Fallback: styled initial letter — never show raw text name
-    const initial = iconName.charAt(0).toUpperCase();
-    return `<span class="onyx-icon-letter">${initial}</span>`;
+
+    // Try lowercase lookup (case-insensitive fallback).
+    const lowerKey = raw.toLowerCase();
+    if (ONYX_CARD_ICONS[lowerKey]) return ONYX_CARD_ICONS[lowerKey];
+    if (window.ONYX_SVG_ICONS && window.ONYX_SVG_ICONS[lowerKey]) {
+        return `<span class="onyx-svg-icon">${window.ONYX_SVG_ICONS[lowerKey]}</span>`;
+    }
+
+    // Fallback: styled initial letter — uses Array.from to handle surrogate pairs correctly
+    // (so "🚀" doesn't get split into a broken half-surrogate).
+    const ch = Array.from(raw)[0] || '?';
+    const initial = /[a-zA-Z]/.test(ch) ? ch.toUpperCase() : ch;
+    return `<span class="onyx-icon-letter">${_onyxEscHtml(initial)}</span>`;
 }
 
 function _onyxEscHtml(s) {
@@ -8859,7 +8895,9 @@ function _renderDynamicCard(container, data, componentType) {
         arr.forEach((item, i) => {
             if (typeof item !== 'object' || item === null) return;
             const color = _onyxColorClass(i);
-            const icon = item.icon || ONYX_CARD_ICONS[item.icon] || item.emoji || '';
+            // Resolve icon through the proper resolver so names like "book"/"code"/"brain"
+            // map to emojis/SVGs instead of leaking as raw text. Falls back to emoji field.
+            const icon = _onyxResolveIcon(item.icon || item.emoji || '');
             const title = item.title || item.name || item.label || item.key || '';
             const desc = item.description || item.desc || item.value || item.text || '';
             const el = document.createElement('div');
@@ -9329,7 +9367,9 @@ function _renderFeatureList(container, data) {
     list.className = 'onyx-checklist';
     features.forEach((f, i) => {
         const text = typeof f === 'string' ? f : (f.title || f.text || f.name || '');
-        const icon = typeof f === 'object' ? (f.icon || '') : '';
+        // Resolve icon names ("book"/"code"/etc.) to emojis/SVGs; never leak raw text.
+        const rawIcon = (typeof f === 'object' && f) ? (f.icon || f.emoji || '') : '';
+        const icon = rawIcon ? _onyxResolveIcon(rawIcon) : '';
         const color = _onyxColorClass(i);
         const el = document.createElement('div');
         el.className = 'onyx-check-item';
@@ -9392,7 +9432,7 @@ function _renderWeatherCard(container, data) {
     const temp = data.temperature || data.temp || '';
     const condition = data.condition || data.status || '';
     const location = data.location || data.city || '';
-    const icon = data.icon || '☁️';
+    const icon = _onyxResolveIcon(data.icon || '') || '☁️';
     body.innerHTML = `
         <div style="display:flex;align-items:center;gap:16px;padding:8px 0">
             <div style="font-size:40px">${icon}</div>
@@ -9408,11 +9448,12 @@ function _renderWeatherCard(container, data) {
         const grid = document.createElement('div');
         grid.className = 'onyx-daily-grid';
         forecast.forEach((d, i) => {
+            const dIcon = _onyxResolveIcon((typeof d === 'object' && d) ? (d.icon || d.emoji || '') : '') || '';
             const el = document.createElement('div');
             el.className = 'onyx-daily-card';
             el.innerHTML = `
                 <div class="onyx-daily-day">${_onyxEscHtml(d.day || d.label || '')}</div>
-                <div style="font-size:16px;margin:4px 0">${d.icon || ''}</div>
+                <div style="font-size:16px;margin:4px 0">${dIcon}</div>
                 <div style="font-size:12px;opacity:0.7">${_onyxEscHtml(String(d.temp || d.high || ''))}${(d.temp || d.high) ? '°' : ''}</div>
             `;
             grid.appendChild(el);
@@ -9427,14 +9468,28 @@ function _renderProfileCard(container, data) {
     const body = document.createElement('div');
     body.className = 'onyx-card-body';
     const name = data.name || data.title || '';
-    const role = data.role || data.title || data.position || '';
+    const role = data.role || data.position || '';
+    // Don't use data.title for role — that duplicates the name as the role.
     const avatar = data.avatar || data.image || '';
     const bio = data.bio || data.description || '';
     const stats = data.stats || [];
     const links = data.links || data.social || [];
+
+    // Decide whether avatar is a usable image URL/path. If not, fall back to initial-letter.
+    // Fixes "invalid image" errors when AI sends e.g. avatar: "robot" or a made-up filename.
+    const isImgUrl = (v) =>
+        typeof v === 'string' && v.length > 0 &&
+        /^(https?:\/\/|\/|data:image\/|blob:)/i.test(v) ||
+        /\.(?:png|jpe?g|gif|webp|bmp|svg|avif|ico)(\?.*)?$/i.test(v || '');
+    const safeAvatar = isImgUrl(avatar) ? avatar.replace(/"/g, '&quot;') : '';
+    const initial = (Array.from(name || '')[0] || '?').toUpperCase();
+
     body.innerHTML = `
         <div style="display:flex;align-items:center;gap:14px;padding:4px 0">
-            ${avatar ? `<img src="${_onyxEscHtml(avatar)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover">` : `<div class="onyx-svc-icon onyx-bg-blue" style="width:48px;height:48px;border-radius:50%;font-size:20px">${name.charAt(0).toUpperCase()}</div>`}
+            ${safeAvatar
+                ? `<img src="${safeAvatar}" alt="${_onyxEscHtml(name)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover" ` +
+                  `onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'onyx-svc-icon onyx-bg-blue',style:'width:48px;height:48px;border-radius:50%;font-size:20px;display:flex;align-items:center;justify-content:center',textContent:'${initial}'}))">`
+                : `<div class="onyx-svc-icon onyx-bg-blue" style="width:48px;height:48px;border-radius:50%;font-size:20px">${_onyxEscHtml(initial)}</div>`}
             <div>
                 <div style="font-size:15px;font-weight:700">${_onyxEscHtml(name)}</div>
                 ${role ? `<div style="font-size:12px;opacity:0.6">${_onyxEscHtml(role)}</div>` : ''}
