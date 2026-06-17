@@ -3713,12 +3713,18 @@ body, #app, #main-content {
   /* Slightly lighter than the message bar (bg-slate-50 dark:bg-white/5).
      Light: rgba(0,0,0,0.03) over white. Dark: rgba(255,255,255,0.08). */
   background: rgba(0, 0, 0, 0.03);
+  /* CRITICAL: never let the entire block vanish. Min-height keeps the header
+     visible even when collapsed. */
+  min-height: 36px;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 .dark .onyx-thinking-block {
   background: rgba(255, 255, 255, 0.08);
 }
 .onyx-thinking-header {
-  display: flex;
+  display: flex !important;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -3728,6 +3734,7 @@ body, #app, #main-content {
   color: inherit;
   opacity: 0.7;
   transition: opacity 0.2s ease, background 0.2s ease;
+  visibility: visible !important;
 }
 .onyx-thinking-header:hover {
   opacity: 1;
@@ -4329,5 +4336,283 @@ button:not(:disabled):active,
   text-align: right;
   word-break: break-word;
 }
+
+/* =====================================================================
+   AGENT SWARM VIEW
+   ===================================================================== */
+.agents-swarm-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background: radial-gradient(circle at center, rgba(244,63,94,0.04), transparent 70%),
+              rgba(255, 255, 255, 0.02);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+}
+.dark .agents-swarm-canvas {
+  background: radial-gradient(circle at center, rgba(244,63,94,0.06), transparent 70%),
+              rgba(0, 0, 0, 0.2);
+}
+.agents-swarm-canvas:active { cursor: grabbing; }
+.agents-swarm-canvas svg {
+  display: block;
+  color: inherit;
+}
+.agents-node {
+  transition: transform 0.2s var(--onyx-ease), filter 0.2s var(--onyx-ease);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.agents-node:hover {
+  filter: drop-shadow(0 4px 12px rgba(244, 63, 94, 0.35));
+}
+.agents-node:hover circle {
+  stroke-width: 2.5;
+}
+.agents-node-orchestrator {
+  animation: onyxOrchPulse 3s ease-in-out infinite;
+}
+@keyframes onyxOrchPulse {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(244, 63, 94, 0)); }
+  50%      { filter: drop-shadow(0 0 12px rgba(244, 63, 94, 0.4)); }
+}
+.agents-swarm-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.agents-swarm-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+  color: inherit;
+}
+
+/* Context menu (appears when tapping a sub-agent node) */
+.agents-context-menu {
+  position: fixed;
+  z-index: 100;
+  width: 220px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  animation: onyxCardAppear 0.18s var(--onyx-ease);
+}
+.dark .agents-context-menu {
+  background: rgba(20, 20, 25, 0.95);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.agents-context-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  margin-bottom: 6px;
+}
+.agents-context-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(244, 63, 94, 0.10);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.agents-context-logo svg { width: 100%; height: 100%; }
+.agents-context-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.agents-context-role {
+  font-size: 11px;
+  opacity: 0.6;
+}
+.agents-context-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--onyx-fast) var(--onyx-ease);
+}
+.agents-context-item:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+.agents-context-item i {
+  width: 14px;
+  opacity: 0.7;
+}
+.agents-context-danger { color: #ef4444; }
+.agents-context-danger:hover { background: rgba(239, 68, 68, 0.10); }
+
+/* =====================================================================
+   SPEAKER BAR — above the chat input, shows who will respond
+   ===================================================================== */
+.speaker-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background: rgba(244, 63, 94, 0.04);
+  border: 1px solid rgba(244, 63, 94, 0.10);
+  border-radius: 10px;
+  animation: onyxCardAppear 0.2s var(--onyx-ease);
+}
+.dark .speaker-bar {
+  background: rgba(244, 63, 94, 0.06);
+  border-color: rgba(244, 63, 94, 0.15);
+}
+.speaker-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 63, 94, 0.10);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.speaker-logo svg { width: 100%; height: 100%; }
+.speaker-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.speaker-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f43f5e;
+  line-height: 1.2;
+}
+.speaker-role {
+  font-size: 10px;
+  opacity: 0.6;
+  line-height: 1.2;
+}
+.speaker-hint {
+  font-size: 10px;
+  opacity: 0.5;
+  font-style: italic;
+}
+.speaker-hint.hidden { display: none; }
+
+/* =====================================================================
+   @ MENTION AUTOCOMPLETE MENU
+   ===================================================================== */
+.mention-menu {
+  position: fixed;
+  z-index: 100;
+  width: 260px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  animation: onyxCardAppear 0.15s var(--onyx-ease);
+}
+.dark .mention-menu {
+  background: rgba(20, 20, 25, 0.97);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.mention-menu.hidden { display: none; }
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--onyx-fast) var(--onyx-ease);
+}
+.mention-item:hover, .mention-item.active {
+  background: rgba(244, 63, 94, 0.10);
+}
+.mention-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(244, 63, 94, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.mention-logo svg { width: 100%; height: 100%; }
+.mention-info { min-width: 0; flex: 1; }
+.mention-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mention-role {
+  font-size: 10px;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =====================================================================
+   FREEFORM SUB-OBJECT RENDERING (no more {...} placeholders)
+   ===================================================================== */
+.onyx-free-obj, .onyx-free-arr {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+}
+.onyx-free-sub {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.10);
+  white-space: nowrap;
+}
+.dark .onyx-free-sub {
+  background: rgba(255, 255, 255, 0.06);
+}
+.onyx-free-arr-row {
+  width: 100%;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+.onyx-free-arr-row:last-child { border-bottom: none; }
 
 

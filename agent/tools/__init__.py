@@ -16,6 +16,9 @@ from agent.tools.todo.todo import TodoTool
 # Import counterfactual reasoning tool (no external dependencies)
 from agent.tools.counterfactual.counterfactual import CounterfactualTool
 
+# Import multi-agent orchestration tool (no external dependencies)
+from agent.tools.orchestration.orchestration import OrchestrationTool
+
 # Import memory tools
 from agent.tools.memory.memory_search import MemorySearchTool
 from agent.tools.memory.memory_get import MemoryGetTool
@@ -144,6 +147,7 @@ __all__ = [
     'Send',
     'TodoTool',
     'CounterfactualTool',
+    'OrchestrationTool',
     'MemorySearchTool',
     'MemoryGetTool',
     'EvolutionUndoTool',

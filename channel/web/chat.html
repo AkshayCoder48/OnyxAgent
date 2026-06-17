@@ -185,6 +185,11 @@
                             <span data-i18n="menu_skills">Skills</span>
                         </a>
                         <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="agents">
+                            <i class="fas fa-network-wired item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_agents">Agents</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="memory">
                             <i class="fas fa-brain item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_memory">Memory</span>
@@ -438,6 +443,18 @@
                     <!-- Chat Input -->
                     <div class="flex-shrink-0 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] px-2 sm:px-4 py-2 sm:py-3">
                         <div class="max-w-3xl mx-auto">
+                            <!-- Speaker indicator: shows who will respond (Orchestrator by default, or @mentioned sub-agent) -->
+                            <div id="speaker-bar" class="speaker-bar">
+                                <div id="speaker-logo" class="speaker-logo"></div>
+                                <div class="speaker-info">
+                                    <span id="speaker-name" class="speaker-name">Orchestrator</span>
+                                    <span id="speaker-role" class="speaker-role">Main coordinator</span>
+                                </div>
+                                <span id="speaker-hint" class="speaker-hint hidden">
+                                    <i class="fas fa-at text-[10px] mr-1"></i>
+                                    <span>Mention a sub-agent with @ to address them directly</span>
+                                </span>
+                            </div>
                             <!-- Attachment preview bar -->
                             <div id="attachment-preview" class="attachment-preview hidden"></div>
                             <div class="flex items-center gap-1 sm:gap-2 relative">
@@ -476,6 +493,8 @@
                                     </button>
                                 </div>
                                 <div id="slash-menu" class="slash-menu hidden"></div>
+                                <!-- @-mention autocomplete for sub-agents -->
+                                <div id="mention-menu" class="mention-menu hidden"></div>
                                 <div class="flex-1 min-w-0 relative flex items-center">
                                     <textarea id="chat-input"
                                               class="w-full pl-3 sm:pl-4 pr-10 sm:pr-11 py-2 sm:py-[10px] rounded-xl border border-slate-200 dark:border-slate-600
@@ -1084,6 +1103,85 @@
                                     class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer" data-i18n="cancel">Cancel</button>
                             <button onclick="confirmDeleteSkill()"
                                     class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors cursor-pointer" data-i18n="ok">Delete</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Agents — swarm visualization                      -->
+                <!-- ====================================================== -->
+                <div id="view-agents" class="view">
+                    <div class="flex-1 overflow-hidden p-6 flex flex-col">
+                        <div class="max-w-5xl mx-auto w-full flex-1 flex flex-col min-h-0">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Agent Swarm</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                        The orchestrator coordinates sub-agents. Tap any agent for options.
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="agentsZoom(-0.15)" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                                        <i class="fas fa-minus"></i>
+                                    </button>
+                                    <button onclick="agentsZoom(0.15)" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                    <button onclick="agentsReset()" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                                        <i class="fas fa-arrows-to-circle"></i>
+                                    </button>
+                                    <button onclick="agentsRefresh()" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                                        <i class="fas fa-rotate-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="agents-swarm-canvas" class="agents-swarm-canvas flex-1 min-h-0">
+                                <div id="agents-swarm-empty" class="agents-swarm-empty">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-3 text-primary-400"></i>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">Loading agent swarm…</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-3 text-xs text-slate-500 dark:text-slate-400 text-center">
+                                <i class="fas fa-circle-info mr-1"></i>
+                                The orchestrator (you, the main chat AI) creates and manages sub-agents. Users can edit, enable/disable, or delete them — but cannot create new ones.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent edit dialog (modal) -->
+                <div id="agent-edit-dialog" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+                    <div class="absolute inset-0 bg-black/50" onclick="closeAgentEditDialog()"></div>
+                    <div class="relative bg-white dark:bg-[#1A1A1A] rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200 dark:border-white/10">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div id="agent-edit-logo" class="w-12 h-12 rounded-xl bg-slate-100 dark:bg-white/10 flex items-center justify-center overflow-hidden"></div>
+                            <div>
+                                <h3 id="agent-edit-title" class="text-base font-semibold text-slate-800 dark:text-slate-100">Edit Agent</h3>
+                                <p id="agent-edit-role" class="text-xs text-slate-500 dark:text-slate-400"></p>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Name</label>
+                                <input id="agent-edit-name" type="text"
+                                       class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0F0F] text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Role</label>
+                                <input id="agent-edit-role-input" type="text"
+                                       class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0F0F] text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">System Prompt</label>
+                                <textarea id="agent-edit-prompt" rows="6"
+                                          class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0F0F] text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors font-mono text-xs resize-y"></textarea>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-end gap-2 mt-5">
+                            <button onclick="closeAgentEditDialog()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">Cancel</button>
+                            <button onclick="saveAgentEdit()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 transition-colors cursor-pointer">Save</button>
                         </div>
                     </div>
                 </div>

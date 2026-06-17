@@ -166,6 +166,7 @@ const I18N = {
         skills_title: 'Skills', skills_desc: 'View, enable, or disable agent tools and skills', skills_hub_btn: 'ClawHub',
         skills_add_btn: 'Add Skill', skills_tab_my: 'My Skills', skills_tab_add: 'Add Skill',
         skills_tab_marketplace: 'Marketplace',
+        menu_agents: 'Agents',
         skills_method_create: 'Create', skills_method_create_desc: 'Write SKILL.md',
         skills_method_upload: 'Upload', skills_method_upload_desc: 'Upload .zip file',
         skills_method_url: 'From URL', skills_method_url_desc: 'GitHub / .zip link',
@@ -417,6 +418,7 @@ const VIEW_META = {
     config:   { group: 'nav_manage',  page: 'menu_config' },
     models:   { group: 'nav_manage',  page: 'menu_models' },
     skills:   { group: 'nav_manage',  page: 'menu_skills' },
+    agents:   { group: 'nav_manage',  page: 'menu_agents' },
     memory:   { group: 'nav_manage',  page: 'menu_memory' },
     knowledge:{ group: 'nav_manage',  page: 'menu_knowledge' },
     files:    { group: 'nav_manage',  page: 'menu_files' },
@@ -443,6 +445,7 @@ function navigateTo(viewId) {
     currentView = viewId;
     if (window.innerWidth < 1024) closeSidebar();
     if (viewId === 'files') filesLoadDirectory();
+    if (viewId === 'agents') agentsRefresh();
 }
 
 function toggleSidebar() {
@@ -4653,6 +4656,571 @@ function _updateTodosBadge(lists) {
     } else {
         badge.classList.add('hidden');
     }
+}
+
+// =====================================================================
+// AGENT SWARM — orchestrator + sub-agents visualization
+// =====================================================================
+// State for the swarm view: zoom level, pan offset, list of agents,
+// and the currently-edited agent (for the edit dialog).
+const agentsState = {
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    panStartX: 0,
+    panStartY: 0,
+    orchestrator: null,
+    agents: [],
+    loaded: false,
+    loading: false,
+    editingAgentId: null,
+};
+
+function agentsRefresh() {
+    if (agentsState.loading) return;
+    agentsState.loading = true;
+    const canvas = document.getElementById('agents-swarm-canvas');
+    if (canvas && !agentsState.loaded) {
+        canvas.innerHTML = `<div class="agents-swarm-empty"><i class="fas fa-spinner fa-spin text-2xl mb-3 text-primary-400"></i><p class="text-sm text-slate-500 dark:text-slate-400">Loading agent swarm…</p></div>`;
+    }
+    fetch('/api/agents')
+        .then(r => r.json())
+        .then(data => {
+            agentsState.loading = false;
+            agentsState.loaded = true;
+            if (data.status !== 'success') {
+                if (canvas) canvas.innerHTML = `<div class="agents-swarm-empty"><i class="fas fa-circle-exclamation text-2xl mb-3 text-red-400"></i><p class="text-sm">${_onyxEscHtml(data.message || 'Failed to load')}</p></div>`;
+                return;
+            }
+            agentsState.orchestrator = data.orchestrator;
+            agentsState.agents = data.agents || [];
+            _agentsRender();
+            _updateSpeakerBar();
+        })
+        .catch(err => {
+            agentsState.loading = false;
+            if (canvas) canvas.innerHTML = `<div class="agents-swarm-empty"><i class="fas fa-circle-exclamation text-2xl mb-3 text-red-400"></i><p class="text-sm">Network error: ${_onyxEscHtml(String(err))}</p></div>`;
+        });
+}
+
+function _agentsRender() {
+    const canvas = document.getElementById('agents-swarm-canvas');
+    if (!canvas) return;
+    const orch = agentsState.orchestrator || {id: 'orchestrator', name: 'Orchestrator', role: '', svg_logo: ''};
+    const agents = agentsState.agents || [];
+    canvas.innerHTML = '';
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '-300 -300 600 600');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.style.transform = `scale(${agentsState.zoom}) translate(${agentsState.panX}px, ${agentsState.panY}px)`;
+    svg.style.transformOrigin = 'center';
+    svg.style.transition = 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
+
+    // Connection lines (orchestrator at center → each sub-agent)
+    const radius = 180;
+    agents.forEach((a, i) => {
+        if (!a.enabled) return; // skip disabled agents in the swarm
+        const angle = (i / Math.max(agents.length, 1)) * 2 * Math.PI - Math.PI / 2;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', 0);
+        line.setAttribute('y1', 0);
+        line.setAttribute('x2', x);
+        line.setAttribute('y2', y);
+        line.setAttribute('stroke', 'rgba(244, 63, 94, 0.25)');
+        line.setAttribute('stroke-width', '1.5');
+        line.setAttribute('stroke-dasharray', '3 3');
+        svg.appendChild(line);
+    });
+
+    // Orchestrator at center
+    const orchGroup = _agentsMakeNode(orch, 0, 0, true);
+    svg.appendChild(orchGroup);
+
+    // Sub-agents around the orchestrator
+    agents.forEach((a, i) => {
+        const angle = (i / Math.max(agents.length, 1)) * 2 * Math.PI - Math.PI / 2;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        const node = _agentsMakeNode(a, x, y, false);
+        if (!a.enabled) node.style.opacity = '0.35';
+        svg.appendChild(node);
+    });
+
+    canvas.appendChild(svg);
+
+    // Empty hint if no sub-agents
+    if (!agents.length) {
+        const hint = document.createElement('div');
+        hint.className = 'agents-swarm-hint';
+        hint.innerHTML = `<i class="fas fa-network-wired text-3xl mb-3 text-primary-400"></i>
+            <p class="text-sm font-medium text-slate-600 dark:text-slate-300">No sub-agents yet</p>
+            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Ask the orchestrator: "create a backend developer sub-agent"</p>`;
+        canvas.appendChild(hint);
+    }
+
+    // Attach pan/zoom drag handlers
+    _agentsAttachPan(canvas, svg);
+}
+
+function _agentsMakeNode(agent, x, y, isOrchestrator) {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('transform', `translate(${x}, ${y})`);
+    g.style.cursor = 'pointer';
+    g.classList.add('agents-node');
+    if (isOrchestrator) g.classList.add('agents-node-orchestrator');
+
+    // Background circle
+    const r = isOrchestrator ? 38 : 30;
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('r', r);
+    circle.setAttribute('fill', isOrchestrator ? 'rgba(244, 63, 94, 0.12)' : 'rgba(255, 255, 255, 0.06)');
+    circle.setAttribute('stroke', isOrchestrator ? '#f43f5e' : 'rgba(244, 63, 94, 0.35)');
+    circle.setAttribute('stroke-width', '1.5');
+    g.appendChild(circle);
+
+    // Logo — embed the SVG by converting it to an <image> via data URL
+    if (agent.svg_logo) {
+        try {
+            // Parse the SVG and extract its inner contents, then re-embed as SVG group
+            // so it scales with our viewBox. Simplest: use a <foreignObject> with the raw SVG.
+            const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+            fo.setAttribute('x', -r * 0.7);
+            fo.setAttribute('y', -r * 0.7);
+            fo.setAttribute('width', r * 1.4);
+            fo.setAttribute('height', r * 1.4);
+            const div = document.createElement('div');
+            div.style.cssText = `width:100%;height:100%;display:flex;align-items:center;justify-content:center;`;
+            div.innerHTML = agent.svg_logo;
+            // Make the inner SVG fill the container
+            const innerSvg = div.querySelector('svg');
+            if (innerSvg) {
+                innerSvg.setAttribute('width', '100%');
+                innerSvg.setAttribute('height', '100%');
+            }
+            fo.appendChild(div);
+            g.appendChild(fo);
+        } catch (e) {
+            // Fallback: first letter
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('dominant-baseline', 'central');
+            text.setAttribute('font-size', isOrchestrator ? '24' : '18');
+            text.setAttribute('font-weight', '700');
+            text.setAttribute('fill', '#f43f5e');
+            text.textContent = (agent.name || '?').charAt(0).toUpperCase();
+            g.appendChild(text);
+        }
+    } else {
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'central');
+        text.setAttribute('font-size', isOrchestrator ? '24' : '18');
+        text.setAttribute('font-weight', '700');
+        text.setAttribute('fill', '#f43f5e');
+        text.textContent = (agent.name || '?').charAt(0).toUpperCase();
+        g.appendChild(text);
+    }
+
+    // Name label below
+    const nameText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    nameText.setAttribute('text-anchor', 'middle');
+    nameText.setAttribute('y', r + 16);
+    nameText.setAttribute('font-size', '12');
+    nameText.setAttribute('font-weight', '600');
+    nameText.setAttribute('fill', 'currentColor');
+    nameText.textContent = agent.name || agent.id;
+    g.appendChild(nameText);
+
+    // Role label below name
+    if (agent.role) {
+        const roleText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        roleText.setAttribute('text-anchor', 'middle');
+        roleText.setAttribute('y', r + 30);
+        roleText.setAttribute('font-size', '10');
+        roleText.setAttribute('fill', 'currentColor');
+        roleText.setAttribute('opacity', '0.55');
+        roleText.textContent = agent.role.length > 24 ? agent.role.slice(0, 22) + '…' : agent.role;
+        g.appendChild(roleText);
+    }
+
+    // Disabled badge
+    if (!isOrchestrator && agent.enabled === false) {
+        const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        badge.setAttribute('cx', r * 0.7);
+        badge.setAttribute('cy', -r * 0.7);
+        badge.setAttribute('r', 8);
+        badge.setAttribute('fill', '#64748b');
+        const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        badgeText.setAttribute('text-anchor', 'middle');
+        badgeText.setAttribute('dominant-baseline', 'central');
+        badgeText.setAttribute('y', -r * 0.7);
+        badgeText.setAttribute('x', r * 0.7);
+        badgeText.setAttribute('font-size', '9');
+        badgeText.setAttribute('fill', '#fff');
+        badgeText.setAttribute('font-weight', '700');
+        badgeText.textContent = '⏸';
+        g.appendChild(badge);
+        g.appendChild(badgeText);
+    }
+
+    // Click handler — only sub-agents are clickable (orchestrator is read-only)
+    if (!isOrchestrator) {
+        g.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            _agentsShowMenu(agent, x, y);
+        });
+    }
+    return g;
+}
+
+function _agentsAttachPan(canvas, svg) {
+    canvas.onmousedown = (e) => {
+        if (e.target.closest('.agents-node')) return; // don't pan when clicking a node
+        agentsState.isDragging = true;
+        agentsState.dragStartX = e.clientX;
+        agentsState.dragStartY = e.clientY;
+        agentsState.panStartX = agentsState.panX;
+        agentsState.panStartY = agentsState.panY;
+        canvas.style.cursor = 'grabbing';
+    };
+    window.addEventListener('mousemove', (e) => {
+        if (!agentsState.isDragging) return;
+        const dx = (e.clientX - agentsState.dragStartX) / agentsState.zoom;
+        const dy = (e.clientY - agentsState.dragStartY) / agentsState.zoom;
+        agentsState.panX = agentsState.panStartX + dx;
+        agentsState.panY = agentsState.panStartY + dy;
+        svg.style.transform = `scale(${agentsState.zoom}) translate(${agentsState.panX}px, ${agentsState.panY}px)`;
+    });
+    window.addEventListener('mouseup', () => {
+        if (agentsState.isDragging) {
+            agentsState.isDragging = false;
+            canvas.style.cursor = '';
+        }
+    });
+    // Wheel zoom
+    canvas.onwheel = (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        agentsZoom(delta);
+    };
+}
+
+function _agentsShowMenu(agent, x, y) {
+    // Remove any existing menu
+    const existing = document.querySelector('.agents-context-menu');
+    if (existing) existing.remove();
+
+    const menu = document.createElement('div');
+    menu.className = 'agents-context-menu';
+    const isEnabled = agent.enabled !== false;
+    menu.innerHTML = `
+        <div class="agents-context-head">
+            <div class="agents-context-logo">${agent.svg_logo || '<i class="fas fa-robot"></i>'}</div>
+            <div>
+                <div class="agents-context-name">${_onyxEscHtml(agent.name || agent.id)}</div>
+                <div class="agents-context-role">${_onyxEscHtml(agent.role || '')}</div>
+            </div>
+        </div>
+        <button class="agents-context-item" onclick="agentEdit('${_onyxEscHtml(agent.id)}')">
+            <i class="fas fa-pen"></i> Edit system prompt
+        </button>
+        <button class="agents-context-item" onclick="agentToggle('${_onyxEscHtml(agent.id)}', ${isEnabled})">
+            <i class="fas fa-${isEnabled ? 'pause' : 'play'}"></i> ${isEnabled ? 'Disable' : 'Enable'} agent
+        </button>
+        <button class="agents-context-item agents-context-danger" onclick="agentDelete('${_onyxEscHtml(agent.id)}')">
+            <i class="fas fa-trash"></i> Delete agent
+        </button>
+    `;
+    document.body.appendChild(menu);
+
+    // Position near the click — convert SVG coords to screen coords roughly
+    const canvas = document.getElementById('agents-swarm-canvas');
+    if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const screenX = cx + x * agentsState.zoom;
+        const screenY = cy + y * agentsState.zoom;
+        menu.style.left = `${Math.min(screenX + 10, window.innerWidth - 220)}px`;
+        menu.style.top = `${Math.min(screenY + 10, window.innerHeight - 200)}px`;
+    }
+
+    // Close on outside click
+    setTimeout(() => {
+        const handler = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('mousedown', handler);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+    }, 50);
+}
+
+function agentsZoom(delta) {
+    agentsState.zoom = Math.max(0.4, Math.min(2.5, agentsState.zoom + delta));
+    const svg = document.querySelector('#agents-swarm-canvas svg');
+    if (svg) svg.style.transform = `scale(${agentsState.zoom}) translate(${agentsState.panX}px, ${agentsState.panY}px)`;
+}
+
+function agentsReset() {
+    agentsState.zoom = 1;
+    agentsState.panX = 0;
+    agentsState.panY = 0;
+    const svg = document.querySelector('#agents-swarm-canvas svg');
+    if (svg) svg.style.transform = `scale(1) translate(0, 0)`;
+}
+
+function agentEdit(agentId) {
+    const agent = agentsState.agents.find(a => a.id === agentId);
+    if (!agent) return;
+    agentsState.editingAgentId = agentId;
+    document.getElementById('agent-edit-title').textContent = agent.name || agentId;
+    document.getElementById('agent-edit-role').textContent = agent.role || '';
+    document.getElementById('agent-edit-name').value = agent.name || '';
+    document.getElementById('agent-edit-role-input').value = agent.role || '';
+    document.getElementById('agent-edit-prompt').value = agent.system_prompt || '';
+    const logoEl = document.getElementById('agent-edit-logo');
+    logoEl.innerHTML = agent.svg_logo || `<i class="fas fa-robot text-xl text-slate-400"></i>`;
+    document.getElementById('agent-edit-dialog').classList.remove('hidden');
+    // Close the context menu
+    const menu = document.querySelector('.agents-context-menu');
+    if (menu) menu.remove();
+}
+
+function closeAgentEditDialog() {
+    document.getElementById('agent-edit-dialog').classList.add('hidden');
+    agentsState.editingAgentId = null;
+}
+
+function saveAgentEdit() {
+    const id = agentsState.editingAgentId;
+    if (!id) return;
+    const name = document.getElementById('agent-edit-name').value.trim();
+    const role = document.getElementById('agent-edit-role-input').value.trim();
+    const system_prompt = document.getElementById('agent-edit-prompt').value;
+    fetch('/api/agents/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({agent_id: id, action: 'edit', name, role, system_prompt}),
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                closeAgentEditDialog();
+                agentsRefresh();
+            } else {
+                alert(`Failed: ${data.message || 'unknown error'}`);
+            }
+        })
+        .catch(err => alert(`Network error: ${err}`));
+}
+
+function agentToggle(agentId, currentlyEnabled) {
+    const action = currentlyEnabled ? 'disable' : 'enable';
+    fetch('/api/agents/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({agent_id: agentId, action}),
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') agentsRefresh();
+            else alert(`Failed: ${data.message || 'unknown error'}`);
+        })
+        .catch(err => alert(`Network error: ${err}`));
+    const menu = document.querySelector('.agents-context-menu');
+    if (menu) menu.remove();
+}
+
+function agentDelete(agentId) {
+    if (!confirm(`Delete agent '${agentId}'? This cannot be undone.`)) return;
+    fetch('/api/agents/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({agent_id: agentId, action: 'delete'}),
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') agentsRefresh();
+            else alert(`Failed: ${data.message || 'unknown error'}`);
+        })
+        .catch(err => alert(`Network error: ${err}`));
+    const menu = document.querySelector('.agents-context-menu');
+    if (menu) menu.remove();
+}
+
+// =====================================================================
+// SPEAKER BAR + @ MENTION AUTOCOMPLETE
+// =====================================================================
+// Shows the current speaker at the top of the message bar (Orchestrator
+// by default; switches to the @mentioned sub-agent when the user types
+// @name in the chat input). The mention menu auto-suggests agent names.
+
+function _updateSpeakerBar() {
+    const nameEl = document.getElementById('speaker-name');
+    const roleEl = document.getElementById('speaker-role');
+    const logoEl = document.getElementById('speaker-logo');
+    if (!nameEl) return;
+    // Default: Orchestrator
+    nameEl.textContent = 'Orchestrator';
+    roleEl.textContent = 'Main coordinator';
+    if (logoEl && agentsState.orchestrator && agentsState.orchestrator.svg_logo) {
+        logoEl.innerHTML = agentsState.orchestrator.svg_logo;
+    } else if (logoEl) {
+        logoEl.innerHTML = '<i class="fas fa-circle-nodes text-primary-500"></i>';
+    }
+}
+
+// Watch the chat input for @ mentions and show the autocomplete menu.
+function _attachMentionAutocomplete() {
+    const input = document.getElementById('chat-input');
+    if (!input || input._onyxMentionAttached) return;
+    input._onyxMentionAttached = true;
+
+    input.addEventListener('input', () => {
+        const text = input.value;
+        const caret = input.selectionStart;
+        // Find the last @ before the caret that's preceded by whitespace or start
+        const before = text.slice(0, caret);
+        const atMatch = before.match(/(?:^|\s)@([a-zA-Z0-9_\- ]*)$/);
+        if (!atMatch) {
+            _hideMentionMenu();
+            _updateSpeakerFromText(text);
+            return;
+        }
+        const query = atMatch[1].toLowerCase().trim();
+        // Show matches
+        const matches = (agentsState.agents || []).filter(a =>
+            a.enabled !== false && (
+                a.name.toLowerCase().includes(query) ||
+                a.id.toLowerCase().includes(query)
+            )
+        ).slice(0, 6);
+        if (!matches.length) {
+            _hideMentionMenu();
+            return;
+        }
+        _showMentionMenu(matches, input);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        const menu = document.getElementById('mention-menu');
+        if (!menu || menu.classList.contains('hidden')) return;
+        const items = menu.querySelectorAll('.mention-item');
+        const active = menu.querySelector('.mention-item.active');
+        let idx = active ? Array.from(items).indexOf(active) : -1;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (active) active.classList.remove('active');
+            idx = Math.min(idx + 1, items.length - 1);
+            if (items[idx]) items[idx].classList.add('active');
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (active) active.classList.remove('active');
+            idx = Math.max(idx - 1, 0);
+            if (items[idx]) items[idx].classList.add('active');
+        } else if (e.key === 'Enter' && active) {
+            e.preventDefault();
+            active.click();
+        } else if (e.key === 'Escape') {
+            _hideMentionMenu();
+        }
+    });
+}
+
+function _showMentionMenu(matches, input) {
+    let menu = document.getElementById('mention-menu');
+    if (!menu) return;
+    menu.innerHTML = '';
+    matches.forEach((a, i) => {
+        const item = document.createElement('div');
+        item.className = 'mention-item' + (i === 0 ? ' active' : '');
+        item.innerHTML = `
+            <span class="mention-logo">${a.svg_logo || '<i class="fas fa-robot text-xs"></i>'}</span>
+            <div class="mention-info">
+                <div class="mention-name">${_onyxEscHtml(a.name)}</div>
+                <div class="mention-role">${_onyxEscHtml(a.role || '')}</div>
+            </div>
+        `;
+        item.addEventListener('click', () => _insertMention(a, input));
+        menu.appendChild(item);
+    });
+    menu.classList.remove('hidden');
+    // Position above the input
+    const rect = input.getBoundingClientRect();
+    menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+    menu.style.left = `${rect.left + 12}px`;
+}
+
+function _hideMentionMenu() {
+    const menu = document.getElementById('mention-menu');
+    if (menu) menu.classList.add('hidden');
+}
+
+function _insertMention(agent, input) {
+    const text = input.value;
+    const caret = input.selectionStart;
+    const before = text.slice(0, caret);
+    const after = text.slice(caret);
+    // Replace the @query with @agent-name
+    const newBefore = before.replace(/(?:^|\s)@([a-zA-Z0-9_\- ]*)$/, ` @${agent.name} `);
+    input.value = newBefore + after;
+    // Move caret to end of inserted mention
+    const newCaret = newBefore.length;
+    input.setSelectionRange(newCaret, newCaret);
+    input.focus();
+    _hideMentionMenu();
+    _updateSpeakerFromText(input.value);
+}
+
+function _updateSpeakerFromText(text) {
+    // Find @agent-name in the text; if found, switch speaker bar to that agent.
+    const m = text.match(/(?:^|\s)@([a-zA-Z0-9_\-]+)(?:\s|$)/);
+    if (!m) {
+        _updateSpeakerBar();
+        return;
+    }
+    const mentionedName = m[1];
+    const agent = (agentsState.agents || []).find(a =>
+        a.name.toLowerCase().replace(/\s+/g, '-') === mentionedName.toLowerCase() ||
+        a.id.toLowerCase() === mentionedName.toLowerCase() ||
+        a.name.toLowerCase() === mentionedName.toLowerCase()
+    );
+    if (agent) {
+        const nameEl = document.getElementById('speaker-name');
+        const roleEl = document.getElementById('speaker-role');
+        const logoEl = document.getElementById('speaker-logo');
+        if (nameEl) nameEl.textContent = agent.name;
+        if (roleEl) roleEl.textContent = agent.role || 'Sub-agent';
+        if (logoEl) logoEl.innerHTML = agent.svg_logo || '<i class="fas fa-robot text-primary-500"></i>';
+    }
+}
+
+// Attach on load + when input becomes available
+if (typeof window !== 'undefined') {
+    setTimeout(() => {
+        _attachMentionAutocomplete();
+        // Also lazy-load agents list so the mention menu has data even if the
+        // user never visits the Agents view.
+        if (!agentsState.loaded && !agentsState.loading) {
+            fetch('/api/agents').then(r => r.json()).then(data => {
+                if (data.status === 'success') {
+                    agentsState.orchestrator = data.orchestrator;
+                    agentsState.agents = data.agents || [];
+                    agentsState.loaded = true;
+                    _updateSpeakerBar();
+                }
+            }).catch(() => {});
+        }
+    }, 800);
 }
 
 function switchSkillsTab(tab) {
@@ -9735,6 +10303,63 @@ function _renderCustomCard(container, data) {
     const body = document.createElement('div');
     body.className = 'onyx-card-body';
 
+    // ── AUTO-DETECT Chart.js-style data shape and normalize ──
+    // The AI often emits data in Chart.js format:
+    //   { chartType: "bar", labels: [...], datasets: [{label, data: [...]}], options: {...} }
+    // We normalize this to our internal schema so the bars/chart sub-renderer
+    // can consume it directly. This prevents the ugly freeform key/value fallback.
+    if (data.chartType || data.chart_type || (data.datasets && Array.isArray(data.datasets))) {
+        const ct = (data.chartType || data.chart_type || 'bar').toLowerCase();
+        const datasets = Array.isArray(data.datasets) ? data.datasets : [];
+        const labels = Array.isArray(data.labels) ? data.labels : [];
+
+        // Pie / donut: aggregate all datasets into a single items list.
+        if (ct === 'pie' || ct === 'doughnut' || ct === 'donut') {
+            const items = [];
+            datasets.forEach(ds => {
+                const dsData = Array.isArray(ds.data) ? ds.data : [];
+                dsData.forEach((v, i) => {
+                    items.push({
+                        label: labels[i] || `${ds.label || ''} #${i+1}`,
+                        value: Number(v) || 0,
+                        color: Array.isArray(ds.backgroundColor) ? ds.backgroundColor[i] : ds.backgroundColor,
+                    });
+                });
+            });
+            data = Object.assign({}, data, {
+                layout: 'chart',
+                kind: 'donut',
+                items: items,
+            });
+        }
+        // Bar / line: use first dataset's data as the series.
+        else if (datasets.length) {
+            const ds0 = datasets[0] || {};
+            const nums = Array.isArray(ds0.data) ? ds0.data : [];
+            // For bar layout, build items: [{label, value}].
+            // For line layout, build series + labels.
+            if (ct === 'bar' || ct === 'column') {
+                data = Object.assign({}, data, {
+                    layout: 'bars',
+                    title: data.title || (data.options && data.options.title && data.options.title.text) || '',
+                    items: nums.map((v, i) => ({
+                        label: labels[i] || `#${i+1}`,
+                        value: Number(v) || 0,
+                    })),
+                });
+            } else {
+                // line / area / radar → use chart sub-renderer with line kind
+                data = Object.assign({}, data, {
+                    layout: 'chart',
+                    kind: 'line',
+                    series: nums,
+                    labels: labels,
+                    title: data.title || (data.options && data.options.title && data.options.title.text) || '',
+                });
+            }
+        }
+    }
+
     const layout = (data.layout || data.type || 'custom').toLowerCase();
     const title = data.title || data.heading || '';
     const subtitle = data.subtitle || data.description || '';
@@ -10011,7 +10636,30 @@ function _buildCustomFreeform(data) {
         let valHtml;
         if (v === null || v === undefined) valHtml = '<span class="onyx-empty-hint">—</span>';
         else if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') valHtml = _onyxEscHtml(String(v));
-        else if (Array.isArray(v)) valHtml = `<div class="onyx-chips">${v.map((x, i) => `<span class="onyx-chip onyx-bg-${_onyxColorClass(i)}" style="color:#fff">${_onyxEscHtml(String(typeof x === 'object' ? JSON.stringify(x) : x))}</span>`).join('')}</div>`;
+        else if (Array.isArray(v)) {
+            // If it's an array of primitives, render as chips. If objects, render as a mini table.
+            const allPrimitive = v.every(x => typeof x !== 'object' || x === null);
+            if (allPrimitive) {
+                valHtml = `<div class="onyx-chips">${v.map((x, i) => `<span class="onyx-chip onyx-bg-${_onyxColorClass(i)}" style="color:#fff">${_onyxEscHtml(String(x))}</span>`).join('')}</div>`;
+            } else {
+                // Render array of objects as rows
+                valHtml = `<div class="onyx-free-arr">${v.map(x => {
+                    if (typeof x === 'object' && x !== null) {
+                        const inner = Object.entries(x).map(([ik, iv]) => `<span class="onyx-free-sub"><b>${_onyxEscHtml(ik)}:</b> ${_onyxEscHtml(String(iv))}</span>`).join(' ');
+                        return `<div class="onyx-free-arr-row">${inner}</div>`;
+                    }
+                    return `<div class="onyx-free-arr-row">${_onyxEscHtml(String(x))}</div>`;
+                }).join('')}</div>`;
+            }
+        }
+        else if (typeof v === 'object') {
+            // Render nested object as inline key/value pairs instead of "{...}"
+            const inner = Object.entries(v).map(([ik, iv]) => {
+                const ivStr = (typeof iv === 'object' && iv !== null) ? JSON.stringify(iv) : String(iv);
+                return `<span class="onyx-free-sub"><b>${_onyxEscHtml(ik)}:</b> ${_onyxEscHtml(ivStr)}</span>`;
+            }).join(' ');
+            valHtml = `<div class="onyx-free-obj">${inner}</div>`;
+        }
         else valHtml = `<pre class="onyx-thinking-pre">${_onyxEscHtml(JSON.stringify(v, null, 2))}</pre>`;
         return `<div class="onyx-free-row"><span class="onyx-free-key">${_onyxEscHtml(k.replace(/_/g, ' '))}</span><span class="onyx-free-val">${valHtml}</span></div>`;
     }).join('');

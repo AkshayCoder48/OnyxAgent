@@ -1144,6 +1144,8 @@ class WebChannel(ChatChannel):
             '/api/skills/marketplace/detail', 'SkillMarketplaceDetailHandler',
             '/api/skills/marketplace/install', 'SkillMarketplaceInstallHandler',
             '/api/todos', 'TodosHandler',
+            '/api/agents', 'AgentsHandler',
+            '/api/agents/update', 'AgentUpdateHandler',
             '/api/memory', 'MemoryHandler',
             '/api/memory/content', 'MemoryContentHandler',
             '/api/knowledge/list', 'KnowledgeListHandler',
@@ -4676,6 +4678,215 @@ class TodosHandler:
         except Exception as e:
             logger.error(f"[WebChannel] Todos API error: {e}")
             return json.dumps({"status": "error", "message": str(e), "lists": []})
+
+
+# =====================================================================
+# Agents — exposes the OrchestrationTool's agent store so the sidebar
+# swarm view can render all agents (orchestrator + sub-agents).
+# =====================================================================
+
+def _orchestrator_logo_svg():
+    return ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">'
+            '<circle cx="24" cy="24" r="8" fill="#f43f5e"/>'
+            '<circle cx="24" cy="6" r="4" fill="#f43f5e" opacity="0.85"/>'
+            '<circle cx="42" cy="24" r="4" fill="#f43f5e" opacity="0.85"/>'
+            '<circle cx="24" cy="42" r="4" fill="#f43f5e" opacity="0.85"/>'
+            '<circle cx="6" cy="24" r="4" fill="#f43f5e" opacity="0.85"/>'
+            '<line x1="24" y1="24" x2="24" y2="6" stroke="#f43f5e" stroke-width="2"/>'
+            '<line x1="24" y1="24" x2="42" y2="24" stroke="#f43f5e" stroke-width="2"/>'
+            '<line x1="24" y1="24" x2="24" y2="42" stroke="#f43f5e" stroke-width="2"/>'
+            '<line x1="24" y1="24" x2="6" y2="24" stroke="#f43f5e" stroke-width="2"/>'
+            '</svg>')
+
+
+class AgentsHandler:
+    """GET /api/agents — return orchestrator + all sub-agents for the swarm view."""
+
+    def GET(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            import json as _json
+            workspace_root = _get_workspace_root()
+            agents_dir = os.path.join(workspace_root, "agents")
+            index_path = os.path.join(agents_dir, "_index.json")
+
+            index = {}
+            if os.path.exists(index_path):
+                try:
+                    with open(index_path, "r", encoding="utf-8") as f:
+                        index = _json.load(f) or {}
+                except Exception:
+                    index = {}
+
+            agents = []
+            # Use index if available; else scan the directory.
+            if index:
+                for aid, meta in index.items():
+                    agent_path = os.path.join(agents_dir, f"{aid}.json")
+                    system_prompt = ""
+                    if os.path.exists(agent_path):
+                        try:
+                            with open(agent_path, "r", encoding="utf-8") as f:
+                                data = _json.load(f) or {}
+                            system_prompt = data.get("system_prompt", "")
+                        except Exception:
+                            pass
+                    agents.append({
+                        "id": aid,
+                        "name": meta.get("name", aid),
+                        "role": meta.get("role", ""),
+                        "system_prompt": system_prompt,
+                        "svg_logo": meta.get("svg_logo", ""),
+                        "enabled": meta.get("enabled", True),
+                        "updated_at": meta.get("updated_at"),
+                    })
+            else:
+                if os.path.isdir(agents_dir):
+                    for name in sorted(os.listdir(agents_dir)):
+                        if not name.endswith(".json") or name.startswith("_"):
+                            continue
+                        agent_path = os.path.join(agents_dir, name)
+                        try:
+                            with open(agent_path, "r", encoding="utf-8") as f:
+                                data = _json.load(f) or {}
+                            agents.append({
+                                "id": data.get("id", name[:-5]),
+                                "name": data.get("name", name[:-5]),
+                                "role": data.get("role", ""),
+                                "system_prompt": data.get("system_prompt", ""),
+                                "svg_logo": data.get("svg_logo", ""),
+                                "enabled": data.get("enabled", True),
+                                "updated_at": data.get("updated_at"),
+                            })
+                        except Exception:
+                            continue
+
+            return json.dumps({
+                "status": "success",
+                "orchestrator": {
+                    "id": "orchestrator",
+                    "name": "Orchestrator",
+                    "role": "Main coordinator",
+                    "svg_logo": _orchestrator_logo_svg(),
+                },
+                "agents": agents,
+                "count": len(agents),
+            }, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Agents API error: {e}")
+            return json.dumps({"status": "error", "message": str(e), "agents": []})
+
+
+class AgentUpdateHandler:
+    """POST /api/agents/update — user-initiated edits from the sidebar.
+    Body: {agent_id, action: 'enable'|'disable'|'delete'|'edit',
+           system_prompt?, name?, role?}
+
+    This is the user's only entry point for agent management — but it's
+    intentionally limited. The orchestrator AI has the full orchestration
+    tool; the user can only:
+      - enable / disable agents (saves compute)
+      - edit system_prompt / name / role
+      - delete an agent
+    The user CANNOT create new agents — that's orchestrator-only.
+    """
+
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            import json as _json
+            body = json.loads(web.data() or b"{}")
+            agent_id = (body.get("agent_id") or "").strip()
+            action = (body.get("action") or "").strip()
+            if not agent_id or not action:
+                return json.dumps({"status": "error",
+                                   "message": "agent_id and action are required"})
+
+            workspace_root = _get_workspace_root()
+            agents_dir = os.path.join(workspace_root, "agents")
+            agent_path = os.path.join(agents_dir, f"{agent_id}.json")
+            index_path = os.path.join(agents_dir, "_index.json")
+
+            if action == "delete":
+                if not os.path.exists(agent_path):
+                    return json.dumps({"status": "error",
+                                       "message": f"Agent '{agent_id}' not found"})
+                os.remove(agent_path)
+                # Remove from index
+                if os.path.exists(index_path):
+                    try:
+                        with open(index_path, "r", encoding="utf-8") as f:
+                            idx = _json.load(f) or {}
+                        if agent_id in idx:
+                            del idx[agent_id]
+                            with open(index_path, "w", encoding="utf-8") as f:
+                                _json.dump(idx, f, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                return json.dumps({"status": "success", "deleted": agent_id})
+
+            # For enable / disable / edit, load + mutate + save
+            if not os.path.exists(agent_path):
+                return json.dumps({"status": "error",
+                                   "message": f"Agent '{agent_id}' not found"})
+            try:
+                with open(agent_path, "r", encoding="utf-8") as f:
+                    data = _json.load(f) or {}
+            except Exception as e:
+                return json.dumps({"status": "error",
+                                   "message": f"Failed to load agent: {e}"})
+
+            from datetime import datetime
+            if action == "enable":
+                data["enabled"] = True
+            elif action == "disable":
+                data["enabled"] = False
+            elif action == "edit":
+                if "name" in body and body["name"]:
+                    data["name"] = str(body["name"]).strip()
+                if "role" in body and body["role"]:
+                    data["role"] = str(body["role"]).strip()
+                if "system_prompt" in body:
+                    data["system_prompt"] = str(body.get("system_prompt") or "").strip()
+            else:
+                return json.dumps({"status": "error",
+                                   "message": f"Unknown action: {action}"})
+
+            data["updated_at"] = datetime.now().isoformat(timespec="seconds")
+            with open(agent_path, "w", encoding="utf-8") as f:
+                _json.dump(data, f, ensure_ascii=False, indent=2)
+
+            # Refresh index
+            idx = {}
+            if os.path.exists(index_path):
+                try:
+                    with open(index_path, "r", encoding="utf-8") as f:
+                        idx = _json.load(f) or {}
+                except Exception:
+                    idx = {}
+            idx[agent_id] = {
+                "name": data.get("name", agent_id),
+                "role": data.get("role", ""),
+                "enabled": data.get("enabled", True),
+                "svg_logo": data.get("svg_logo", ""),
+                "updated_at": data.get("updated_at"),
+            }
+            with open(index_path, "w", encoding="utf-8") as f:
+                _json.dump(idx, f, ensure_ascii=False, indent=2)
+
+            return json.dumps({"status": "success", "agent": {
+                "id": agent_id,
+                "name": data.get("name", agent_id),
+                "role": data.get("role", ""),
+                "system_prompt": data.get("system_prompt", ""),
+                "svg_logo": data.get("svg_logo", ""),
+                "enabled": data.get("enabled", True),
+            }}, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Agent update error: {e}")
+            return json.dumps({"status": "error", "message": str(e)})
 
 
 class MemoryHandler:
