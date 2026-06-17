@@ -47,19 +47,55 @@ def _load_agent(workspace: Optional[str], agent_id: str) -> Optional[Dict[str, A
 def _get_api_config() -> Dict[str, str]:
     """Pull the OpenAI-compatible API config from the running config.
 
-    OnyxAgent uses MODEL-SPECIFIC api key names (deepseek_api_key,
-    claude_api_key, moonshot_api_key, etc.) rather than a single
-    open_ai_api_key. We map the configured model → the right key + base,
-    falling back to open_ai_api_key if the model is unknown.
+    Resolution order (first non-empty key wins):
+      1. CUSTOM PROVIDER mode (bot_type='custom' or 'custom:<id>'):
+         - Multi-provider: looks up the provider by id in `custom_providers`
+           and returns its api_key + api_base + model + custom_headers.
+         - Legacy: reads flat `custom_api_key` / `custom_api_base` / `model`.
+      2. MODEL-SPECIFIC mode: maps the configured `model` prefix to the
+         matching `*_api_key` / `*_api_base` pair (deepseek_api_key,
+         claude_api_key, gemini_api_key, qwen/dashscope, glm/zhipu,
+         moonshot, doubao/ark, minimax, ernie/qianfan).
+      3. Fallback: `open_ai_api_key` + `open_ai_api_base`.
+      4. Last-resort: scan all `*_api_key` fields for any non-empty value.
     """
     try:
         from config import conf
         cfg = conf()
         model = (cfg.get("model") or "").lower()
+        bot_type = (cfg.get("bot_type") or "").lower()
 
+        # ── 1. CUSTOM PROVIDER MODE ──
+        if bot_type == "custom" or bot_type.startswith("custom:"):
+            # Try to use the existing custom_provider resolver for fidelity
+            # with how the orchestrator itself resolves credentials.
+            try:
+                from models.custom_provider import resolve_custom_credentials
+                api_key, api_base, custom_model, custom_headers = resolve_custom_credentials()
+                if api_key:
+                    return {
+                        "api_key": api_key,
+                        "api_base": api_base or "https://api.openai.com/v1",
+                        "model": custom_model or cfg.get("model") or "gpt-3.5-turbo",
+                        "headers": custom_headers or {},
+                    }
+            except Exception as e:
+                logger.debug(f"[SubAgentRunner] custom_provider resolver failed, trying manual: {e}")
+
+            # Manual fallback for custom mode (legacy flat fields)
+            api_key = cfg.get("custom_api_key", "") or ""
+            api_base = cfg.get("custom_api_base", "") or "https://api.openai.com/v1"
+            if api_key:
+                return {
+                    "api_key": api_key,
+                    "api_base": api_base,
+                    "model": cfg.get("model") or "gpt-3.5-turbo",
+                    "headers": {},
+                }
+            # If custom mode but no key yet, fall through to the scan below.
+
+        # ── 2. MODEL-SPECIFIC MODE ──
         # Map model prefix → (api_key_field, api_base_default)
-        # Order matters: longest prefix first so "deepseek" doesn't shadow
-        # a hypothetical "deepseek-custom".
         MODEL_MAP = [
             ("deepseek",  ("deepseek_api_key",  "https://api.deepseek.com/v1")),
             ("claude",    ("claude_api_key",    "https://api.anthropic.com/v1")),
@@ -83,17 +119,14 @@ def _get_api_config() -> Dict[str, str]:
                 api_base = cfg.get(f"{prefix}_api_base", "") or base_default
                 break
 
-        # Fallback to open_ai_api_key if no model matched OR if the matched key is empty
+        # ── 3. FALLBACK: open_ai_api_key ──
         if not api_key:
             api_key = cfg.get("open_ai_api_key", "") or ""
             api_base = api_base or cfg.get("open_ai_api_base", "") or "https://api.openai.com/v1"
 
-        # As a last resort, scan all *_api_key fields for any non-empty value.
-        # This handles cases where the user set a provider-specific key but the
-        # model field doesn't match any prefix (e.g. a custom model name).
+        # ── 4. LAST-RESORT: scan all *_api_key fields (incl. custom_api_key) ──
         if not api_key:
             try:
-                # conf() may return a dict or a ConfigParser-like object; handle both.
                 items = cfg.items() if hasattr(cfg, 'items') else []
                 for k, v in items:
                     if isinstance(k, str) and k.endswith("_api_key") and v:
@@ -107,10 +140,10 @@ def _get_api_config() -> Dict[str, str]:
         if not api_base:
             api_base = "https://api.openai.com/v1"
 
-        return {"api_key": api_key, "api_base": api_base, "model": cfg.get("model") or "gpt-3.5-turbo"}
+        return {"api_key": api_key, "api_base": api_base, "model": cfg.get("model") or "gpt-3.5-turbo", "headers": {}, "bot_type": bot_type}
     except Exception as e:
         logger.error(f"[SubAgentRunner] config load failed: {e}")
-        return {"api_key": "", "api_base": "https://api.openai.com/v1", "model": "gpt-3.5-turbo"}
+        return {"api_key": "", "api_base": "https://api.openai.com/v1", "model": "gpt-3.5-turbo", "headers": {}, "bot_type": ""}
 
 
 def stream_sub_agent_response(
@@ -143,9 +176,23 @@ def stream_sub_agent_response(
 
     api_cfg = _get_api_config()
     if not api_cfg["api_key"]:
+        # Provide a more actionable error message that lists all the places
+        # the user might have configured a key.
         yield {"type": "delta", "content":
                f"⚠ Sub-agent '{agent.get('name', agent_id)}' cannot run — "
-               f"no API key configured. Set open_ai_api_key in config."}
+               f"no API key found in config.\n\n"
+               f"Configured bot_type: `{api_cfg.get('bot_type', '(none)')}`\n"
+               f"Configured model: `{api_cfg.get('model', '(none)')}`\n\n"
+               f"To fix this, set ONE of these in your config:\n"
+               f"• For custom providers: `custom_api_key` + `custom_api_base` + `bot_type: \"custom\"`\n"
+               f"• Or add a provider to `custom_providers` and set `bot_type: \"custom:<id>\"`\n"
+               f"• For OpenAI: `open_ai_api_key`\n"
+               f"• For DeepSeek: `deepseek_api_key`\n"
+               f"• For Claude: `claude_api_key`\n"
+               f"• For Gemini: `gemini_api_key`\n"
+               f"• For Qwen: `dashscope_api_key`\n"
+               f"• For GLM: `zhipu_ai_api_key`\n\n"
+               f"The sub-agent uses the SAME API config as the orchestrator."}
         yield {"type": "agent_end"}
         return
 
@@ -173,6 +220,7 @@ def _stream_openai_compatible(
     """Make a streaming chat.completions request to an OpenAI-compatible API.
 
     Yields {"type": "delta", "content": "..."} for each token chunk.
+    Supports custom headers (e.g. from custom_providers[].custom_headers).
     """
     import requests
 
@@ -182,6 +230,14 @@ def _stream_openai_compatible(
         "Content-Type": "application/json",
         "Accept": "text/event-stream",
     }
+    # Merge any custom headers from the API config (used by custom providers
+    # that require extra headers like X-API-Key, Helicone-Auth, etc.).
+    custom_headers = api_cfg.get("headers") or {}
+    if isinstance(custom_headers, dict):
+        for k, v in custom_headers.items():
+            if k and v is not None:
+                headers[str(k)] = str(v)
+
     payload = {
         "model": api_cfg["model"],
         "messages": [
