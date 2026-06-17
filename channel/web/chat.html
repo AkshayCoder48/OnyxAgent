@@ -827,11 +827,15 @@
                                 </div>
                             </div>
 
-                            <!-- Skills Tabs: My Skills / Add Skill -->
+                            <!-- Skills Tabs: My Skills / Add Skill / Marketplace -->
                             <div class="flex items-center bg-slate-100 dark:bg-white/10 rounded-lg p-0.5 mb-6 w-fit">
                                 <button id="skills-tab-my" onclick="switchSkillsTab('my')"
                                         class="skills-tab px-4 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors duration-150 active">
                                     <i class="fas fa-bolt mr-1.5"></i><span data-i18n="skills_tab_my">My Skills</span>
+                                </button>
+                                <button id="skills-tab-marketplace" onclick="switchSkillsTab('marketplace')"
+                                        class="skills-tab px-4 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors duration-150">
+                                    <i class="fas fa-store mr-1.5"></i><span data-i18n="skills_tab_marketplace">Marketplace</span>
                                 </button>
                                 <button id="skills-tab-add" onclick="switchSkillsTab('add')"
                                         class="skills-tab px-4 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors duration-150">
@@ -1001,6 +1005,32 @@
                                             </button>
                                             <span id="skill-url-status" class="text-xs text-slate-400 dark:text-slate-500"></span>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Panel: ClawHub Marketplace -->
+                            <div id="skills-panel-marketplace" class="hidden">
+                                <div class="marketplace-search-wrap">
+                                    <input id="marketplace-search-input"
+                                           type="text"
+                                           placeholder="Search ClawHub skills…  (e.g. pptx, image, web)"
+                                           oninput="onMarketplaceSearchInput(this.value)">
+                                    <i class="fas fa-search marketplace-search-icon"></i>
+                                </div>
+                                <div class="marketplace-toolbar">
+                                    <span id="marketplace-count" class="marketplace-count">Loading…</span>
+                                    <div class="flex gap-2">
+                                        <button id="marketplace-prev-btn" onclick="marketplacePrevPage()" disabled>← Prev</button>
+                                        <button id="marketplace-next-btn" onclick="marketplaceNextPage()">Next →</button>
+                                        <button onclick="marketplaceRefresh()" title="Refresh">
+                                            <i class="fas fa-rotate-right"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="marketplace-grid" class="marketplace-grid">
+                                    <div class="marketplace-empty">
+                                        <i class="fas fa-spinner fa-spin mr-1"></i> Loading ClawHub skills…
                                     </div>
                                 </div>
                             </div>

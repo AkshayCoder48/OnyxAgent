@@ -10,6 +10,12 @@ from agent.tools.bash.bash import Bash
 from agent.tools.ls.ls import Ls
 from agent.tools.send.send import Send
 
+# Import todo tool (no external dependencies)
+from agent.tools.todo.todo import TodoTool
+
+# Import counterfactual reasoning tool (no external dependencies)
+from agent.tools.counterfactual.counterfactual import CounterfactualTool
+
 # Import memory tools
 from agent.tools.memory.memory_search import MemorySearchTool
 from agent.tools.memory.memory_get import MemoryGetTool
@@ -136,6 +142,8 @@ __all__ = [
     'Bash',
     'Ls',
     'Send',
+    'TodoTool',
+    'CounterfactualTool',
     'MemorySearchTool',
     'MemoryGetTool',
     'EvolutionUndoTool',

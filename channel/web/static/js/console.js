@@ -165,6 +165,7 @@ const I18N = {
         config_password_cleared: 'Password cleared',
         skills_title: 'Skills', skills_desc: 'View, enable, or disable agent tools and skills', skills_hub_btn: 'ClawHub',
         skills_add_btn: 'Add Skill', skills_tab_my: 'My Skills', skills_tab_add: 'Add Skill',
+        skills_tab_marketplace: 'Marketplace',
         skills_method_create: 'Create', skills_method_create_desc: 'Write SKILL.md',
         skills_method_upload: 'Upload', skills_method_upload_desc: 'Upload .zip file',
         skills_method_url: 'From URL', skills_method_url_desc: 'GitHub / .zip link',
@@ -4402,9 +4403,303 @@ function switchSkillsTab(tab) {
     document.getElementById('skills-tab-' + tab).classList.add('active');
     document.getElementById('skills-panel-my').classList.toggle('hidden', tab !== 'my');
     document.getElementById('skills-panel-add').classList.toggle('hidden', tab !== 'add');
+    document.getElementById('skills-panel-marketplace').classList.toggle('hidden', tab !== 'marketplace');
     if (tab === 'my') {
         loadSkillsSection();
+    } else if (tab === 'marketplace') {
+        // Lazy-load on first visit; subsequent clicks just show the cached panel.
+        if (!marketplaceState.loaded && !marketplaceState.loading) {
+            marketplaceLoadPage(1);
+        }
     }
+}
+
+// =====================================================================
+// ClawHub Marketplace controller
+// =====================================================================
+// State machine for the marketplace panel. Tracks current page, search query,
+// loading state, and the last fetched items so the UI can re-render without
+// re-fetching when the user toggles between detail/list views.
+const marketplaceState = {
+    page: 1,
+    hasPrev: false,
+    hasNext: false,
+    loading: false,
+    loaded: false,
+    query: '',
+    items: [],         // current list of {slug, display_name, summary, installed}
+    detailSlug: null,  // when set, panel renders detail view instead of grid
+    searchTimer: null,
+};
+
+function _marketplaceShowStatus(html, isEmpty) {
+    const grid = document.getElementById('marketplace-grid');
+    if (!grid) return;
+    if (isEmpty) {
+        grid.innerHTML = `<div class="marketplace-empty">${html}</div>`;
+    } else {
+        grid.innerHTML = html;
+    }
+}
+
+function _marketplaceUpdateToolbar() {
+    const countEl = document.getElementById('marketplace-count');
+    const prevBtn = document.getElementById('marketplace-prev-btn');
+    const nextBtn = document.getElementById('marketplace-next-btn');
+    if (countEl) {
+        if (marketplaceState.loading) {
+            countEl.textContent = 'Loading…';
+        } else if (marketplaceState.query) {
+            countEl.textContent = `${marketplaceState.items.length} result${marketplaceState.items.length === 1 ? '' : 's'} for "${marketplaceState.query}"`;
+        } else {
+            countEl.textContent = `Page ${marketplaceState.page}`;
+        }
+    }
+    if (prevBtn) prevBtn.disabled = marketplaceState.page <= 1 || marketplaceState.loading;
+    if (nextBtn) nextBtn.disabled = !marketplaceState.hasNext || marketplaceState.loading;
+}
+
+function _marketplaceRenderGrid() {
+    const grid = document.getElementById('marketplace-grid');
+    if (!grid) return;
+    const items = marketplaceState.items;
+    if (!items.length) {
+        _marketplaceShowStatus('No skills found. Try a different search or refresh.', true);
+        return;
+    }
+    grid.innerHTML = '';
+    items.forEach(item => {
+        const initial = (item.display_name || item.slug || '?').charAt(0).toUpperCase();
+        const card = document.createElement('div');
+        card.className = 'marketplace-card';
+        card.innerHTML = `
+            <div class="marketplace-card-head">
+                <div class="marketplace-card-icon">${_onyxEscHtml(initial)}</div>
+                <div style="min-width:0;flex:1">
+                    <div class="marketplace-card-title">${_onyxEscHtml(item.display_name || item.slug)}</div>
+                    <div class="marketplace-card-slug">${_onyxEscHtml(item.slug || '')}</div>
+                </div>
+            </div>
+            <div class="marketplace-card-desc">${_onyxEscHtml(item.summary || 'No description available.')}</div>
+            <div class="marketplace-card-actions">
+                <button class="marketplace-install-btn ${item.installed ? 'installed' : ''}"
+                        ${item.installed ? 'disabled' : ''}
+                        onclick="marketplaceInstall(event, ${JSON.stringify(item.slug).replace(/"/g, '&quot;')})">
+                    ${item.installed ? '✓ Installed' : 'Install'}
+                </button>
+                <span class="marketplace-card-status" onclick="marketplaceShowDetail(${JSON.stringify(item.slug).replace(/"/g, '&quot;')})"
+                      style="cursor:pointer;text-decoration:underline">Details</span>
+            </div>
+        `;
+        // Whole card click also opens detail view
+        card.addEventListener('click', (e) => {
+            // Don't trigger if user clicked the install button
+            if (e.target.closest('.marketplace-install-btn')) return;
+            marketplaceShowDetail(item.slug);
+        });
+        grid.appendChild(card);
+    });
+}
+
+function marketplaceLoadPage(page) {
+    if (marketplaceState.loading) return;
+    marketplaceState.loading = true;
+    marketplaceState.page = page;
+    marketplaceState.detailSlug = null;
+    _marketplaceUpdateToolbar();
+    _marketplaceShowStatus('<i class="fas fa-spinner fa-spin mr-1"></i> Loading ClawHub skills…', true);
+
+    const url = `/api/skills/marketplace?page=${encodeURIComponent(page)}`;
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            marketplaceState.loading = false;
+            marketplaceState.loaded = true;
+            if (data.status !== 'success') {
+                _marketplaceShowStatus(`Failed to load: ${data.message || 'unknown error'}`, true);
+                _marketplaceUpdateToolbar();
+                return;
+            }
+            marketplaceState.items = data.items || [];
+            marketplaceState.hasNext = !!data.has_next;
+            marketplaceState.hasPrev = page > 1;
+            _marketplaceRenderGrid();
+            _marketplaceUpdateToolbar();
+        })
+        .catch(err => {
+            marketplaceState.loading = false;
+            _marketplaceShowStatus(`Network error: ${err}`, true);
+            _marketplaceUpdateToolbar();
+        });
+}
+
+function marketplaceNextPage() {
+    if (!marketplaceState.hasNext || marketplaceState.loading) return;
+    marketplaceLoadPage(marketplaceState.page + 1);
+}
+
+function marketplacePrevPage() {
+    if (marketplaceState.page <= 1 || marketplaceState.loading) return;
+    marketplaceLoadPage(marketplaceState.page - 1);
+}
+
+function marketplaceRefresh() {
+    // Reset cursor cache by reloading from page 1.
+    marketplaceState.loaded = false;
+    marketplaceLoadPage(1);
+}
+
+function onMarketplaceSearchInput(value) {
+    // Debounce: only search after 350ms of no typing.
+    if (marketplaceState.searchTimer) clearTimeout(marketplaceState.searchTimer);
+    const q = (value || '').trim();
+    marketplaceState.searchTimer = setTimeout(() => marketplaceRunSearch(q), 350);
+}
+
+function marketplaceRunSearch(q) {
+    if (marketplaceState.loading) return;
+    if (!q) {
+        // Empty search → back to browse mode
+        marketplaceState.query = '';
+        marketplaceLoadPage(1);
+        return;
+    }
+    marketplaceState.loading = true;
+    marketplaceState.query = q;
+    marketplaceState.detailSlug = null;
+    _marketplaceUpdateToolbar();
+    _marketplaceShowStatus(`<i class="fas fa-spinner fa-spin mr-1"></i> Searching for "${_onyxEscHtml(q)}"…`, true);
+
+    fetch(`/api/skills/marketplace/search?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            marketplaceState.loading = false;
+            if (data.status !== 'success') {
+                _marketplaceShowStatus(`Search failed: ${data.message || 'unknown error'}`, true);
+                _marketplaceUpdateToolbar();
+                return;
+            }
+            marketplaceState.items = data.results || [];
+            marketplaceState.hasNext = false;
+            marketplaceState.hasPrev = false;
+            _marketplaceRenderGrid();
+            _marketplaceUpdateToolbar();
+        })
+        .catch(err => {
+            marketplaceState.loading = false;
+            _marketplaceShowStatus(`Network error: ${err}`, true);
+            _marketplaceUpdateToolbar();
+        });
+}
+
+function marketplaceShowDetail(slug) {
+    if (!slug) return;
+    const grid = document.getElementById('marketplace-grid');
+    if (!grid) return;
+    marketplaceState.detailSlug = slug;
+    grid.innerHTML = `<div class="marketplace-empty"><i class="fas fa-spinner fa-spin mr-1"></i> Loading details for "${_onyxEscHtml(slug)}"…</div>`;
+
+    fetch(`/api/skills/marketplace/detail?slug=${encodeURIComponent(slug)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.status !== 'success') {
+                grid.innerHTML = `<div class="marketplace-empty">${_onyxEscHtml(data.message || 'Failed to load details')}</div>`;
+                return;
+            }
+            const s = data.skill || {};
+            const initial = (s.display_name || s.slug || '?').charAt(0).toUpperCase();
+            const tags = s.tags && typeof s.tags === 'object'
+                ? Object.entries(s.tags).map(([k, v]) => `<span class="onyx-chip onyx-bg-blue" style="color:#fff;font-size:10px;padding:2px 8px;border-radius:4px">${_onyxEscHtml(k)}: ${_onyxEscHtml(String(v))}</span>`).join(' ')
+                : '';
+            grid.innerHTML = `
+                <div class="marketplace-detail">
+                    <div class="marketplace-detail-head">
+                        <div style="display:flex;align-items:center;gap:12px;min-width:0">
+                            <div class="marketplace-card-icon" style="width:48px;height:48px;font-size:22px">${_onyxEscHtml(initial)}</div>
+                            <div style="min-width:0">
+                                <div class="marketplace-detail-title">${_onyxEscHtml(s.display_name || s.slug)}</div>
+                                <div class="marketplace-detail-meta">
+                                    <span style="font-family:ui-monospace,monospace">${_onyxEscHtml(s.slug || '')}</span>
+                                    ${s.version ? ` · v${_onyxEscHtml(s.version)}` : ''}
+                                    ${data.installed ? ' · <span style="color:#22c55e;font-weight:600">Installed</span>' : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <button class="marketplace-detail-back" onclick="marketplaceBackToList()">← Back</button>
+                    </div>
+                    <div class="marketplace-detail-desc">${_onyxEscHtml(s.description || s.summary || 'No description available.')}</div>
+                    ${tags ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${tags}</div>` : ''}
+                    <div class="marketplace-detail-actions">
+                        <button class="marketplace-install-btn ${data.installed ? 'installed' : ''}"
+                                ${data.installed ? 'disabled' : ''}
+                                onclick="marketplaceInstall(event, ${JSON.stringify(slug).replace(/"/g, '&quot;')})">
+                            ${data.installed ? '✓ Already Installed' : 'Install to Workspace'}
+                        </button>
+                        <a href="https://clawhub.ai/skills/${encodeURIComponent(slug)}"
+                           target="_blank" rel="noopener"
+                           style="font-size:12px;color:inherit;opacity:0.7;text-decoration:underline">Open on ClawHub ↗</a>
+                    </div>
+                </div>
+            `;
+        })
+        .catch(err => {
+            grid.innerHTML = `<div class="marketplace-empty">Network error: ${_onyxEscHtml(String(err))}</div>`;
+        });
+}
+
+function marketplaceBackToList() {
+    marketplaceState.detailSlug = null;
+    if (marketplaceState.query) {
+        marketplaceRunSearch(marketplaceState.query);
+    } else {
+        _marketplaceRenderGrid();
+        _marketplaceUpdateToolbar();
+    }
+}
+
+function marketplaceInstall(ev, slug) {
+    if (ev) ev.stopPropagation();
+    if (!slug) return;
+    const btn = ev && ev.target ? ev.target.closest('.marketplace-install-btn') : null;
+    if (btn && btn.disabled) return; // already installed
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Installing…';
+    }
+    fetch('/api/skills/marketplace/install', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({slug}),
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (btn) {
+                    btn.classList.add('installed');
+                    btn.textContent = '✓ Installed';
+                }
+                // Mark this slug as installed in cached state so re-render persists
+                const it = marketplaceState.items.find(x => x.slug === slug);
+                if (it) it.installed = true;
+                // Reload "My Skills" tab so the new skill shows up there too.
+                toolsLoaded = false;
+                // Best-effort refresh; ignore failures.
+                fetch('/api/skills').then(r => r.json()).then(() => {}).catch(() => {});
+            } else {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Install';
+                }
+                alert(`Install failed: ${data.message || 'unknown error'}`);
+            }
+        })
+        .catch(err => {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Install';
+            }
+            alert(`Network error: ${err}`);
+        });
 }
 
 // ---- Add Skill Method Switching ----
@@ -8964,6 +9259,207 @@ function _renderDynamicCard(container, data, componentType) {
     container.appendChild(body);
 }
 
+// =====================================================================
+// Todo List Card — interactive JSON-backed task lists (CRUD via chat)
+// =====================================================================
+function _renderTodoListCard(container, data) {
+    const body = document.createElement('div');
+    body.className = 'onyx-card-body';
+
+    // Index view (list of all todo lists) — render a simple gallery and stop.
+    if (data.component === 'todo-index') {
+        const lists = Array.isArray(data.lists) ? data.lists : [];
+        if (!lists.length) {
+            body.innerHTML = `<div class="onyx-empty-hint">No todo lists yet. Ask the agent to "create a todo list" to get started.</div>`;
+            container.appendChild(body);
+            return;
+        }
+        const grid = document.createElement('div');
+        grid.className = 'onyx-service-grid';
+        lists.forEach((l, i) => {
+            const color = _onyxColorClass(i);
+            const stats = l.stats || { total: 0, done: 0, pending: 0 };
+            const el = document.createElement('div');
+            el.className = 'onyx-service-card';
+            el.innerHTML = `
+                <div class="onyx-svc-icon onyx-bg-${color}">📋</div>
+                <div class="onyx-svc-title">${_onyxEscHtml(l.title || l.id || '')}</div>
+                <div class="onyx-svc-desc">${_onyxEscHtml(l.description || '')}</div>
+                <div class="onyx-todo-stats">
+                    <span class="onyx-todo-stat-done">✓ ${stats.done}</span>
+                    <span class="onyx-todo-stat-pending">○ ${stats.pending}</span>
+                    <span class="onyx-todo-stat-total">${stats.total} total</span>
+                </div>
+            `;
+            grid.appendChild(el);
+        });
+        body.appendChild(grid);
+        container.appendChild(body);
+        return;
+    }
+
+    // Single list view
+    const title = data.title || data.id || 'Todo List';
+    const desc = data.description || '';
+    const items = Array.isArray(data.items) ? data.items : [];
+    const stats = data.stats || { total: items.length, done: 0, pending: items.length };
+
+    // Header row with stats
+    const header = document.createElement('div');
+    header.className = 'onyx-todo-header';
+    header.innerHTML = `
+        <div class="onyx-todo-progress-bar">
+            <div class="onyx-todo-progress-fill" style="width:${stats.total ? Math.round(stats.done * 100 / stats.total) : 0}%"></div>
+        </div>
+        <div class="onyx-todo-stats">
+            <span class="onyx-todo-stat-done">${stats.done} done</span>
+            <span class="onyx-todo-stat-pending">${stats.pending} pending</span>
+            <span class="onyx-todo-stat-total">${stats.total} total</span>
+        </div>
+    `;
+    body.appendChild(header);
+    if (desc) {
+        const descEl = document.createElement('div');
+        descEl.className = 'onyx-todo-desc';
+        descEl.textContent = desc;
+        body.appendChild(descEl);
+    }
+
+    // Items list
+    const list = document.createElement('div');
+    list.className = 'onyx-todo-list';
+    if (!items.length) {
+        list.innerHTML = `<div class="onyx-empty-hint">No items yet. Ask the agent to add tasks.</div>`;
+    } else {
+        items.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'onyx-todo-item' + (item.completed ? ' onyx-todo-item-done' : '');
+            const priority = item.priority || 'medium';
+            const due = item.due ? `<span class="onyx-todo-due">📅 ${_onyxEscHtml(item.due)}</span>` : '';
+            const notes = item.notes ? `<div class="onyx-todo-notes">${_onyxEscHtml(item.notes)}</div>` : '';
+            row.innerHTML = `
+                <div class="onyx-todo-check">${item.completed ? '✓' : '○'}</div>
+                <div class="onyx-todo-content">
+                    <div class="onyx-todo-title">${_onyxEscHtml(item.title || '')}</div>
+                    ${notes}
+                    <div class="onyx-todo-meta">
+                        <span class="onyx-todo-priority onyx-priority-${priority}">${priority}</span>
+                        ${due}
+                    </div>
+                </div>
+            `;
+            list.appendChild(row);
+        });
+    }
+    body.appendChild(list);
+
+    container.appendChild(body);
+}
+
+// =====================================================================
+// Counterfactual Card — "what if X had been different?" reasoning view
+// =====================================================================
+function _renderCounterfactualCard(container, data) {
+    // Index view
+    if (data.component === 'counterfactual-index') {
+        const body = document.createElement('div');
+        body.className = 'onyx-card-body';
+        const analyses = Array.isArray(data.analyses) ? data.analyses : [];
+        if (!analyses.length) {
+            body.innerHTML = `<div class="onyx-empty-hint">No counterfactual analyses yet. Ask the agent to explore a "what if" scenario.</div>`;
+            container.appendChild(body);
+            return;
+        }
+        const grid = document.createElement('div');
+        grid.className = 'onyx-service-grid';
+        analyses.forEach((a, i) => {
+            const color = _onyxColorClass(i);
+            const el = document.createElement('div');
+            el.className = 'onyx-service-card';
+            el.innerHTML = `
+                <div class="onyx-svc-icon onyx-bg-${color}">🔮</div>
+                <div class="onyx-svc-title">${_onyxEscHtml(a.title || a.id || '')}</div>
+                <div class="onyx-svc-desc">${_onyxEscHtml(a.hypothetical || '')}</div>
+                <div class="onyx-todo-stats">
+                    <span class="onyx-todo-stat-total">${a.branch_count || 0} branches</span>
+                </div>
+            `;
+            grid.appendChild(el);
+        });
+        body.appendChild(grid);
+        container.appendChild(body);
+        return;
+    }
+
+    // Single analysis view
+    const body = document.createElement('div');
+    body.className = 'onyx-card-body onyx-cf-body';
+
+    // Observed vs Hypothetical split panel
+    const split = document.createElement('div');
+    split.className = 'onyx-cf-split';
+    split.innerHTML = `
+        <div class="onyx-cf-panel onyx-cf-observed">
+            <div class="onyx-cf-panel-label">OBSERVED</div>
+            <div class="onyx-cf-panel-text">${_onyxEscHtml(data.observed || '')}</div>
+        </div>
+        <div class="onyx-cf-arrow">→</div>
+        <div class="onyx-cf-panel onyx-cf-hypothetical">
+            <div class="onyx-cf-panel-label">HYPOTHETICAL</div>
+            <div class="onyx-cf-panel-text">${_onyxEscHtml(data.hypothetical || '')}</div>
+        </div>
+    `;
+    body.appendChild(split);
+
+    // Branches
+    const branches = Array.isArray(data.branches) ? data.branches : [];
+    if (branches.length) {
+        const title = document.createElement('div');
+        title.className = 'onyx-section-title';
+        title.textContent = `POSSIBLE OUTCOMES (${branches.length})`;
+        body.appendChild(title);
+
+        const grid = document.createElement('div');
+        grid.className = 'onyx-cf-branches';
+        branches.forEach((b, i) => {
+            const color = _onyxColorClass(i);
+            const plaus = b.plausibility || 'medium';
+            const pros = Array.isArray(b.pros) ? b.pros : [];
+            const cons = Array.isArray(b.cons) ? b.cons : [];
+            const prosHtml = pros.length
+                ? `<div class="onyx-cf-pros">${pros.map(p => `<div>✓ ${_onyxEscHtml(p)}</div>`).join('')}</div>`
+                : '';
+            const consHtml = cons.length
+                ? `<div class="onyx-cf-cons">${cons.map(c => `<div>✗ ${_onyxEscHtml(c)}</div>`).join('')}</div>`
+                : '';
+            const el = document.createElement('div');
+            el.className = `onyx-cf-branch onyx-bg-${color}`;
+            el.innerHTML = `
+                <div class="onyx-cf-branch-head">
+                    <span class="onyx-cf-outcome">${_onyxEscHtml(b.outcome || '')}</span>
+                    <span class="onyx-cf-plausibility onyx-plaus-${plaus}">${plaus}</span>
+                </div>
+                ${prosHtml}${consHtml}
+            `;
+            grid.appendChild(el);
+        });
+        body.appendChild(grid);
+    }
+
+    // Recommendation
+    if (data.recommendation) {
+        const rec = document.createElement('div');
+        rec.className = 'onyx-cf-recommendation';
+        rec.innerHTML = `
+            <div class="onyx-cf-rec-label">RECOMMENDATION</div>
+            <div class="onyx-cf-rec-text">${_onyxEscHtml(data.recommendation)}</div>
+        `;
+        body.appendChild(rec);
+    }
+
+    container.appendChild(body);
+}
+
 // ── Unlimited Component Registry ──
 // Anyone can register new component types: ONYX_CARD_RENDERERS['my-type'] = fn(container, data)
 window.ONYX_CARD_RENDERERS = {};
@@ -8997,6 +9493,12 @@ ONYX_CARD_RENDERERS['kanban'] = _renderKanbanCard;
 ONYX_CARD_RENDERERS['metric'] = _renderMetricCard;
 ONYX_CARD_RENDERERS['code-snippet'] = _renderCodeSnippetCard;
 ONYX_CARD_RENDERERS['api-endpoint'] = _renderApiEndpointCard;
+
+// New: Todo list + counterfactual reasoning cards (JSON-backed via tools)
+ONYX_CARD_RENDERERS['todo-list'] = _renderTodoListCard;
+ONYX_CARD_RENDERERS['todo-index'] = _renderTodoListCard;
+ONYX_CARD_RENDERERS['counterfactual'] = _renderCounterfactualCard;
+ONYX_CARD_RENDERERS['counterfactual-index'] = _renderCounterfactualCard;
 
 // ── Interactive Q&A Card ──
 // Renders a card with questions, 4 selectable options + custom answer

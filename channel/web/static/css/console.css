@@ -3197,3 +3197,463 @@ body, #app, #main-content {
   animation: none;
 }
 
+/* =====================================================================
+   TODO LIST CARD
+   ===================================================================== */
+.onyx-todo-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.onyx-todo-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.dark .onyx-todo-progress-bar {
+  background: rgba(255,255,255,0.10);
+}
+.onyx-todo-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #22c55e);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.onyx-todo-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.onyx-todo-stat-done { color: #22c55e; font-weight: 600; }
+.onyx-todo-stat-pending { color: #f59e0b; font-weight: 600; }
+.onyx-todo-stat-total { opacity: 0.6; }
+.onyx-todo-desc {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+.onyx-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.onyx-todo-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.03);
+  border-radius: 8px;
+  align-items: flex-start;
+}
+.dark .onyx-todo-item {
+  background: rgba(255,255,255,0.04);
+}
+.onyx-todo-item-done {
+  opacity: 0.55;
+}
+.onyx-todo-item-done .onyx-todo-title {
+  text-decoration: line-through;
+}
+.onyx-todo-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  background: rgba(0,0,0,0.06);
+  color: inherit;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.dark .onyx-todo-check {
+  background: rgba(255,255,255,0.10);
+}
+.onyx-todo-item-done .onyx-todo-check {
+  background: #22c55e;
+  color: #fff;
+}
+.onyx-todo-content {
+  flex: 1;
+  min-width: 0;
+}
+.onyx-todo-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+.onyx-todo-notes {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.onyx-todo-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 10px;
+  align-items: center;
+}
+.onyx-todo-priority {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.onyx-priority-low { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.onyx-priority-medium { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.onyx-priority-high { background: rgba(239,68,68,0.15); color: #ef4444; }
+.onyx-priority-urgent { background: rgba(220,38,38,0.20); color: #dc2626; font-weight: 700; }
+.onyx-todo-due { opacity: 0.6; }
+
+/* =====================================================================
+   COUNTERFACTUAL CARD
+   ===================================================================== */
+.onyx-cf-body { display: flex; flex-direction: column; gap: 12px; }
+.onyx-cf-split {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+@media (max-width: 540px) {
+  .onyx-cf-split {
+    grid-template-columns: 1fr;
+  }
+  .onyx-cf-arrow { display: none; }
+}
+.onyx-cf-panel {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid;
+}
+.onyx-cf-observed {
+  background: rgba(100,116,139,0.08);
+  border-color: rgba(100,116,139,0.20);
+}
+.dark .onyx-cf-observed {
+  background: rgba(148,163,184,0.10);
+  border-color: rgba(148,163,184,0.25);
+}
+.onyx-cf-hypothetical {
+  background: rgba(168,85,247,0.08);
+  border-color: rgba(168,85,247,0.25);
+}
+.dark .onyx-cf-hypothetical {
+  background: rgba(192,132,252,0.12);
+  border-color: rgba(192,132,252,0.30);
+}
+.onyx-cf-panel-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+.onyx-cf-panel-text {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.onyx-cf-arrow {
+  align-self: center;
+  font-size: 22px;
+  opacity: 0.5;
+  padding: 0 4px;
+}
+.onyx-cf-branches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+.onyx-cf-branch {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.dark .onyx-cf-branch {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.08);
+}
+.onyx-cf-branch-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.onyx-cf-outcome {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.onyx-cf-plausibility {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+.onyx-plaus-low { background: rgba(148,163,184,0.20); color: #94a3b8; }
+.onyx-plaus-medium { background: rgba(245,158,11,0.20); color: #f59e0b; }
+.onyx-plaus-high { background: rgba(34,197,94,0.20); color: #22c55e; }
+.onyx-cf-pros, .onyx-cf-cons {
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.onyx-cf-pros { color: #22c55e; }
+.onyx-cf-cons { color: #ef4444; }
+.onyx-cf-recommendation {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(34,197,94,0.08);
+  border: 1px solid rgba(34,197,94,0.20);
+}
+.dark .onyx-cf-recommendation {
+  background: rgba(34,197,94,0.10);
+}
+.onyx-cf-rec-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #22c55e;
+  margin-bottom: 4px;
+}
+.onyx-cf-rec-text {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.onyx-empty-hint {
+  font-size: 12px;
+  opacity: 0.6;
+  padding: 16px 8px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* =====================================================================
+   SKILL MARKETPLACE PANEL
+   ===================================================================== */
+.marketplace-search-wrap {
+  position: relative;
+  margin-bottom: 12px;
+}
+.marketplace-search-wrap input {
+  width: 100%;
+  padding: 8px 32px 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(100,116,139,0.30);
+  background: rgba(255,255,255,0.95);
+  color: #0f172a;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.dark .marketplace-search-wrap input {
+  background: rgba(15,23,42,0.90);
+  color: #e2e8f0;
+  border-color: rgba(148,163,184,0.30);
+}
+.marketplace-search-wrap input:focus {
+  border-color: #f43f5e;
+}
+.marketplace-search-wrap .marketplace-search-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 13px;
+  pointer-events: none;
+}
+.marketplace-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.marketplace-toolbar .marketplace-count {
+  font-size: 12px;
+  opacity: 0.7;
+}
+.marketplace-toolbar button {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(148,163,184,0.30);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.marketplace-toolbar button:hover:not(:disabled) {
+  background: rgba(148,163,184,0.15);
+}
+.marketplace-toolbar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.marketplace-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.marketplace-card {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,0.20);
+  background: rgba(255,255,255,0.95);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+}
+.dark .marketplace-card {
+  background: rgba(30,41,59,0.60);
+  border-color: rgba(148,163,184,0.18);
+}
+.marketplace-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.10);
+}
+.marketplace-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.marketplace-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f43f5e, #ec4899);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.marketplace-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  word-break: break-word;
+}
+.marketplace-card-slug {
+  font-size: 11px;
+  opacity: 0.6;
+  font-family: ui-monospace, monospace;
+}
+.marketplace-card-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.75;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 54px;
+}
+.marketplace-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  align-items: center;
+}
+.marketplace-install-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  background: #f43f5e;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.marketplace-install-btn:hover:not(:disabled) {
+  background: #e11d48;
+}
+.marketplace-install-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.marketplace-install-btn.installed {
+  background: #22c55e;
+  cursor: default;
+}
+.marketplace-card-status {
+  font-size: 11px;
+  opacity: 0.6;
+}
+.marketplace-empty {
+  padding: 40px 16px;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.6;
+  line-height: 1.6;
+}
+.marketplace-detail {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,0.20);
+  background: rgba(255,255,255,0.95);
+}
+.dark .marketplace-detail {
+  background: rgba(30,41,59,0.60);
+  border-color: rgba(148,163,184,0.18);
+}
+.marketplace-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.marketplace-detail-back {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(148,163,184,0.30);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.marketplace-detail-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.marketplace-detail-meta {
+  font-size: 12px;
+  opacity: 0.65;
+  margin-bottom: 12px;
+}
+.marketplace-detail-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+.marketplace-detail-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+

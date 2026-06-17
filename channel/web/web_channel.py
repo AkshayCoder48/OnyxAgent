@@ -1139,6 +1139,10 @@ class WebChannel(ChatChannel):
             '/api/skills/upload', 'SkillUploadHandler',
             '/api/skills/install', 'SkillInstallHandler',
             '/api/skills/delete', 'SkillDeleteHandler',
+            '/api/skills/marketplace', 'SkillMarketplaceHandler',
+            '/api/skills/marketplace/search', 'SkillMarketplaceSearchHandler',
+            '/api/skills/marketplace/detail', 'SkillMarketplaceDetailHandler',
+            '/api/skills/marketplace/install', 'SkillMarketplaceInstallHandler',
             '/api/memory', 'MemoryHandler',
             '/api/memory/content', 'MemoryContentHandler',
             '/api/knowledge/list', 'KnowledgeListHandler',
@@ -4359,6 +4363,232 @@ class SkillDeleteHandler:
             return json.dumps({"status": "success"}, ensure_ascii=False)
         except Exception as e:
             logger.error(f"[WebChannel] Skill delete error: {e}")
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+# =====================================================================
+# ClawHub Marketplace — browse / search / detail / install
+# Mirrors the CLI's ClawHub v1 API client (https://clawhub.ai/api/v1).
+# =====================================================================
+
+CLAWHUB_API_BASE = "https://clawhub.ai/api/v1"
+CLAWHUB_PAGE_SIZE = 12  # cards per page in the marketplace UI
+
+
+def _clawhub_get(path: str, params: dict = None, timeout: int = 12):
+    """Thin wrapper around requests.get for the ClawHub v1 API.
+
+    Returns (status_code, json_or_text). Network/parse errors are caught and
+    returned as (0, error_message) so handlers can format a clean error.
+    """
+    import requests
+    try:
+        resp = requests.get(
+            f"{CLAWHUB_API_BASE}{path}",
+            params=params or {},
+            timeout=timeout,
+            headers={"Accept": "application/json"},
+        )
+    except requests.RequestException as e:
+        return 0, f"Network error: {e}"
+    try:
+        return resp.status_code, resp.json()
+    except ValueError:
+        return resp.status_code, resp.text
+
+
+class SkillMarketplaceHandler:
+    """GET /api/skills/marketplace — list ClawHub skills with cursor pagination.
+
+    Query params:
+      ?page=N  — 1-based page number (cursors cached in-memory per page)
+    """
+
+    # Module-level cursor cache: page → cursor string.
+    # Lives for the process; reset on restart. Good enough for browse UX.
+    _cursors: dict = {1: None}
+
+    def GET(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            params = web.input(page='1')
+            try:
+                page = max(1, int(params.page))
+            except (TypeError, ValueError):
+                page = 1
+
+            query_params = {"limit": CLAWHUB_PAGE_SIZE, "sort": "recommended"}
+            cursor = self._cursors.get(page)
+            if page > 1 and cursor:
+                query_params["cursor"] = cursor
+
+            status, data = _clawhub_get("/skills", query_params)
+            if status != 200 or not isinstance(data, dict):
+                return json.dumps({
+                    "status": "error",
+                    "message": f"ClawHub returned status {status}",
+                    "items": [],
+                    "page": page,
+                    "has_next": False,
+                }, ensure_ascii=False)
+
+            items = data.get("items", []) or []
+            next_cursor = data.get("nextCursor")
+            if next_cursor:
+                self._cursors[page + 1] = next_cursor
+
+            # Mark which ones are already installed locally.
+            installed = set(self._installed_slugs())
+
+            return json.dumps({
+                "status": "success",
+                "items": [
+                    {
+                        "slug": it.get("slug", ""),
+                        "display_name": it.get("displayName", it.get("slug", "")),
+                        "summary": it.get("summary", "") or "",
+                        "installed": it.get("slug", "") in installed,
+                    }
+                    for it in items
+                ],
+                "page": page,
+                "has_next": bool(next_cursor),
+            }, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Marketplace list error: {e}")
+            return json.dumps({"status": "error", "message": str(e), "items": []},
+                              ensure_ascii=False)
+
+    @staticmethod
+    def _installed_slugs():
+        try:
+            from cli.commands.skill import load_skills_config
+            return set(load_skills_config().keys())
+        except Exception:
+            return set()
+
+
+class SkillMarketplaceSearchHandler:
+    """GET /api/skills/marketplace/search?q=QUERY — search ClawHub."""
+
+    def GET(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            params = web.input(q='')
+            q = (params.q or '').strip()
+            if not q:
+                return json.dumps({"status": "success", "results": [], "query": ""})
+
+            status, data = _clawhub_get("/search", {"q": q})
+            if status != 200 or not isinstance(data, dict):
+                return json.dumps({
+                    "status": "error",
+                    "message": f"ClawHub returned status {status}",
+                    "results": [],
+                    "query": q,
+                }, ensure_ascii=False)
+
+            results = data.get("results", []) or []
+            installed = set(SkillMarketplaceHandler._installed_slugs())
+            return json.dumps({
+                "status": "success",
+                "query": q,
+                "results": [
+                    {
+                        "slug": r.get("slug", ""),
+                        "display_name": r.get("displayName", r.get("slug", "")),
+                        "summary": r.get("summary", "") or "",
+                        "installed": r.get("slug", "") in installed,
+                    }
+                    for r in results
+                ],
+            }, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Marketplace search error: {e}")
+            return json.dumps({"status": "error", "message": str(e), "results": []})
+
+
+class SkillMarketplaceDetailHandler:
+    """GET /api/skills/marketplace/detail?slug=SLUG — full skill info from ClawHub."""
+
+    def GET(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            params = web.input(slug='')
+            slug = (params.slug or '').strip()
+            if not slug:
+                return json.dumps({"status": "error", "message": "slug is required"})
+
+            status, data = _clawhub_get(f"/skills/{slug}")
+            if status == 404:
+                return json.dumps({"status": "error", "message": f"Skill '{slug}' not found on ClawHub"})
+            if status != 200 or not isinstance(data, dict):
+                return json.dumps({"status": "error", "message": f"ClawHub returned status {status}"})
+
+            skill = data.get("skill", {}) or {}
+            latest = data.get("latestVersion", {}) or {}
+            installed = slug in SkillMarketplaceHandler._installed_slugs()
+            return json.dumps({
+                "status": "success",
+                "skill": {
+                    "slug": skill.get("slug", slug),
+                    "display_name": skill.get("displayName", slug),
+                    "summary": skill.get("summary", "") or "",
+                    "description": skill.get("description", "") or "",
+                    "tags": skill.get("tags", {}) or {},
+                    "version": latest.get("version", ""),
+                },
+                "installed": installed,
+            }, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Marketplace detail error: {e}")
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class SkillMarketplaceInstallHandler:
+    """POST /api/skills/marketplace/install  {slug: "..."}
+    Downloads the skill from ClawHub and extracts it into the workspace skills dir.
+    Reuses the CLI's _install_hub helper for fidelity with `onyx skill install`.
+    """
+
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or b"{}")
+            slug = (body.get("slug") or '').strip()
+            if not slug:
+                return json.dumps({"status": "error", "message": "slug is required"})
+
+            # Reuse the CLI installer so behavior matches `onyx skill install <slug>`.
+            try:
+                from cli.commands.skill import _install_hub, InstallResult, SkillInstallError
+            except Exception as e:
+                return json.dumps({"status": "error",
+                                   "message": f"Skill installer unavailable: {e}"})
+
+            result = InstallResult()
+            try:
+                _install_hub(slug, result, provider="clawhub")
+            except SkillInstallError as e:
+                return json.dumps({"status": "error", "message": str(e),
+                                   "messages": result.messages})
+            except Exception as e:
+                logger.error(f"[WebChannel] ClawHub install failed for '{slug}': {e}")
+                return json.dumps({"status": "error", "message": f"Install failed: {e}",
+                                   "messages": result.messages})
+
+            return json.dumps({
+                "status": "success",
+                "slug": slug,
+                "installed": list(result.installed),
+                "messages": result.messages,
+            }, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Marketplace install error: {e}")
             return json.dumps({"status": "error", "message": str(e)})
 
 
