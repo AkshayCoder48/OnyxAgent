@@ -638,18 +638,105 @@ function _rewriteLocalImgSrc(html) {
     });
 }
 
+// =====================================================================
+// Typewriter fade-in — gives streaming content a smooth, seamless reveal
+// =====================================================================
+// On every delta render we briefly toggle a CSS class on the content element.
+// The class triggers a 250ms opacity animation on newly-rendered child nodes,
+// so text appears to fade in smoothly character-by-character (driven by the
+// speed of incoming deltas from the LLM, not an artificial speed slider).
+function _onyxTriggerTypewriterFade(contentEl) {
+    if (!contentEl) return;
+    // Force a reflow so the animation restarts on each render.
+    contentEl.classList.remove('onyx-typewriter-fade');
+    void contentEl.offsetWidth; // reflow
+    contentEl.classList.add('onyx-typewriter-fade');
+}
+
+// =====================================================================
+// "Still thinking..." indicator — pulsing dots when LLM is silent >2s
+// =====================================================================
+// Shows 3 pulsing dots at the bottom of the streaming bubble when:
+//   - The agent has started replying (delta received at least once)
+//   - No new delta has arrived in >2 seconds
+//   - We are NOT in a tool-execution phase (tool_start was the most recent)
+//   - The stream hasn't ended (no message_end with has_tool_calls=false yet)
+// Hidden immediately the moment a new delta arrives OR a tool starts.
+
+const ONYX_STILL_THINKING_THRESHOLD_MS = 2000;
+let _onyxStillThinkingInterval = null;
+
+function _onyxEnsureStillThinkingMonitor() {
+    if (_onyxStillThinkingInterval) return;
+    _onyxStillThinkingInterval = setInterval(() => {
+        // Find all active streaming content elements.
+        document.querySelectorAll('.answer-content.sse-streaming').forEach(el => {
+            if (!el._onyxLastDeltaTs) return; // no delta yet — agent still warming up
+            const elapsed = Date.now() - el._onyxLastDeltaTs;
+            if (elapsed > ONYX_STILL_THINKING_THRESHOLD_MS && !el._onyxToolActive) {
+                _onyxShowStillThinking(el);
+            }
+        });
+    }, 500);
+}
+
+function _onyxShowStillThinking(contentEl) {
+    if (!contentEl) return;
+    let indicator = contentEl.querySelector('.onyx-still-thinking');
+    if (indicator) return; // already showing
+    indicator = document.createElement('div');
+    indicator.className = 'onyx-still-thinking';
+    indicator.innerHTML = '<span class="onyx-dot"></span><span class="onyx-dot"></span><span class="onyx-dot"></span>';
+    contentEl.appendChild(indicator);
+}
+
+function _onyxHideStillThinking(contentEl) {
+    if (!contentEl) return;
+    const indicator = contentEl.querySelector('.onyx-still-thinking');
+    if (indicator) indicator.remove();
+}
+
+// Kick off the monitor once the script loads.
+if (typeof window !== 'undefined') {
+    _onyxEnsureStillThinkingMonitor();
+}
+
 function renderMarkdown(text) {
     try {
         // Pre-process: truncate long base64 data URLs in plain text so they
         // don't blow up the chat bubble.  We preserve the prefix so the user
         // can still see what it is, but collapse the payload.
         let processed = _truncateDataUris(text);
+        // Pre-process: extract <thinking>…</thinking> blocks BEFORE markdown runs.
+        // We replace each block with a unique placeholder token, run markdown on
+        // the rest of the text, then splice the styled collapsible block back in.
+        // This means markdown is "paused" inside <thinking> (raw text shown) and
+        // "resumes" cleanly after the closing tag.
+        const thinkingBlocks = [];
+        processed = processed.replace(/<thinking>([\s\S]*?)<\/thinking>/g,
+            (m, inner) => {
+                const idx = thinkingBlocks.length;
+                thinkingBlocks.push(inner);
+                return `\x00THINKING_BLOCK_${idx}\x00`;
+            });
+        // Also handle an unclosed <thinking> tag mid-stream — auto-close at end
+        // so the user sees the partial thought rather than raw tag text.
+        processed = processed.replace(/<thinking>([\s\S]*)$/, (m, inner) => {
+            const idx = thinkingBlocks.length;
+            thinkingBlocks.push(inner + '\n\n_(streaming — closing tag pending)_');
+            return `\x00THINKING_BLOCK_${idx}\x00`;
+        });
         // Pre-process: wrap bare JSON card objects (not already in code fences)
         // in ```json fences so the card processor can render them as cards.
         // This catches cases where the AI outputs `json { "component": ... }`
         // or just `{ "component": ... }` without proper markdown fencing.
         processed = _wrapBareCardJson(processed);
         let html = md.render(processed);
+        // Restore <thinking> blocks as styled collapsible divs.
+        html = html.replace(/\x00THINKING_BLOCK_(\d+)\x00/g, (m, idx) => {
+            const inner = thinkingBlocks[parseInt(idx, 10)] || '';
+            return _buildThinkingBlockHtml(inner);
+        });
         html = _rewriteLocalImgSrc(html);
         // Order matters: video first (more specific), then image.
         html = injectImagePreviews(injectVideoPlayers(html));
@@ -661,6 +748,40 @@ function renderMarkdown(text) {
     }
     catch (e) { return text.replace(/\n/g, '<br>'); }
 }
+
+/**
+ * Build a styled collapsible "Thinking..." block.
+ *
+ * Markdown is paused inside this block — the inner text is shown escaped and
+ * preformatted, NOT re-rendered through markdown. This matches the agent's
+ * intent: <thinking> is internal reasoning, not user-facing prose.
+ *
+ * Default state: collapsed. Click the header to expand.
+ * Color: text color only, slightly lighter than the message bar background.
+ */
+function _buildThinkingBlockHtml(innerText) {
+    // Escape the inner text so it renders as plain preformatted text.
+    const escaped = _onyxEscHtml(innerText.replace(/^\n+/, '').replace(/\n+$/, ''));
+    // Truncate very long thinking blocks in the collapsed view (full text on expand).
+    const preview = escaped.length > 140 ? escaped.slice(0, 140) + '…' : escaped;
+    return `<div class="onyx-thinking-block" data-collapsed="1">
+        <div class="onyx-thinking-header" onclick="onyxToggleThinkingBlock(this)">
+            <i class="fas fa-lightbulb onyx-thinking-icon"></i>
+            <span class="onyx-thinking-label">Thinking</span>
+            <span class="onyx-thinking-preview">${preview}</span>
+            <i class="fas fa-chevron-right onyx-thinking-chevron"></i>
+        </div>
+        <div class="onyx-thinking-body"><pre class="onyx-thinking-pre">${escaped}</pre></div>
+    </div>`;
+}
+
+// Toggle a thinking block between collapsed and expanded.
+window.onyxToggleThinkingBlock = function(headerEl) {
+    const block = headerEl.parentElement;
+    if (!block) return;
+    const collapsed = block.getAttribute('data-collapsed') === '1';
+    block.setAttribute('data-collapsed', collapsed ? '0' : '1');
+};
 
 /**
  * Pre-process raw markdown: find bare JSON objects containing a "component"
@@ -2363,6 +2484,10 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                     reasoningText = '';
                 }
                 accumulatedText += item.content;
+                // Track last delta time for the "Still thinking..." indicator.
+                contentEl._onyxLastDeltaTs = Date.now();
+                // Hide the still-thinking indicator the moment new tokens arrive.
+                _onyxHideStillThinking(contentEl);
                 // ── PERFORMANCE: batch & throttle all DOM updates ──
                 // Accumulate raw text, schedule a single render via rAF
                 if (!contentEl._onyxRafPending) {
@@ -2372,6 +2497,8 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                         contentEl._onyxRafPending = false;
                         const text = accumulatedText;
                         contentEl.innerHTML = renderMarkdown(text);
+                        // Trigger the typewriter fade-in on the freshly rendered content.
+                        _onyxTriggerTypewriterFade(contentEl);
                         // Only run heavy pipeline every 8th render or when pending cards exist
                         if (!contentEl._onyxRenderCount) contentEl._onyxRenderCount = 0;
                         contentEl._onyxRenderCount++;
@@ -2386,6 +2513,8 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                 }
 
             } else if (item.type === 'message_end') {
+                // Hide still-thinking indicator — message is done (or transitioning to tools).
+                _onyxHideStillThinking(contentEl);
                 if (item.has_tool_calls && accumulatedText.trim()) {
                     ensureBotEl();
                     const frozenEl = document.createElement('div');
@@ -2406,6 +2535,11 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
 
             } else if (item.type === 'tool_start') {
                 ensureBotEl();
+                // Hide still-thinking indicator — we're now executing a tool, not
+                // waiting for the LLM. The indicator should only fire when the LLM
+                // itself is silent, not when a tool is chugging along.
+                contentEl._onyxToolActive = true;
+                _onyxHideStillThinking(contentEl);
                 if (currentReasoningEl) {
                     finalizeThinking(currentReasoningEl, reasoningStartTime, reasoningText);
                     currentReasoningEl = null;
@@ -4397,7 +4531,130 @@ function loadSkillsView() {
     loadSkillsSection();
 }
 
-// ---- Skills Tab Switching ----
+// =====================================================================
+// Todos right-bar panel — shows all todo lists from /api/todos with
+// colorful UI, auto-refresh, and a header badge with total pending count.
+// =====================================================================
+
+let _todosPanelState = {
+    open: false,
+    loaded: false,
+    loading: false,
+    refreshTimer: null,
+    lastListCount: 0,
+};
+
+function toggleTodosPanel() {
+    const panel = document.getElementById('todos-panel');
+    const overlay = document.getElementById('todos-panel-overlay');
+    if (!panel) return;
+    _todosPanelState.open = !_todosPanelState.open;
+    if (_todosPanelState.open) {
+        panel.classList.remove('hidden');
+        if (overlay) overlay.classList.remove('hidden');
+        // Lazy-load on first open, then refresh every 10s while open.
+        if (!_todosPanelState.loaded && !_todosPanelState.loading) {
+            refreshTodosPanel();
+        }
+        if (_todosPanelState.refreshTimer) clearInterval(_todosPanelState.refreshTimer);
+        _todosPanelState.refreshTimer = setInterval(refreshTodosPanel, 10000);
+    } else {
+        panel.classList.add('hidden');
+        if (overlay) overlay.classList.add('hidden');
+        if (_todosPanelState.refreshTimer) {
+            clearInterval(_todosPanelState.refreshTimer);
+            _todosPanelState.refreshTimer = null;
+        }
+    }
+}
+
+function closeTodosPanel() {
+    if (!_todosPanelState.open) return;
+    toggleTodosPanel();
+}
+
+function refreshTodosPanel() {
+    if (_todosPanelState.loading) return;
+    _todosPanelState.loading = true;
+    fetch('/api/todos')
+        .then(r => r.json())
+        .then(data => {
+            _todosPanelState.loading = false;
+            _todosPanelState.loaded = true;
+            if (data.status !== 'success') {
+                _renderTodosPanelError(data.message || 'Failed to load todos');
+                return;
+            }
+            _renderTodosPanel(data.lists || []);
+            _updateTodosBadge(data.lists || []);
+        })
+        .catch(err => {
+            _todosPanelState.loading = false;
+            _renderTodosPanelError(String(err));
+        });
+}
+
+function _renderTodosPanelError(msg) {
+    const list = document.getElementById('todos-panel-list');
+    if (!list) return;
+    list.innerHTML = `<div class="todos-panel-empty"><i class="fas fa-circle-exclamation mb-2 text-red-400"></i><br>${_onyxEscHtml(msg)}</div>`;
+}
+
+function _renderTodosPanel(lists) {
+    const list = document.getElementById('todos-panel-list');
+    if (!list) return;
+    if (!lists.length) {
+        list.innerHTML = `<div class="todos-panel-empty">
+            <i class="fas fa-clipboard-list mb-2 text-slate-400 text-2xl"></i><br>
+            <span class="text-sm">No todo lists yet.</span><br>
+            <span class="text-xs opacity-60">Ask the agent: "create a todo list called Plan"</span>
+        </div>`;
+        return;
+    }
+    const palette = ['blue', 'purple', 'emerald', 'amber', 'rose', 'cyan', 'indigo', 'pink'];
+    list.innerHTML = '';
+    lists.forEach((l, i) => {
+        const color = palette[i % palette.length];
+        const stats = l.stats || { total: 0, done: 0, pending: 0 };
+        const pct = stats.total ? Math.round(stats.done * 100 / stats.total) : 0;
+        const card = document.createElement('div');
+        card.className = `todos-panel-card todos-color-${color}`;
+        card.innerHTML = `
+            <div class="todos-panel-card-head">
+                <span class="todos-panel-card-title">${_onyxEscHtml(l.title || l.id)}</span>
+                <span class="todos-panel-card-stats">${stats.done}/${stats.total}</span>
+            </div>
+            ${l.description ? `<div class="todos-panel-card-desc">${_onyxEscHtml(l.description)}</div>` : ''}
+            <div class="todos-panel-progress"><div class="todos-panel-progress-fill" style="width:${pct}%"></div></div>
+            <div class="todos-panel-items">
+                ${(l.items || []).slice(0, 50).map(item => {
+                    const completed = !!item.completed;
+                    const priority = item.priority || 'medium';
+                    return `<div class="todos-panel-item ${completed ? 'done' : ''}">
+                        <span class="todos-panel-check">${completed ? '✓' : '○'}</span>
+                        <span class="todos-panel-item-text">${_onyxEscHtml(item.title || '')}</span>
+                        ${!completed && priority ? `<span class="todos-panel-priority todos-priority-${priority}">${priority}</span>` : ''}
+                    </div>`;
+                }).join('')}
+                ${(l.items || []).length > 50 ? `<div class="todos-panel-more">+${(l.items || []).length - 50} more…</div>` : ''}
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+function _updateTodosBadge(lists) {
+    const badge = document.getElementById('todos-badge');
+    if (!badge) return;
+    const totalPending = lists.reduce((s, l) => s + ((l.stats && l.stats.pending) || 0), 0);
+    if (totalPending > 0) {
+        badge.textContent = totalPending > 99 ? '99+' : String(totalPending);
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
 function switchSkillsTab(tab) {
     document.querySelectorAll('.skills-tab').forEach(el => el.classList.remove('active'));
     document.getElementById('skills-tab-' + tab).classList.add('active');
@@ -9354,6 +9611,13 @@ function _renderTodoListCard(container, data) {
     body.appendChild(list);
 
     container.appendChild(body);
+
+    // Best-effort: refresh the todos right-bar panel so it stays in sync with
+    // agent-driven mutations. Only fires if the panel has been opened at least
+    // once (so we don't poll the endpoint on every page load).
+    if (typeof _todosPanelState !== 'undefined' && _todosPanelState.loaded) {
+        setTimeout(refreshTodosPanel, 200);
+    }
 }
 
 // =====================================================================
@@ -9460,6 +9724,300 @@ function _renderCounterfactualCard(container, data) {
     container.appendChild(body);
 }
 
+// =====================================================================
+// Custom Card — AI creates its own arbitrary card layout.
+// Supported `layout` values: "chart" | "bars" | "grid" | "planning" |
+// "tracking" | "stats" | "table" | "custom". The renderer inspects the
+// fields and picks the best sub-renderer, so the AI can ship any shape
+// of card without us predefining every type.
+// =====================================================================
+function _renderCustomCard(container, data) {
+    const body = document.createElement('div');
+    body.className = 'onyx-card-body';
+
+    const layout = (data.layout || data.type || 'custom').toLowerCase();
+    const title = data.title || data.heading || '';
+    const subtitle = data.subtitle || data.description || '';
+
+    if (title) {
+        const h = document.createElement('div');
+        h.className = 'onyx-section-title';
+        h.textContent = title;
+        body.appendChild(h);
+    }
+    if (subtitle) {
+        const s = document.createElement('div');
+        s.className = 'onyx-todo-desc';
+        s.textContent = subtitle;
+        body.appendChild(s);
+    }
+
+    // ── Chart layout: line/area/donut/pie via simple inline SVG ──
+    if (layout === 'chart') {
+        body.appendChild(_buildCustomChart(data));
+    }
+    // ── Bars layout: horizontal bar chart from `items: [{label, value, max?}]` ──
+    else if (layout === 'bars') {
+        body.appendChild(_buildCustomBars(data));
+    }
+    // ── Planning layout: phases with progress + items ──
+    else if (layout === 'planning') {
+        body.appendChild(_buildCustomPlanning(data));
+    }
+    // ── Tracking layout: metrics with trends ──
+    else if (layout === 'tracking') {
+        body.appendChild(_buildCustomTracking(data));
+    }
+    // ── Stats layout: KPI grid ──
+    else if (layout === 'stats' || layout === 'stat-cards') {
+        body.appendChild(_buildCustomStats(data));
+    }
+    // ── Table layout ──
+    else if (layout === 'table') {
+        body.appendChild(_buildCustomTable(data));
+    }
+    // ── Grid layout: generic card grid ──
+    else if (layout === 'grid') {
+        body.appendChild(_buildCustomGrid(data));
+    }
+    // ── Custom / unknown: render any provided fields dynamically ──
+    else {
+        body.appendChild(_buildCustomFreeform(data));
+    }
+
+    // Optional footer / CTA
+    if (data.footer) {
+        const f = document.createElement('div');
+        f.className = 'onyx-todo-desc';
+        f.style.marginTop = '10px';
+        f.textContent = data.footer;
+        body.appendChild(f);
+    }
+
+    container.appendChild(body);
+}
+
+// ── Custom chart sub-renderer (line/area/donut/pie) ──
+function _buildCustomChart(data) {
+    const wrap = document.createElement('div');
+    wrap.className = 'onyx-custom-chart';
+    const kind = (data.kind || data.chart_type || 'line').toLowerCase();
+    const series = Array.isArray(data.series) ? data.series : (Array.isArray(data.values) ? data.values : []);
+    const labels = Array.isArray(data.labels) ? data.labels : [];
+
+    if (kind === 'donut' || kind === 'pie') {
+        // Donut/pie from {label, value, color?} items
+        const items = Array.isArray(data.items) ? data.items : series.map((v, i) => ({
+            label: labels[i] || `#${i+1}`, value: typeof v === 'number' ? v : (v.value || 0),
+        }));
+        const total = items.reduce((s, x) => s + (Number(x.value) || 0), 0) || 1;
+        const radius = 50, circumference = 2 * Math.PI * radius;
+        let offset = 0;
+        const colors = ['#f43f5e', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#10b981'];
+        const svgParts = items.map((it, i) => {
+            const pct = (Number(it.value) || 0) / total;
+            const dash = pct * circumference;
+            const color = it.color || colors[i % colors.length];
+            const seg = `<circle r="${radius}" cx="60" cy="60" fill="none" stroke="${color}" stroke-width="16" stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 60 60)"/>`;
+            offset += dash;
+            return seg;
+        }).join('');
+        wrap.innerHTML = `
+            <div class="onyx-chart-row">
+                <svg viewBox="0 0 120 120" width="140" height="140">${svgParts}<text x="60" y="60" text-anchor="middle" dominant-baseline="middle" font-size="14" font-weight="700" fill="currentColor">${total}</text></svg>
+                <div class="onyx-chart-legend">
+                    ${items.map((it, i) => `<div class="onyx-chart-legend-item"><span class="onyx-chart-dot" style="background:${it.color || colors[i % colors.length]}"></span>${_onyxEscHtml(it.label || '')} <span class="onyx-chart-val">${Number(it.value) || 0}</span></div>`).join('')}
+                </div>
+            </div>`;
+        return wrap;
+    }
+
+    // Default: line/area chart from numeric series
+    if (!series.length) {
+        wrap.innerHTML = `<div class="onyx-empty-hint">No chart data provided.</div>`;
+        return wrap;
+    }
+    const nums = series.map(v => typeof v === 'number' ? v : (v && v.value !== undefined ? Number(v.value) : 0));
+    const max = Math.max(...nums, 1);
+    const min = Math.min(...nums, 0);
+    const range = max - min || 1;
+    const w = 280, h = 100, pad = 8;
+    const pts = nums.map((v, i) => {
+        const x = pad + (i / Math.max(nums.length - 1, 1)) * (w - 2 * pad);
+        const y = h - pad - ((v - min) / range) * (h - 2 * pad);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    const stroke = data.color || '#f43f5e';
+    const fill = data.fill || `${stroke}33`;
+    const pathLine = `M ${pts.join(' L ')}`;
+    const pathArea = `${pathLine} L ${w - pad},${h - pad} L ${pad},${h - pad} Z`;
+    wrap.innerHTML = `
+        <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none">
+            <path d="${pathArea}" fill="${fill}" stroke="none"/>
+            <path d="${pathLine}" fill="none" stroke="${stroke}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+            ${pts.map(p => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="2.5" fill="${stroke}"/>`).join('')}
+        </svg>
+        ${labels.length ? `<div class="onyx-chart-xlabels">${labels.map(l => `<span>${_onyxEscHtml(l)}</span>`).join('')}</div>` : ''}
+    `;
+    return wrap;
+}
+
+// ── Custom bars sub-renderer ──
+function _buildCustomBars(data) {
+    const wrap = document.createElement('div');
+    wrap.className = 'onyx-custom-bars';
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (!items.length) {
+        wrap.innerHTML = `<div class="onyx-empty-hint">No bars provided.</div>`;
+        return wrap;
+    }
+    const max = Math.max(...items.map(it => Number(it.value || it.count || 0)), 1);
+    const colors = ['#f43f5e', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4'];
+    wrap.innerHTML = items.map((it, i) => {
+        const v = Number(it.value || it.count || 0);
+        const pct = (v / max) * 100;
+        const color = it.color || colors[i % colors.length];
+        return `<div class="onyx-bar-row">
+            <span class="onyx-bar-label">${_onyxEscHtml(it.label || it.name || '')}</span>
+            <div class="onyx-bar-track"><div class="onyx-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+            <span class="onyx-bar-val">${v}</span>
+        </div>`;
+    }).join('');
+    return wrap;
+}
+
+// ── Custom planning sub-renderer ──
+function _buildCustomPlanning(data) {
+    const wrap = document.createElement('div');
+    wrap.className = 'onyx-custom-planning';
+    const phases = Array.isArray(data.phases) ? data.phases : (Array.isArray(data.items) ? data.items : []);
+    if (!phases.length) {
+        wrap.innerHTML = `<div class="onyx-empty-hint">No phases provided.</div>`;
+        return wrap;
+    }
+    wrap.innerHTML = phases.map((p, i) => {
+        const progress = Math.min(100, Math.max(0, Number(p.progress || 0)));
+        const status = p.status || (progress >= 100 ? 'done' : progress > 0 ? 'in-progress' : 'pending');
+        const items = Array.isArray(p.items) ? p.items : [];
+        return `<div class="onyx-plan-phase">
+            <div class="onyx-plan-head">
+                <span class="onyx-plan-num">${i + 1}</span>
+                <span class="onyx-plan-title">${_onyxEscHtml(p.title || p.name || '')}</span>
+                <span class="onyx-plan-status onyx-plan-status-${status}">${status}</span>
+            </div>
+            ${p.description ? `<div class="onyx-todo-desc">${_onyxEscHtml(p.description)}</div>` : ''}
+            <div class="onyx-todo-progress-bar"><div class="onyx-todo-progress-fill" style="width:${progress}%"></div></div>
+            ${items.length ? `<div class="onyx-plan-items">${items.map(it => `<div class="onyx-plan-item">${_onyxEscHtml(typeof it === 'string' ? it : (it.title || it.text || ''))}</div>`).join('')}</div>` : ''}
+        </div>`;
+    }).join('');
+    return wrap;
+}
+
+// ── Custom tracking sub-renderer ──
+function _buildCustomTracking(data) {
+    const wrap = document.createElement('div');
+    wrap.className = 'onyx-custom-tracking';
+    const metrics = Array.isArray(data.metrics) ? data.metrics : (Array.isArray(data.items) ? data.items : []);
+    if (!metrics.length) {
+        wrap.innerHTML = `<div class="onyx-empty-hint">No metrics provided.</div>`;
+        return wrap;
+    }
+    wrap.innerHTML = metrics.map(m => {
+        const value = m.value !== undefined ? m.value : '—';
+        const trend = m.trend || m.delta || '';
+        const isUp = String(trend).startsWith('+') || String(trend).startsWith('↑');
+        const isDown = String(trend).startsWith('-') || String(trend).startsWith('↓');
+        const trendClass = isUp ? 'up' : (isDown ? 'down' : '');
+        return `<div class="onyx-track-metric">
+            <div class="onyx-track-value">${_onyxEscHtml(String(value))}</div>
+            <div class="onyx-track-label">${_onyxEscHtml(m.label || m.name || '')}</div>
+            ${trend ? `<div class="onyx-track-trend ${trendClass}">${_onyxEscHtml(String(trend))}</div>` : ''}
+        </div>`;
+    }).join('');
+    return wrap;
+}
+
+// ── Custom stats sub-renderer ──
+function _buildCustomStats(data) {
+    const wrap = document.createElement('div');
+    wrap.className = 'onyx-stat-grid';
+    const stats = Array.isArray(data.stats) ? data.stats : (Array.isArray(data.items) ? data.items : []);
+    if (!stats.length) {
+        wrap.innerHTML = `<div class="onyx-empty-hint">No stats provided.</div>`;
+        return wrap;
+    }
+    wrap.innerHTML = stats.map(s => `<div class="onyx-stat-card">
+        <div class="onyx-stat-value">${_onyxEscHtml(String(s.value !== undefined ? s.value : '—'))}</div>
+        <div class="onyx-stat-label">${_onyxEscHtml(s.label || s.name || '')}</div>
+    </div>`).join('');
+    return wrap;
+}
+
+// ── Custom table sub-renderer ──
+function _buildCustomTable(data) {
+    const wrap = document.createElement('div');
+    wrap.className = 'onyx-custom-table-wrap';
+    const columns = Array.isArray(data.columns) ? data.columns : [];
+    const rows = Array.isArray(data.rows) ? data.rows : (Array.isArray(data.items) ? data.items : []);
+    if (!columns.length || !rows.length) {
+        wrap.innerHTML = `<div class="onyx-empty-hint">Table needs columns and rows.</div>`;
+        return wrap;
+    }
+    wrap.innerHTML = `<table class="onyx-custom-table">
+        <thead><tr>${columns.map(c => `<th>${_onyxEscHtml(typeof c === 'string' ? c : (c.label || c.key || ''))}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(r => `<tr>${columns.map(c => {
+            const key = typeof c === 'string' ? c : (c.key || c.label || '');
+            const val = (typeof r === 'object' && r) ? r[key] : '';
+            return `<td>${_onyxEscHtml(String(val ?? ''))}</td>`;
+        }).join('')}</tr>`).join('')}</tbody>
+    </table>`;
+    return wrap;
+}
+
+// ── Custom grid sub-renderer ──
+function _buildCustomGrid(data) {
+    const wrap = document.createElement('div');
+    wrap.className = 'onyx-service-grid';
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (!items.length) {
+        wrap.innerHTML = `<div class="onyx-empty-hint">No items provided.</div>`;
+        return wrap;
+    }
+    wrap.innerHTML = items.map((it, i) => {
+        const color = _onyxColorClass(i);
+        const icon = _onyxResolveIcon(it.icon || it.emoji || '');
+        const title = it.title || it.name || it.label || '';
+        const desc = it.description || it.desc || it.value || '';
+        return `<div class="onyx-service-card">
+            ${icon ? `<div class="onyx-svc-icon onyx-bg-${color}">${icon}</div>` : ''}
+            ${title ? `<div class="onyx-svc-title">${_onyxEscHtml(String(title))}</div>` : ''}
+            ${desc ? `<div class="onyx-svc-desc">${_onyxEscHtml(String(desc))}</div>` : ''}
+        </div>`;
+    }).join('');
+    return wrap;
+}
+
+// ── Custom freeform sub-renderer: render whatever fields the AI provided ──
+function _buildCustomFreeform(data) {
+    const wrap = document.createElement('div');
+    wrap.className = 'onyx-custom-freeform';
+    const skipKeys = new Set(['component', 'layout', 'type', 'title', 'heading', 'subtitle', 'description', 'footer']);
+    const entries = Object.entries(data).filter(([k]) => !skipKeys.has(k));
+    if (!entries.length) {
+        wrap.innerHTML = `<div class="onyx-empty-hint">Empty custom card.</div>`;
+        return wrap;
+    }
+    wrap.innerHTML = entries.map(([k, v]) => {
+        let valHtml;
+        if (v === null || v === undefined) valHtml = '<span class="onyx-empty-hint">—</span>';
+        else if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') valHtml = _onyxEscHtml(String(v));
+        else if (Array.isArray(v)) valHtml = `<div class="onyx-chips">${v.map((x, i) => `<span class="onyx-chip onyx-bg-${_onyxColorClass(i)}" style="color:#fff">${_onyxEscHtml(String(typeof x === 'object' ? JSON.stringify(x) : x))}</span>`).join('')}</div>`;
+        else valHtml = `<pre class="onyx-thinking-pre">${_onyxEscHtml(JSON.stringify(v, null, 2))}</pre>`;
+        return `<div class="onyx-free-row"><span class="onyx-free-key">${_onyxEscHtml(k.replace(/_/g, ' '))}</span><span class="onyx-free-val">${valHtml}</span></div>`;
+    }).join('');
+    return wrap;
+}
+
 // ── Unlimited Component Registry ──
 // Anyone can register new component types: ONYX_CARD_RENDERERS['my-type'] = fn(container, data)
 window.ONYX_CARD_RENDERERS = {};
@@ -9499,6 +10057,10 @@ ONYX_CARD_RENDERERS['todo-list'] = _renderTodoListCard;
 ONYX_CARD_RENDERERS['todo-index'] = _renderTodoListCard;
 ONYX_CARD_RENDERERS['counterfactual'] = _renderCounterfactualCard;
 ONYX_CARD_RENDERERS['counterfactual-index'] = _renderCounterfactualCard;
+
+// New: Custom card — AI creates any layout (chart/bars/planning/tracking/stats/table/grid/freeform)
+ONYX_CARD_RENDERERS['custom-card'] = _renderCustomCard;
+ONYX_CARD_RENDERERS['custom'] = _renderCustomCard;
 
 // ── Interactive Q&A Card ──
 // Renders a card with questions, 4 selectable options + custom answer

@@ -1143,6 +1143,7 @@ class WebChannel(ChatChannel):
             '/api/skills/marketplace/search', 'SkillMarketplaceSearchHandler',
             '/api/skills/marketplace/detail', 'SkillMarketplaceDetailHandler',
             '/api/skills/marketplace/install', 'SkillMarketplaceInstallHandler',
+            '/api/todos', 'TodosHandler',
             '/api/memory', 'MemoryHandler',
             '/api/memory/content', 'MemoryContentHandler',
             '/api/knowledge/list', 'KnowledgeListHandler',
@@ -4590,6 +4591,91 @@ class SkillMarketplaceInstallHandler:
         except Exception as e:
             logger.error(f"[WebChannel] Marketplace install error: {e}")
             return json.dumps({"status": "error", "message": str(e)})
+
+
+# =====================================================================
+# Todos — exposes the TodoTool's JSON store so the right sidebar can
+# render all todo lists with colorful UI and live updates.
+# =====================================================================
+
+class TodosHandler:
+    """GET /api/todos — return all todo lists with their items + stats.
+
+    Reads directly from the TodoTool's JSON store under
+    <workspace>/todos/_index.json and <workspace>/todos/<list_id>.json
+    so it stays in sync with whatever the agent writes via the tool.
+    """
+
+    def GET(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            import json as _json
+            workspace_root = _get_workspace_root()
+            todos_dir = os.path.join(workspace_root, "todos")
+            index_path = os.path.join(todos_dir, "_index.json")
+
+            # Read the index for fast list metadata.
+            index = {}
+            if os.path.exists(index_path):
+                try:
+                    with open(index_path, "r", encoding="utf-8") as f:
+                        index = _json.load(f) or {}
+                except Exception:
+                    index = {}
+
+            # If we have an index, augment each entry with the full item list.
+            lists = []
+            if index:
+                for list_id, meta in index.items():
+                    list_path = os.path.join(todos_dir, f"{list_id}.json")
+                    items = []
+                    if os.path.exists(list_path):
+                        try:
+                            with open(list_path, "r", encoding="utf-8") as f:
+                                data = _json.load(f) or {}
+                            items = data.get("items", []) or []
+                        except Exception:
+                            pass
+                    total = len(items)
+                    done = sum(1 for it in items if it.get("completed"))
+                    lists.append({
+                        "id": list_id,
+                        "title": meta.get("title", list_id),
+                        "description": meta.get("description", ""),
+                        "items": items,
+                        "stats": {"total": total, "done": done, "pending": total - done},
+                        "updated_at": meta.get("updated_at"),
+                    })
+            else:
+                # No index — scan the directory for *.json files (excluding _index.json).
+                if os.path.isdir(todos_dir):
+                    for name in sorted(os.listdir(todos_dir)):
+                        if not name.endswith(".json") or name.startswith("_"):
+                            continue
+                        list_path = os.path.join(todos_dir, name)
+                        try:
+                            with open(list_path, "r", encoding="utf-8") as f:
+                                data = _json.load(f) or {}
+                            items = data.get("items", []) or []
+                            total = len(items)
+                            done = sum(1 for it in items if it.get("completed"))
+                            lists.append({
+                                "id": data.get("id", name[:-5]),
+                                "title": data.get("title", name[:-5]),
+                                "description": data.get("description", ""),
+                                "items": items,
+                                "stats": {"total": total, "done": done, "pending": total - done},
+                                "updated_at": data.get("updated_at"),
+                            })
+                        except Exception:
+                            continue
+
+            return json.dumps({"status": "success", "lists": lists, "count": len(lists)},
+                              ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Todos API error: {e}")
+            return json.dumps({"status": "error", "message": str(e), "lists": []})
 
 
 class MemoryHandler:

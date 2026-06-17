@@ -264,6 +264,33 @@
         <div id="session-panel-overlay" class="session-panel-overlay hidden" onclick="closeSessionPanel()"></div>
 
         <!-- ================================================================ -->
+        <!-- TODOS PANEL (right sidebar — colorful todo lists from /api/todos) -->
+        <!-- ================================================================ -->
+        <aside id="todos-panel" class="todos-panel hidden">
+            <div class="todos-panel-header">
+                <span class="todos-panel-title">
+                    <i class="fas fa-list-check mr-1.5 text-primary-500"></i>
+                    <span>Todo Lists</span>
+                </span>
+                <div class="flex items-center gap-2">
+                    <button class="todos-panel-refresh" onclick="refreshTodosPanel()" title="Refresh">
+                        <i class="fas fa-rotate-right"></i>
+                    </button>
+                    <button class="todos-panel-close" onclick="toggleTodosPanel()" title="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="todos-panel-list" class="todos-panel-list">
+                <div class="todos-panel-empty">
+                    <i class="fas fa-spinner fa-spin mb-2"></i><br>
+                    Loading todos…
+                </div>
+            </div>
+        </aside>
+        <div id="todos-panel-overlay" class="session-panel-overlay hidden" onclick="closeTodosPanel()"></div>
+
+        <!-- ================================================================ -->
         <!-- MAIN CONTENT                                                     -->
         <!-- ================================================================ -->
         <div id="main-content" class="flex-1 flex flex-col min-w-0 h-dvh">
@@ -279,6 +306,13 @@
                 <button id="session-toggle-btn" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer transition-colors duration-150"
                         onclick="toggleSessionPanel()" title="Chat history">
                     <i class="fas fa-clock-rotate-left text-slate-500 dark:text-slate-400"></i>
+                </button>
+
+                <!-- Todos panel toggle (opens todos right sidebar) -->
+                <button id="todos-toggle-btn" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer transition-colors duration-150 relative"
+                        onclick="toggleTodosPanel()" title="Todo lists">
+                    <i class="fas fa-list-check text-slate-500 dark:text-slate-400"></i>
+                    <span id="todos-badge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center">0</span>
                 </button>
 
                 <!-- Breadcrumb (hidden on mobile) -->
