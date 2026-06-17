@@ -1,26 +1,34 @@
 """
-Sub-agent runner — makes a real streaming LLM call with a sub-agent's
-system prompt, using the same OpenAI-compatible API config as the
-orchestrator (open_ai_api_key + open_ai_api_base + model from config.json).
+Sub-agent runner — runs a sub-agent with REAL tool access using the same
+Agent infrastructure as the orchestrator.
+
+The sub-agent:
+  - Uses the same LLM model + API config as the orchestrator
+  - Gets ALL tools EXCEPT the orchestration tool (so it can't recursively
+    spawn sub-agents or modify the agent swarm)
+  - Has its own system prompt (defined when the orchestrator created it)
+  - Streams its response back via on_event callbacks
+  - Tool calls are executed for real (web_search, bash, read, write, etc.)
+    so the sub-agent can actually DO things, not just talk about doing them
 
 The runner exposes a single function: stream_sub_agent_response().
 
-It yields SSE-style event dicts that the web channel can forward directly
-to the browser:
+It yields SSE-style event dicts that the web channel forwards to the browser:
 
     {"type": "agent_start",  "agent_id": "...", "agent_name": "...", "svg_logo": "..."}
-    {"type": "delta",        "content": "..."}
+    {"type": "delta",        "content": "..."}        # streamed text tokens
+    {"type": "tool_start",   "tool": "...", "args": {...}}
+    {"type": "tool_end",     "tool": "...", "status": "success|error", "result": ...}
     {"type": "agent_end"}
     {"type": "error",        "message": "..."}
 
-This is intentionally self-contained — it does NOT depend on the agent
-bridge / bot factory, so it can't break the main orchestrator. It reads
-the workspace's agent JSON file to get the system_prompt, then makes a
-direct streaming HTTP call to the configured OpenAI-compatible endpoint.
+This replaces the old plain-LLM-call runner that couldn't execute tools,
+which caused sub-agents to emit raw <tool_call> tags as text.
 """
 
 import json
 import os
+import threading
 from typing import Any, Dict, Iterator, Optional
 
 from common.log import logger
@@ -48,16 +56,13 @@ def _get_api_config() -> Dict[str, str]:
     """Pull the OpenAI-compatible API config from the running config.
 
     Resolution order (first non-empty key wins):
-      1. CUSTOM PROVIDER mode (bot_type='custom' or 'custom:<id>'):
-         - Multi-provider: looks up the provider by id in `custom_providers`
-           and returns its api_key + api_base + model + custom_headers.
-         - Legacy: reads flat `custom_api_key` / `custom_api_base` / `model`.
-      2. MODEL-SPECIFIC mode: maps the configured `model` prefix to the
-         matching `*_api_key` / `*_api_base` pair (deepseek_api_key,
-         claude_api_key, gemini_api_key, qwen/dashscope, glm/zhipu,
-         moonshot, doubao/ark, minimax, ernie/qianfan).
-      3. Fallback: `open_ai_api_key` + `open_ai_api_base`.
-      4. Last-resort: scan all `*_api_key` fields for any non-empty value.
+      1. CUSTOM PROVIDER mode (bot_type='custom' or 'custom:<id>').
+      2. MODEL-SPECIFIC mode (deepseek_api_key, claude_api_key, etc.).
+      3. Fallback: open_ai_api_key + open_ai_api_base.
+      4. Last-resort: scan all *_api_key fields.
+    Returns dict with: api_key, api_base, model, headers, bot_type.
+    Used only for the "no API key" error message — the actual LLM calls
+    go through the orchestrator's bridge/bot infrastructure.
     """
     try:
         from config import conf
@@ -65,37 +70,21 @@ def _get_api_config() -> Dict[str, str]:
         model = (cfg.get("model") or "").lower()
         bot_type = (cfg.get("bot_type") or "").lower()
 
-        # ── 1. CUSTOM PROVIDER MODE ──
+        # Tier 1: Custom provider mode
         if bot_type == "custom" or bot_type.startswith("custom:"):
-            # Try to use the existing custom_provider resolver for fidelity
-            # with how the orchestrator itself resolves credentials.
             try:
                 from models.custom_provider import resolve_custom_credentials
                 api_key, api_base, custom_model, custom_headers = resolve_custom_credentials()
                 if api_key:
-                    return {
-                        "api_key": api_key,
-                        "api_base": api_base or "https://api.openai.com/v1",
-                        "model": custom_model or cfg.get("model") or "gpt-3.5-turbo",
-                        "headers": custom_headers or {},
-                    }
-            except Exception as e:
-                logger.debug(f"[SubAgentRunner] custom_provider resolver failed, trying manual: {e}")
-
-            # Manual fallback for custom mode (legacy flat fields)
+                    return {"api_key": api_key, "api_base": api_base or "", "model": custom_model or cfg.get("model", ""), "headers": custom_headers or {}, "bot_type": bot_type}
+            except Exception:
+                pass
             api_key = cfg.get("custom_api_key", "") or ""
-            api_base = cfg.get("custom_api_base", "") or "https://api.openai.com/v1"
+            api_base = cfg.get("custom_api_base", "") or ""
             if api_key:
-                return {
-                    "api_key": api_key,
-                    "api_base": api_base,
-                    "model": cfg.get("model") or "gpt-3.5-turbo",
-                    "headers": {},
-                }
-            # If custom mode but no key yet, fall through to the scan below.
+                return {"api_key": api_key, "api_base": api_base, "model": cfg.get("model", ""), "headers": {}, "bot_type": bot_type}
 
-        # ── 2. MODEL-SPECIFIC MODE ──
-        # Map model prefix → (api_key_field, api_base_default)
+        # Tier 2: Model-specific
         MODEL_MAP = [
             ("deepseek",  ("deepseek_api_key",  "https://api.deepseek.com/v1")),
             ("claude",    ("claude_api_key",    "https://api.anthropic.com/v1")),
@@ -110,7 +99,6 @@ def _get_api_config() -> Dict[str, str]:
             ("ernie",     ("qianfan_api_key",   "https://qianfan.baidubce.com/v2")),
             ("qianfan",   ("qianfan_api_key",   "https://qianfan.baidubce.com/v2")),
         ]
-
         api_key = ""
         api_base = ""
         for prefix, (key_field, base_default) in MODEL_MAP:
@@ -119,31 +107,28 @@ def _get_api_config() -> Dict[str, str]:
                 api_base = cfg.get(f"{prefix}_api_base", "") or base_default
                 break
 
-        # ── 3. FALLBACK: open_ai_api_key ──
+        # Tier 3: open_ai_api_key
         if not api_key:
             api_key = cfg.get("open_ai_api_key", "") or ""
             api_base = api_base or cfg.get("open_ai_api_base", "") or "https://api.openai.com/v1"
 
-        # ── 4. LAST-RESORT: scan all *_api_key fields (incl. custom_api_key) ──
+        # Tier 4: scan all *_api_key fields
         if not api_key:
             try:
                 items = cfg.items() if hasattr(cfg, 'items') else []
                 for k, v in items:
                     if isinstance(k, str) and k.endswith("_api_key") and v:
                         api_key = v
-                        provider = k[:-8]  # strip "_api_key"
+                        provider = k[:-8]
                         api_base = cfg.get(f"{provider}_api_base", "") or api_base
                         break
             except Exception:
                 pass
 
-        if not api_base:
-            api_base = "https://api.openai.com/v1"
-
-        return {"api_key": api_key, "api_base": api_base, "model": cfg.get("model") or "gpt-3.5-turbo", "headers": {}, "bot_type": bot_type}
+        return {"api_key": api_key, "api_base": api_base, "model": cfg.get("model", ""), "headers": {}, "bot_type": bot_type}
     except Exception as e:
         logger.error(f"[SubAgentRunner] config load failed: {e}")
-        return {"api_key": "", "api_base": "https://api.openai.com/v1", "model": "gpt-3.5-turbo", "headers": {}, "bot_type": ""}
+        return {"api_key": "", "api_base": "", "model": "", "headers": {}, "bot_type": ""}
 
 
 def stream_sub_agent_response(
@@ -153,14 +138,18 @@ def stream_sub_agent_response(
 ) -> Iterator[Dict[str, Any]]:
     """Stream a sub-agent's response to a user message.
 
-    Yields event dicts (see module docstring). The caller (web channel)
-    converts these to SSE bytes and flushes them to the browser.
+    Creates a REAL Agent instance (using the same bridge/bot infrastructure
+    as the orchestrator) with the sub-agent's system prompt and ALL tools
+    EXCEPT the orchestration tool. The agent can execute tool calls for real
+    (web_search, bash, read, write, etc.) and streams its response back.
+
+    Yields event dicts (see module docstring).
     """
-    agent = _load_agent(workspace, agent_id)
-    if agent is None:
+    agent_data = _load_agent(workspace, agent_id)
+    if agent_data is None:
         yield {"type": "error", "message": f"Agent '{agent_id}' not found"}
         return
-    if not agent.get("enabled", True):
+    if not agent_data.get("enabled", True):
         yield {"type": "error", "message": f"Agent '{agent_id}' is disabled"}
         return
 
@@ -169,17 +158,16 @@ def stream_sub_agent_response(
     yield {
         "type": "agent_start",
         "agent_id": agent_id,
-        "agent_name": agent.get("name", agent_id),
-        "agent_role": agent.get("role", ""),
-        "svg_logo": agent.get("svg_logo", ""),
+        "agent_name": agent_data.get("name", agent_id),
+        "agent_role": agent_data.get("role", ""),
+        "svg_logo": agent_data.get("svg_logo", ""),
     }
 
+    # Check API config — if no key, emit a helpful error and stop.
     api_cfg = _get_api_config()
     if not api_cfg["api_key"]:
-        # Provide a more actionable error message that lists all the places
-        # the user might have configured a key.
         yield {"type": "delta", "content":
-               f"⚠ Sub-agent '{agent.get('name', agent_id)}' cannot run — "
+               f"⚠ Sub-agent '{agent_data.get('name', agent_id)}' cannot run — "
                f"no API key found in config.\n\n"
                f"Configured bot_type: `{api_cfg.get('bot_type', '(none)')}`\n"
                f"Configured model: `{api_cfg.get('model', '(none)')}`\n\n"
@@ -196,88 +184,169 @@ def stream_sub_agent_response(
         yield {"type": "agent_end"}
         return
 
-    system_prompt = agent.get("system_prompt", "").strip()
+    system_prompt = agent_data.get("system_prompt", "").strip()
     if not system_prompt:
-        system_prompt = f"You are {agent.get('name', agent_id)}. Help the user."
+        system_prompt = f"You are {agent_data.get('name', agent_id)}. Help the user."
 
+    # ── Run the sub-agent with REAL tool access ──
+    # We use the orchestrator's bridge to create an Agent instance with the
+    # sub-agent's system prompt. The agent gets ALL tools EXCEPT orchestration
+    # (so it can't recursively spawn sub-agents or modify the swarm).
     try:
-        yield from _stream_openai_compatible(
-            api_cfg, system_prompt, user_message, agent_id
+        yield from _run_subagent_with_tools(
+            agent_id, agent_data, system_prompt, user_message, workspace
         )
     except Exception as e:
-        logger.error(f"[SubAgentRunner] streaming failed: {e}")
-        yield {"type": "delta", "content": f"\n\n⚠ Streaming error: {e}"}
+        logger.error(f"[SubAgentRunner] sub-agent execution failed: {e}", exc_info=True)
+        yield {"type": "delta", "content": f"\n\n⚠ Sub-agent execution error: {e}"}
     finally:
         yield {"type": "agent_end"}
 
 
-def _stream_openai_compatible(
-    api_cfg: Dict[str, str],
+def _run_subagent_with_tools(
+    agent_id: str,
+    agent_data: Dict[str, Any],
     system_prompt: str,
     user_message: str,
-    agent_id: str,
+    workspace: Optional[str],
 ) -> Iterator[Dict[str, Any]]:
-    """Make a streaming chat.completions request to an OpenAI-compatible API.
+    """Create a real Agent instance and run it with streaming + tool access.
 
-    Yields {"type": "delta", "content": "..."} for each token chunk.
-    Supports custom headers (e.g. from custom_providers[].custom_headers).
+    Uses the same Agent / AgentStreamExecutor / bridge infrastructure as the
+    orchestrator, but with:
+      - The sub-agent's system prompt
+      - ALL tools EXCEPT orchestration (filtered out by name)
+      - A fresh message history (sub-agents don't share the orchestrator's context)
+      - An on_event callback that translates agent events to our SSE event format
     """
-    import requests
+    # Lazy imports — these pull in the full agent stack which is heavy.
+    from agent.protocol import Agent
+    from bridge.agent_bridge import AgentLLMModel
+    from bridge.bridge import Bridge
+    from agent.tools import ToolManager
 
-    url = f"{api_cfg['api_base'].rstrip('/')}/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {api_cfg['api_key']}",
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream",
-    }
-    # Merge any custom headers from the API config (used by custom providers
-    # that require extra headers like X-API-Key, Helicone-Auth, etc.).
-    custom_headers = api_cfg.get("headers") or {}
-    if isinstance(custom_headers, dict):
-        for k, v in custom_headers.items():
-            if k and v is not None:
-                headers[str(k)] = str(v)
+    # Get the singleton Bridge instance (same one the orchestrator uses).
+    bridge = Bridge()
+    model = AgentLLMModel(bridge)
 
-    payload = {
-        "model": api_cfg["model"],
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
-        "stream": True,
-        "temperature": 0.7,
-    }
-
-    # Use stream=True so requests doesn't buffer the whole response.
-    resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=120)
-    if resp.status_code != 200:
-        # Try to extract error message
+    # Load all tools, then FILTER OUT the orchestration tool.
+    tool_manager = ToolManager()
+    tool_manager.load_tools()
+    tools = []
+    workspace_dir = _safe_workspace(workspace)
+    for tool_name in tool_manager.tool_classes.keys():
+        if tool_name == "orchestration":
+            # Sub-agents CANNOT use the orchestration tool — prevents
+            # recursive sub-agent spawning and swarm modification.
+            continue
         try:
-            err_body = resp.json()
-            err_msg = err_body.get("error", {}).get("message", resp.text[:300])
+            tool = tool_manager.create_tool(tool_name)
+            if tool:
+                if workspace_dir and hasattr(tool, 'cwd'):
+                    tool.cwd = workspace_dir
+                tools.append(tool)
+        except Exception as e:
+            logger.warning(f"[SubAgentRunner] Failed to load tool {tool_name}: {e}")
+
+    logger.info(f"[SubAgentRunner] Sub-agent '{agent_id}' loaded with {len(tools)} tools (orchestration excluded)")
+
+    # Create the Agent instance with the sub-agent's system prompt.
+    agent = Agent(
+        system_prompt=system_prompt,
+        description=f"Sub-agent: {agent_data.get('name', agent_id)}",
+        model=model,
+        tools=tools,
+        max_steps=15,
+        output_mode="logger",
+        workspace_dir=workspace_dir,
+        enable_skills=True,
+    )
+
+    # Queue to collect events from the agent's on_event callback.
+    # We use a queue so the generator can yield events as they arrive.
+    import queue
+    event_queue: "queue.Queue" = queue.Queue()
+    _SENTINEL = object()
+
+    def on_event(event: dict):
+        """Translate agent events to our SSE event format and enqueue them."""
+        try:
+            etype = event.get("type", "")
+            data = event.get("data", {}) or {}
+
+            if etype == "message_update":
+                # Streamed text delta
+                delta = data.get("delta", "")
+                if delta:
+                    event_queue.put({"type": "delta", "content": delta})
+
+            elif etype == "tool_execution_start":
+                event_queue.put({
+                    "type": "tool_start",
+                    "tool": data.get("tool", ""),
+                    "args": data.get("arguments", {}),
+                })
+
+            elif etype == "tool_execution_end":
+                result = data.get("result", "")
+                # Truncate very long tool results so they don't blow up the UI
+                if isinstance(result, str) and len(result) > 2000:
+                    result = result[:2000] + "\n... [truncated]"
+                event_queue.put({
+                    "type": "tool_end",
+                    "tool": data.get("tool", ""),
+                    "status": "success" if data.get("status") != "error" else "error",
+                    "result": result,
+                })
+
+            elif etype == "reasoning_update":
+                # Optionally stream reasoning — we skip it to keep the UI clean.
+                # The orchestrator shows reasoning in a collapsible block; sub-agents
+                # just show their final answer + tool calls.
+                pass
+
+            elif etype == "error":
+                event_queue.put({"type": "delta", "content": f"\n\n⚠ Error: {data.get('error', 'unknown')}"})
+
+            # We deliberately DON'T forward agent_start/agent_end/message_start/
+            # message_end/turn_start/turn_end — we emit our own agent_start at
+            # the top of stream_sub_agent_response() and our own agent_end in
+            # the finally block. The frontend only cares about deltas + tool calls.
+
+        except Exception as e:
+            logger.error(f"[SubAgentRunner] on_event error: {e}")
+
+    # Run the agent in a background thread (run_stream is blocking).
+    final_response_holder = {"text": ""}
+
+    def _run():
+        try:
+            result = agent.run_stream(
+                user_message,
+                on_event=on_event,
+                clear_history=True,  # sub-agents start fresh, no shared context
+            )
+            final_response_holder["text"] = result or ""
+        except Exception as e:
+            logger.error(f"[SubAgentRunner] run_stream failed: {e}", exc_info=True)
+            event_queue.put({"type": "delta", "content": f"\n\n⚠ Sub-agent execution failed: {e}"})
+        finally:
+            event_queue.put(_SENTINEL)
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+
+    # Yield events as they arrive from the agent thread.
+    while True:
+        try:
+            item = event_queue.get(timeout=300)  # 5-minute timeout
         except Exception:
-            err_msg = resp.text[:300]
-        yield {"type": "delta", "content":
-               f"⚠ API returned status {resp.status_code}: {err_msg}"}
-        return
+            # Timeout — agent took too long
+            yield {"type": "delta", "content": "\n\n⚠ Sub-agent timed out after 5 minutes."}
+            break
+        if item is _SENTINEL:
+            break
+        yield item
 
-    # Parse SSE: lines starting with "data: " contain JSON. "data: [DONE]" ends stream.
-    for raw_line in resp.iter_lines(decode_unicode=True):
-        if not raw_line:
-            continue
-        if not raw_line.startswith("data:"):
-            continue
-        data_str = raw_line[5:].strip()
-        if data_str == "[DONE]":
-            return
-        try:
-            chunk = json.loads(data_str)
-            choices = chunk.get("choices", [])
-            if choices:
-                delta = choices[0].get("delta", {})
-                content = delta.get("content", "")
-                if content:
-                    yield {"type": "delta", "content": content}
-        except (json.JSONDecodeError, IndexError, KeyError) as e:
-            logger.debug(f"[SubAgentRunner] skip malformed chunk: {e}")
-            continue
+    # Wait for the thread to fully finish (it may still be cleaning up).
+    thread.join(timeout=5)

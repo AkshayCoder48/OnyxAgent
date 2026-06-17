@@ -483,6 +483,38 @@ body, #app, #main-content {
 .msg-content {
     word-break: break-word;
     overflow-wrap: anywhere;
+    max-width: 100%;
+    min-width: 0;
+}
+/* CRITICAL: prevent any child element from overflowing the chat bubble.
+   Tables, code blocks, images, and SVGs all get constrained. */
+.msg-content > * {
+    max-width: 100%;
+}
+.msg-content pre,
+.msg-content table,
+.msg-content img,
+.msg-content svg,
+.msg-content video {
+    max-width: 100% !important;
+    overflow-x: auto;
+}
+.msg-content pre {
+    overflow-x: auto;
+    white-space: pre;
+}
+.msg-content table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.msg-content img {
+    max-width: 100%;
+    height: auto;
+}
+.msg-content code {
+    word-break: break-all;
+    overflow-wrap: anywhere;
 }
 .msg-content p { margin: 0.5em 0; line-height: 1.7; }
 .msg-content p:first-child { margin-top: 0; }
@@ -1695,6 +1727,33 @@ body, #app, #main-content {
 .user-message-group:hover .delete-msg-btn,
 .bot-message-group:hover .regenerate-msg-btn {
     opacity: 1;
+}
+/* Ensure the bot message content column never overflows the chat area.
+   The max-w-[85%] on the inner div can still let children push wider;
+   this forces the column to shrink and its children to wrap/scroll. */
+.bot-message-group > div {
+    min-width: 0;
+}
+.bot-message-group .msg-content {
+    overflow-x: auto;
+}
+
+/* Sub-agent tool-execution indicator (shown inside the bubble while a tool runs) */
+.subagent-tool-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin: 4px 0;
+    font-size: 11px;
+    color: #64748b;
+    background: rgba(148, 163, 184, 0.10);
+    border-radius: 6px;
+    animation: onyxCardAppear 0.15s var(--onyx-ease);
+}
+.dark .subagent-tool-indicator {
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.06);
 }
 
 /* Chat Avatars */

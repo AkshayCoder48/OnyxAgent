@@ -2373,39 +2373,62 @@ function _saveSubAgentMessage(agentMeta, content, userMessage) {
 }
 
 /**
- * Inspect an orchestration tool's `delegate` result. If it carries a
- * delegation task, automatically open a sub-agent stream so the sub-agent's
- * response appears as a NEW chat bubble. This lets the orchestrator invoke
- * sub-agents programmatically (via the orchestration tool) without the user
- * needing to @mention them.
+ * Queue a sub-agent delegation for LATER execution.
  *
- * The result can be either a JSON object or a JSON string (since tool
- * results are often serialized). We parse defensively.
+ * When the orchestrator calls the orchestration tool with action='delegate',
+ * we DON'T stream the sub-agent immediately — that would interleave the
+ * sub-agent's output with the orchestrator's ongoing stream, which is
+ * confusing. Instead, we queue the delegation and flush the queue when the
+ * orchestrator's stream ends (on the 'done' SSE event).
+ *
+ * The queue is a simple array of agent-meta dicts. _flushQueuedDelegations()
+ * processes them sequentially (one sub-agent at a time, not concurrently).
  */
-function _maybeAutoStreamSubAgent(result) {
+const _delegationQueue = [];
+
+function _queueSubAgentDelegation(result) {
     let payload = result;
     if (typeof result === 'string') {
         try { payload = JSON.parse(result); }
         catch (e) { return; }  // not JSON — not a delegation
     }
     if (!payload || typeof payload !== 'object') return;
-    // Only trigger for delegation results (component=agent-card + delegation field)
     if (payload.component !== 'agent-card' || !payload.delegation) return;
     const taskId = payload.delegation.task;
     const agentId = payload.id;
     if (!taskId || !agentId) return;
 
-    // Build the agent meta from the payload
     const agentMeta = {
         id: agentId,
         name: payload.name || agentId,
         role: payload.role || '',
         svg_logo: payload.svg_logo || '',
+        task: taskId,
     };
+    _delegationQueue.push(agentMeta);
+    console.log(`[sub-agent] Queued delegation to '${agentMeta.name}' (will fire after orchestrator finishes)`);
+}
 
-    // Add a small "delegating to..." notice, then stream the sub-agent's response.
-    // We DON'T add a user message here (the user didn't send one to the sub-agent —
-    // the orchestrator delegated). We pass the delegation task as the message.
+/**
+ * Flush the delegation queue — called when the orchestrator's stream ends.
+ * Processes delegations ONE AT A TIME (sequential, not concurrent) so the
+ * sub-agent bubbles appear in order and don't overwhelm the UI.
+ */
+function _flushQueuedDelegations() {
+    if (!_delegationQueue.length) return;
+    // Process the first delegation now; subsequent ones are processed when
+    // this one finishes (chained via the agent_end event).
+    const agentMeta = _delegationQueue.shift();
+    console.log(`[sub-agent] Flushing delegation to '${agentMeta.name}'`);
+    _streamDelegatedSubAgent(agentMeta);
+}
+
+/**
+ * Stream a delegated sub-agent's response into a NEW chat bubble.
+ * When this sub-agent finishes, it checks the queue for more delegations
+ * and processes the next one (sequential execution).
+ */
+function _streamDelegatedSubAgent(agentMeta) {
     const timestamp = new Date();
     const botEl = createBotMessageEl('', timestamp, 'subagent_delegate_' + Date.now(), null, agentMeta);
     messagesDiv.appendChild(botEl);
@@ -2416,7 +2439,7 @@ function _maybeAutoStreamSubAgent(result) {
     contentEl.innerHTML = '<span class="onyx-still-thinking"><span class="onyx-dot"></span><span class="onyx-dot"></span><span class="onyx-dot"></span></span>';
     contentEl._onyxLastDeltaTs = Date.now();
 
-    const url = `/api/agents/delegate?agent_id=${encodeURIComponent(agentId)}&message=${encodeURIComponent(taskId)}`;
+    const url = `/api/agents/delegate?agent_id=${encodeURIComponent(agentMeta.id)}&message=${encodeURIComponent(agentMeta.task)}`;
     const es = new EventSource(url);
     let accumulatedText = '';
 
@@ -2436,6 +2459,20 @@ function _maybeAutoStreamSubAgent(result) {
             contentEl.innerHTML = renderMarkdown(accumulatedText);
             _onyxTriggerTypewriterFade(contentEl);
             scrollChatToBottom();
+        } else if (event.type === 'tool_start') {
+            // Show a tool-execution indicator inside the bubble
+            const toolIndicator = document.createElement('div');
+            toolIndicator.className = 'subagent-tool-indicator';
+            toolIndicator.innerHTML = `<i class="fas fa-cog fa-spin text-xs"></i> ${_onyxEscHtml(event.tool || 'tool')}…`;
+            contentEl.appendChild(toolIndicator);
+            scrollChatToBottom();
+        } else if (event.type === 'tool_end') {
+            // Remove the last tool indicator and optionally show a result summary
+            const indicators = contentEl.querySelectorAll('.subagent-tool-indicator');
+            if (indicators.length) indicators[indicators.length - 1].remove();
+            // Re-render the accumulated text to preserve it
+            if (accumulatedText) contentEl.innerHTML = renderMarkdown(accumulatedText);
+            scrollChatToBottom();
         } else if (event.type === 'agent_end') {
             _onyxHideStillThinking(contentEl);
             contentEl.classList.remove('sse-streaming');
@@ -2445,17 +2482,18 @@ function _maybeAutoStreamSubAgent(result) {
             contentEl.dataset.rawMd = accumulatedText;
             es.close();
             scrollChatToBottom();
-            // Persist the delegated sub-agent response. No user_message since
-            // this was an orchestrator-initiated delegation, not a user mention.
+            // Persist the delegated sub-agent response
             _saveSubAgentMessage(agentMeta, accumulatedText, '');
+            // Process the next queued delegation (sequential execution)
+            _flushQueuedDelegations();
         } else if (event.type === 'error') {
             _onyxHideStillThinking(contentEl);
             contentEl.innerHTML = `<div class="text-red-500 text-sm">⚠ ${_onyxEscHtml(event.message || 'Sub-agent error')}</div>`;
             contentEl.classList.remove('sse-streaming');
             es.close();
-            if (accumulatedText) {
-                _saveSubAgentMessage(agentMeta, accumulatedText, '');
-            }
+            if (accumulatedText) _saveSubAgentMessage(agentMeta, accumulatedText, '');
+            // Still process the next delegation even if this one errored
+            _flushQueuedDelegations();
         }
     };
 
@@ -2468,9 +2506,9 @@ function _maybeAutoStreamSubAgent(result) {
             }
         }
         es.close();
-        if (accumulatedText) {
-            _saveSubAgentMessage(agentMeta, accumulatedText, '');
-        }
+        if (accumulatedText) _saveSubAgentMessage(agentMeta, accumulatedText, '');
+        // Process next delegation even on error
+        _flushQueuedDelegations();
     };
 }
 
@@ -2868,11 +2906,12 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                 // action='delegate', the tool returns a JSON payload like:
                 //   {component: 'agent-card', id, name, role, svg_logo,
                 //    delegation: {task, status, note}}
-                // We detect this and automatically open a sub-agent stream
-                // so the sub-agent's response appears as a NEW chat bubble,
-                // without the user needing to @mention it.
+                // We QUEUE the delegation and fire it AFTER the orchestrator
+                // finishes streaming (on the 'done' event). This prevents the
+                // sub-agent from streaming concurrently with the orchestrator,
+                // which would interleave their outputs confusingly.
                 if (toolName === 'orchestration' && !isError && result) {
-                    _maybeAutoStreamSubAgent(result);
+                    _queueSubAgentDelegation(result);
                 }
 
             } else if (item.type === 'image') {
@@ -2948,6 +2987,11 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                 done = true;
                 clearOwnerRequest();
                 resetSendBtnSendMode();
+
+                // Flush any queued sub-agent delegations. The orchestrator
+                // has finished streaming, so now it's safe to let sub-agents
+                // stream their responses without interleaving.
+                _flushQueuedDelegations();
 
                 const finalTextRaw = item.content || accumulatedText;
                 const finalText = localizeCancelMarker(finalTextRaw);
