@@ -95,6 +95,30 @@ def _require_auth():
                             json.dumps({"status": "error", "message": "Unauthorized"}))
 
 
+def _cors_origin():
+    """Return the CORS origin to use.
+
+    SECURITY: In production, restrict CORS to a configured origin instead of
+    using wildcard '*'. Falls back to '*' only when no origin is configured
+    (local dev mode). Set 'web_cors_origin' in config.json to lock this down.
+    """
+    try:
+        origin = conf().get("web_cors_origin", "").strip()
+        return origin if origin else "*"
+    except Exception:
+        return "*"
+
+
+def _set_cors_headers():
+    """Set standard CORS headers on the response using the configured origin."""
+    origin = _cors_origin()
+    web.header('Access-Control-Allow-Origin', origin)
+    if origin != "*":
+        web.header('Access-Control-Allow-Credentials', 'true')
+        web.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        web.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+
+
 # Localized text for /cancel system replies. Web is the only channel that
 # honors a per-request `lang`; other channels reply in Chinese by default.
 def _cancel_reply_text(cancelled: int, lang: str) -> str:
@@ -1145,6 +1169,7 @@ class WebChannel(ChatChannel):
             '/api/skills/marketplace/install', 'SkillMarketplaceInstallHandler',
             '/api/todos', 'TodosHandler',
             '/api/workflows', 'WorkflowsHandler',
+            '/api/security/audit', 'SecurityAuditHandler',
             '/api/memory', 'MemoryHandler',
             '/api/memory/content', 'MemoryContentHandler',
             '/api/knowledge/list', 'KnowledgeListHandler',
@@ -1466,7 +1491,7 @@ class OpenAIChatCompletionsHandler:
             web.header('Cache-Control', 'no-cache')
             web.header('Connection', 'keep-alive')
             web.header('X-Accel-Buffering', 'no')
-            web.header('Access-Control-Allow-Origin', '*')
+            _set_cors_headers()
 
             import time as _time
             created = int(_time.time())
@@ -1626,7 +1651,7 @@ class OpenAIChatCompletionsHandler:
 
     def OPTIONS(self):
         """Handle CORS preflight."""
-        web.header('Access-Control-Allow-Origin', '*')
+        _set_cors_headers()
         web.header('Access-Control-Allow-Methods', 'POST, OPTIONS')
         web.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         web.header('Content-Type', 'application/json; charset=utf-8')
@@ -1698,7 +1723,7 @@ class OpenAIModelsHandler:
 
     def OPTIONS(self):
         """Handle CORS preflight."""
-        web.header('Access-Control-Allow-Origin', '*')
+        _set_cors_headers()
         web.header('Access-Control-Allow-Methods', 'GET, OPTIONS')
         web.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         web.header('Content-Type', 'application/json; charset=utf-8')
@@ -1941,7 +1966,7 @@ class StreamHandler:
         web.header('Content-Type', 'text/event-stream; charset=utf-8')
         web.header('Cache-Control', 'no-cache')
         web.header('X-Accel-Buffering', 'no')
-        web.header('Access-Control-Allow-Origin', '*')
+        _set_cors_headers()
 
         return WebChannel().stream_response(request_id)
 
@@ -4754,6 +4779,33 @@ class WorkflowsHandler:
                                "workflows": []})
 
 
+# =====================================================================
+# Security audit — runs the SecurityAuditTool on the workspace and
+# returns the structured report for the sidebar view.
+# =====================================================================
+
+class SecurityAuditHandler:
+    """GET /api/security/audit — run a security scan and return the report."""
+
+    def GET(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            from agent.tools.security_audit.security_audit import SecurityAuditTool
+            workspace_root = _get_workspace_root()
+            tool = SecurityAuditTool(config={"workspace": workspace_root})
+            result = tool.execute({"action": "scan", "path": workspace_root})
+            if result.status == "success":
+                return json.dumps({"status": "success", "report": result.result},
+                                  ensure_ascii=False)
+            else:
+                return json.dumps({"status": "error", "message": result.result},
+                                  ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Security audit error: {e}")
+            return json.dumps({"status": "error", "message": str(e)})
+
+
 class MemoryHandler:
     def GET(self):
         _require_auth()
@@ -4944,7 +4996,7 @@ class HistoryHandler:
     def GET(self):
         _require_auth()
         web.header('Content-Type', 'application/json; charset=utf-8')
-        web.header('Access-Control-Allow-Origin', '*')
+        _set_cors_headers()
         try:
             params = web.input(session_id='', page='1', page_size='20')
             session_id = params.session_id.strip()
@@ -4968,7 +5020,7 @@ class MessageDeleteHandler:
     def POST(self):
         _require_auth()
         web.header('Content-Type', 'application/json; charset=utf-8')
-        web.header('Access-Control-Allow-Origin', '*')
+        _set_cors_headers()
         try:
             data = json.loads(web.data())
             session_id = data.get('session_id', '').strip()

@@ -167,6 +167,7 @@ const I18N = {
         skills_add_btn: 'Add Skill', skills_tab_my: 'My Skills', skills_tab_add: 'Add Skill',
         skills_tab_marketplace: 'Marketplace',
         menu_workflows: 'Workflows',
+        menu_security: 'Security',
         skills_method_create: 'Create', skills_method_create_desc: 'Write SKILL.md',
         skills_method_upload: 'Upload', skills_method_upload_desc: 'Upload .zip file',
         skills_method_url: 'From URL', skills_method_url_desc: 'GitHub / .zip link',
@@ -419,6 +420,7 @@ const VIEW_META = {
     models:   { group: 'nav_manage',  page: 'menu_models' },
     skills:   { group: 'nav_manage',  page: 'menu_skills' },
     workflows:{ group: 'nav_manage',  page: 'menu_workflows' },
+    security: { group: 'nav_manage',  page: 'menu_security' },
     memory:   { group: 'nav_manage',  page: 'menu_memory' },
     knowledge:{ group: 'nav_manage',  page: 'menu_knowledge' },
     files:    { group: 'nav_manage',  page: 'menu_files' },
@@ -446,6 +448,7 @@ function navigateTo(viewId) {
     if (window.innerWidth < 1024) closeSidebar();
     if (viewId === 'files') filesLoadDirectory();
     if (viewId === 'workflows') loadWorkflowsView();
+    if (viewId === 'security') { /* lazy — user clicks Run Scan */ }
 }
 
 function toggleSidebar() {
@@ -4609,6 +4612,97 @@ function showWorkflowDetail(wf) {
 function closeWorkflowDetail() {
     const dialog = document.getElementById('workflow-detail-dialog');
     if (dialog) dialog.classList.add('hidden');
+}
+
+// =====================================================================
+// Security audit view — runs a scan and shows the report
+// =====================================================================
+
+function runSecurityAudit() {
+    const loading = document.getElementById('security-loading');
+    const empty = document.getElementById('security-empty');
+    const summary = document.getElementById('security-summary');
+    const checks = document.getElementById('security-checks');
+    const checklist = document.getElementById('security-checklist');
+    if (loading) loading.classList.remove('hidden');
+    if (empty) empty.classList.add('hidden');
+    if (summary) summary.classList.add('hidden');
+    if (checks) checks.classList.add('hidden');
+    if (checklist) checklist.classList.add('hidden');
+
+    fetch('/api/security/audit')
+        .then(r => r.json())
+        .then(data => {
+            if (loading) loading.classList.add('hidden');
+            if (data.status !== 'success') {
+                if (empty) {
+                    empty.classList.remove('hidden');
+                    empty.innerHTML = `<div class="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-3"><i class="fas fa-circle-exclamation text-red-400 text-lg"></i></div><p class="text-red-500 font-medium">Scan failed</p><p class="text-sm text-slate-400 mt-1">${_onyxEscHtml(data.message || 'Unknown error')}</p>`;
+                }
+                return;
+            }
+            _renderSecurityReport(data.report);
+        })
+        .catch(err => {
+            if (loading) loading.classList.add('hidden');
+            if (empty) {
+                empty.classList.remove('hidden');
+                empty.innerHTML = `<div class="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-3"><i class="fas fa-circle-exclamation text-red-400 text-lg"></i></div><p class="text-red-500 font-medium">Network error</p><p class="text-sm text-slate-400 mt-1">${_onyxEscHtml(String(err))}</p>`;
+            }
+        });
+}
+
+function _renderSecurityReport(report) {
+    const summary = document.getElementById('security-summary');
+    const checks = document.getElementById('security-checks');
+    const checklist = document.getElementById('security-checklist');
+    if (!summary || !checks) return;
+
+    // Show summary
+    summary.classList.remove('hidden');
+    document.getElementById('security-critical-count').textContent = report.summary.critical;
+    document.getElementById('security-warning-count').textContent = report.summary.warnings;
+    document.getElementById('security-pass-count').textContent = report.summary.checks_passed;
+
+    // Render checks
+    checks.classList.remove('hidden');
+    checks.innerHTML = '';
+    (report.checks || []).forEach(c => {
+        const emoji = c.status === 'fail' ? '🔴' : (c.status === 'warning' ? '🟡' : '🟢');
+        const card = document.createElement('div');
+        card.className = `security-check-card security-status-${c.status}`;
+        const findingsHtml = (c.findings || []).slice(0, 5).map(f => `
+            <div class="security-finding">
+                <span class="security-finding-sev security-finding-${f.severity}">${f.severity}</span>
+                <span class="security-finding-file">${_onyxEscHtml(f.file)}:${f.line}</span>
+                <span class="security-finding-desc">${_onyxEscHtml(f.description)}</span>
+            </div>
+        `).join('');
+        const moreCount = (c.findings || []).length - 5;
+        card.innerHTML = `
+            <div class="security-check-head">
+                <span class="security-check-emoji">${emoji}</span>
+                <span class="security-check-name">${_onyxEscHtml(c.name)}</span>
+                <span class="security-check-badge">${c.critical > 0 ? c.critical + ' critical' : (c.warnings > 0 ? c.warnings + ' warn' : 'passed')}</span>
+            </div>
+            ${findingsHtml}
+            ${moreCount > 0 ? `<div class="security-finding-more">+ ${moreCount} more…</div>` : ''}
+        `;
+        checks.appendChild(card);
+    });
+
+    // Render pre-launch checklist
+    if (checklist && report.pre_launch_checklist) {
+        checklist.classList.remove('hidden');
+        const clItems = document.getElementById('security-checklist-items');
+        clItems.innerHTML = report.pre_launch_checklist.map(item => {
+            // Check if the corresponding check passed
+            const check = (report.checks || []).find(c => c.id === item.check);
+            const passed = check && check.status === 'pass';
+            const icon = passed ? '✅' : '⬜';
+            return `<div class="security-checklist-item"><span>${icon}</span> <span>${_onyxEscHtml(item.item)}</span></div>`;
+        }).join('');
+    }
 }
 
 function loadSkillsView() {

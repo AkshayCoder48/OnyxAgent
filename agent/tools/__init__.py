@@ -19,6 +19,9 @@ from agent.tools.counterfactual.counterfactual import CounterfactualTool
 # Import workflow tool (no external dependencies)
 from agent.tools.workflow.workflow import WorkflowTool
 
+# Import security audit tool (no external dependencies)
+from agent.tools.security_audit.security_audit import SecurityAuditTool
+
 # Import memory tools
 from agent.tools.memory.memory_search import MemorySearchTool
 from agent.tools.memory.memory_get import MemoryGetTool
@@ -148,6 +151,7 @@ __all__ = [
     'TodoTool',
     'CounterfactualTool',
     'WorkflowTool',
+    'SecurityAuditTool',
     'MemorySearchTool',
     'MemoryGetTool',
     'EvolutionUndoTool',

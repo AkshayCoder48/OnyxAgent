@@ -190,6 +190,11 @@
                             <span data-i18n="menu_workflows">Workflows</span>
                         </a>
                         <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="security">
+                            <i class="fas fa-shield-halved item-icon text-xs w-5 text-center"></i>
+                            <span data-i18n="menu_security">Security</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="memory">
                             <i class="fas fa-brain item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_memory">Memory</span>
@@ -1152,6 +1157,71 @@
                         <div id="workflow-detail-steps" class="space-y-3"></div>
                         <div class="mt-4 pt-4 border-t border-slate-200 dark:border-white/10 text-xs text-slate-400 dark:text-slate-500">
                             <span id="workflow-detail-meta"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Security                                          -->
+                <!-- ====================================================== -->
+                <div id="view-security" class="view">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Security Audit</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                        Scans your codebase for the top 10 security issues before launch.
+                                    </p>
+                                </div>
+                                <button onclick="runSecurityAudit()"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-primary-500 hover:bg-primary-600 transition-colors cursor-pointer">
+                                    <i class="fas fa-shield-halved text-[10px]"></i>
+                                    <span>Run Scan</span>
+                                </button>
+                            </div>
+
+                            <!-- Summary -->
+                            <div id="security-summary" class="hidden mb-6 grid grid-cols-3 gap-4">
+                                <div class="security-stat-card security-stat-critical">
+                                    <div class="security-stat-num" id="security-critical-count">0</div>
+                                    <div class="security-stat-label">Critical</div>
+                                </div>
+                                <div class="security-stat-card security-stat-warning">
+                                    <div class="security-stat-num" id="security-warning-count">0</div>
+                                    <div class="security-stat-label">Warnings</div>
+                                </div>
+                                <div class="security-stat-card security-stat-pass">
+                                    <div class="security-stat-num" id="security-pass-count">0</div>
+                                    <div class="security-stat-label">Checks Passed</div>
+                                </div>
+                            </div>
+
+                            <!-- Loading state -->
+                            <div id="security-loading" class="hidden flex flex-col items-center justify-center py-12">
+                                <i class="fas fa-spinner fa-spin text-2xl text-primary-400 mb-3"></i>
+                                <p class="text-sm text-slate-500">Scanning codebase…</p>
+                            </div>
+
+                            <!-- Empty state -->
+                            <div id="security-empty" class="flex flex-col items-center justify-center py-12">
+                                <div class="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mb-3">
+                                    <i class="fas fa-shield-halved text-emerald-400 text-lg"></i>
+                                </div>
+                                <p class="text-slate-500 dark:text-slate-400 font-medium">Click "Run Scan" to audit your code</p>
+                                <p class="text-sm text-slate-400 dark:text-slate-500 mt-1 text-center max-w-md">
+                                    Checks for exposed secrets, rate limiting, input validation, CORS, auth, and more.
+                                </p>
+                            </div>
+
+                            <!-- Check results -->
+                            <div id="security-checks" class="hidden space-y-3"></div>
+
+                            <!-- Pre-launch checklist -->
+                            <div id="security-checklist" class="hidden mt-8">
+                                <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">Pre-Launch Checklist</h3>
+                                <div id="security-checklist-items" class="space-y-2"></div>
+                            </div>
                         </div>
                     </div>
                 </div>

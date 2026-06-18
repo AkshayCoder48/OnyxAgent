@@ -34,6 +34,7 @@
   "wecom_bot_secret": "",
   "web_host": "",
   "web_password": "",
+  "web_cors_origin": "",
   "agent": true,
   "agent_max_context_tokens": 50000,
   "agent_max_context_turns": 20,

@@ -829,6 +829,10 @@ class ConversationStore:
 
                 placeholders = ",".join("?" * len(seqs_to_delete))
                 with conn:
+                    # SECURITY: This is NOT SQL injection — placeholders are
+                    # parameterized (?), and seqs_to_delete are passed as
+                    # bound parameters, not interpolated. The f-string only
+                    # generates the correct number of ? placeholders.
                     conn.execute(
                         f"DELETE FROM messages WHERE session_id = ? AND seq IN ({placeholders})",
                         (session_id, *seqs_to_delete),

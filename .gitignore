@@ -18,6 +18,13 @@ workspace
 config.yaml
 user_datas.pkl
 chatgpt_tool_hub/
+# Security: never commit environment files with secrets
+.env
+.env.local
+.env.production
+.env.*.local
+.env.example
+!.env.example
 plugins/**/
 !plugins/bdunit
 !plugins/dungeon
