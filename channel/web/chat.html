@@ -654,6 +654,35 @@
                             </div>
                             <div class="grid gap-6">
 
+                                <!-- Export / Import Card -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-4 sm:p-6">
+                                    <div class="flex items-center gap-3 mb-5">
+                                        <div class="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
+                                            <i class="fas fa-cloud-arrow-down text-emerald-500"></i>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <h3 class="text-base font-semibold text-slate-700 dark:text-slate-200">Backup & Restore</h3>
+                                            <p class="text-xs text-slate-400 dark:text-slate-500">Export all data or import from a backup ZIP</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-wrap gap-3">
+                                        <button onclick="exportAllData()"
+                                                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition-colors cursor-pointer flex-shrink-0">
+                                            <i class="fas fa-download text-xs"></i>
+                                            <span>Export All Data</span>
+                                        </button>
+                                        <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 transition-colors cursor-pointer flex-shrink-0">
+                                            <i class="fas fa-upload text-xs"></i>
+                                            <span>Import Backup</span>
+                                            <input type="file" accept=".zip" class="hidden" onchange="importAllData(event)">
+                                        </label>
+                                    </div>
+                                    <div id="import-status" class="hidden mt-3 text-sm"></div>
+                                    <p class="text-xs text-slate-400 dark:text-slate-500 mt-3">
+                                        Exports: chats, config (models + API keys), memory, knowledge, skills, workflows, todos, scheduled tasks, MCP config.
+                                    </p>
+                                </div>
+
                                 <!-- Model Config Card -->
                                 <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
                                     <div class="flex items-center gap-3 mb-5">

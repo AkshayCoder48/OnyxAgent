@@ -451,6 +451,60 @@ function navigateTo(viewId) {
     if (viewId === 'security') { /* lazy — user clicks Run Scan */ }
 }
 
+// =====================================================================
+// Export / Import — full data backup and restore
+// =====================================================================
+
+function exportAllData() {
+    window.location.href = '/api/export';
+}
+
+function importAllData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('import-status');
+    if (statusEl) {
+        statusEl.classList.remove('hidden');
+        statusEl.className = 'mt-3 text-sm text-amber-500';
+        statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Importing backup…';
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    fetch('/api/import', {
+        method: 'POST',
+        body: formData,
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (statusEl) {
+            if (data.status === 'success') {
+                const imp = data.imported;
+                const parts = [];
+                if (imp.config) parts.push('config');
+                if (imp.conversations) parts.push('chats');
+                if (imp.user_datas) parts.push('session data');
+                if (imp.workspace_files > 0) parts.push(imp.workspace_files + ' workspace files');
+                statusEl.className = 'mt-3 text-sm text-emerald-500';
+                statusEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i> Import successful! Restored: ' + parts.join(', ') + '.' +
+                    (data.error_count > 0 ? ' (' + data.error_count + ' errors)' : '') +
+                    '<br><span class="text-xs opacity-60">Refresh the page to see imported data.</span>';
+            } else {
+                statusEl.className = 'mt-3 text-sm text-red-500';
+                statusEl.innerHTML = '<i class="fas fa-times-circle mr-1"></i> Import failed: ' + (data.message || 'unknown error');
+            }
+        }
+    })
+    .catch(err => {
+        if (statusEl) {
+            statusEl.className = 'mt-3 text-sm text-red-500';
+            statusEl.innerHTML = '<i class="fas fa-times-circle mr-1"></i> Network error: ' + err;
+        }
+    });
+    event.target.value = '';
+}
+
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');

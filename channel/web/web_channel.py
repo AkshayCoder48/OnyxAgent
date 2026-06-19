@@ -1192,6 +1192,8 @@ class WebChannel(ChatChannel):
             '/api/files/mkdir', 'FilesMkdirHandler',
             '/api/files/download', 'FilesDownloadHandler',
             '/api/connection/status', 'ConnectionStatusHandler',
+            '/api/export', 'ExportHandler',
+            '/api/import', 'ImportHandler',
             '/v1/chat/completions', 'OpenAIChatCompletionsHandler',
             '/v1/models', 'OpenAIModelsHandler',
             '/health', 'HealthHandler',
@@ -5508,4 +5510,170 @@ class FilesDownloadHandler:
                     return f.read()
         except Exception as e:
             web.header('Content-Type', 'application/json; charset=utf-8')
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+# =====================================================================
+# Export / Import — full data backup and restore as ZIP
+# =====================================================================
+
+class ExportHandler:
+    """GET /api/export — export ALL data as a ZIP file.
+    Exports config.json, conversation DB, all workspace files
+    (memory, knowledge, skills, todos, workflows, counterfactuals,
+    scheduler, mcp.json), user_datas.pkl, and export metadata.
+    """
+    def GET(self):
+        _require_auth()
+        try:
+            import io as _io
+            import zipfile
+            from common.utils import expand_path
+            home = expand_path("~")
+            app_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
+            buf = _io.BytesIO()
+            zf = zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED)
+
+            # 1. config.json
+            config_path = os.path.join(app_root, 'config.json')
+            if os.path.exists(config_path):
+                zf.write(config_path, 'config.json')
+
+            # 2. config-template.json
+            template_path = os.path.join(app_root, 'config-template.json')
+            if os.path.exists(template_path):
+                zf.write(template_path, 'config-template.json')
+
+            # 3. Conversation store (SQLite DB)
+            try:
+                from agent.memory import get_conversation_store
+                store = get_conversation_store()
+                if hasattr(store, 'db_path') and os.path.exists(store.db_path):
+                    zf.write(store.db_path, 'data/conversations.db')
+            except Exception as e:
+                logger.warning(f"[Export] conversations: {e}")
+
+            # 4. Everything in ~/onyx workspace
+            onyx_dir = os.path.join(home, 'onyx')
+            if os.path.isdir(onyx_dir):
+                for root, dirs, files in os.walk(onyx_dir):
+                    dirs[:] = [d for d in dirs if d not in ('__pycache__', '.git', 'node_modules')]
+                    for fname in files:
+                        fpath = os.path.join(root, fname)
+                        arcname = 'workspace/' + os.path.relpath(fpath, onyx_dir)
+                        try:
+                            if os.path.getsize(fpath) < 50 * 1024 * 1024:
+                                zf.write(fpath, arcname)
+                        except Exception:
+                            pass
+
+            # 5. user_datas.pkl
+            user_datas_path = os.path.join(app_root, 'user_datas.pkl')
+            if os.path.exists(user_datas_path):
+                zf.write(user_datas_path, 'user_datas.pkl')
+
+            # 6. Metadata
+            import datetime as _dt
+            zf.writestr('_export_meta.json', json.dumps({
+                "exported_at": _dt.datetime.now().isoformat(),
+                "version": "1.0",
+            }, indent=2))
+
+            zf.close()
+            buf.seek(0)
+
+            filename = "onyxagent-backup-" + _dt.datetime.now().strftime('%Y%m%d-%H%M%S') + ".zip"
+            web.header('Content-Type', 'application/zip')
+            web.header('Content-Disposition', 'attachment; filename="' + filename + '"')
+            return buf.getvalue()
+        except Exception as e:
+            logger.error("[Export] error: " + str(e))
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class ImportHandler:
+    """POST /api/import — import a ZIP backup, restore all data."""
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            import zipfile
+            import io as _io
+            from common.utils import expand_path
+            home = expand_path("~")
+            onyx_dir = os.path.join(home, 'onyx')
+            app_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
+            x = web.input(file={})
+            if 'file' not in x:
+                return json.dumps({"status": "error", "message": "No file uploaded. Use field name 'file'."})
+
+            upload_data = x['file'].file.read() if hasattr(x['file'], 'file') else x['file']
+            if not upload_data:
+                return json.dumps({"status": "error", "message": "Empty file."})
+
+            buf = _io.BytesIO(upload_data)
+            zf = zipfile.ZipFile(buf, 'r')
+
+            imported = {"config": False, "conversations": False,
+                        "workspace_files": 0, "user_datas": False}
+            errors = []
+
+            for info in zf.infolist():
+                if info.is_dir():
+                    continue
+                name = info.filename
+                try:
+                    data = zf.read(name)
+
+                    if name == 'config.json':
+                        with open(os.path.join(app_root, 'config.json'), 'wb') as f:
+                            f.write(data)
+                        imported['config'] = True
+
+                    elif name == 'data/conversations.db':
+                        try:
+                            from agent.memory import get_conversation_store
+                            store = get_conversation_store()
+                            if hasattr(store, 'db_path'):
+                                with open(store.db_path, 'wb') as f:
+                                    f.write(data)
+                                imported['conversations'] = True
+                        except Exception as e:
+                            errors.append("conversations: " + str(e))
+
+                    elif name == 'user_datas.pkl':
+                        with open(os.path.join(app_root, 'user_datas.pkl'), 'wb') as f:
+                            f.write(data)
+                        imported['user_datas'] = True
+
+                    elif name == '_export_meta.json':
+                        pass
+
+                    elif name.startswith('workspace/'):
+                        rel_path = name[len('workspace/'):]
+                        target = os.path.normpath(os.path.join(onyx_dir, rel_path))
+                        if not target.startswith(onyx_dir):
+                            errors.append("skipped: " + name)
+                            continue
+                        os.makedirs(os.path.dirname(target), exist_ok=True)
+                        with open(target, 'wb') as f:
+                            f.write(data)
+                        imported['workspace_files'] += 1
+
+                except Exception as e:
+                    errors.append(name + ": " + str(e))
+
+            zf.close()
+
+            return json.dumps({
+                "status": "success",
+                "imported": imported,
+                "errors": errors[:20],
+                "error_count": len(errors),
+            }, ensure_ascii=False)
+        except Exception as e:
+            logger.error("[Import] error: " + str(e))
             return json.dumps({"status": "error", "message": str(e)})
