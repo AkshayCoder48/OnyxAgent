@@ -25,6 +25,16 @@ class Bash(BaseTool):
     _PROGRESS_MAX_BYTES = 4 * 1024
     _PROGRESS_INTERVAL = 0.5
 
+    # ── Anti-abuse rate limiting ──
+    # Prevents the AI from spamming bash commands in a tight loop, which
+    # can trigger HuggingFace's anti-abuse system and get the account banned.
+    _MAX_CALLS_PER_MINUTE = 10        # max 10 bash calls per 60 seconds
+    _MIN_INTERVAL_SECONDS = 2.0       # minimum 2 seconds between calls
+    _LOOP_DETECT_THRESHOLD = 5        # if same command runs 5+ times in a row, stop
+    _call_history = []                # list of (timestamp, command_hash) tuples
+    _last_command_hash = None
+    _last_command_repeat_count = 0
+
     name: str = "bash"
     description: str = f"""Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last {DEFAULT_MAX_LINES} lines or {DEFAULT_MAX_BYTES // 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file.
 {'''
@@ -73,6 +83,60 @@ SAFETY:
 
         if not command:
             return ToolResult.fail("Error: command parameter is required")
+
+        # ── Anti-abuse: rate limiting + loop detection ──
+        # This prevents the AI from running bash commands in a tight loop,
+        # which triggers HuggingFace's anti-abuse system.
+        now = time.time()
+
+        # 1. Loop detection: if the same command has been run N times in a row, refuse
+        import hashlib
+        cmd_hash = hashlib.md5(command.encode()).hexdigest()[:8]
+        if cmd_hash == self._last_command_hash:
+            self._last_command_repeat_count += 1
+        else:
+            self._last_command_hash = cmd_hash
+            self._last_command_repeat_count = 1
+
+        if self._last_command_repeat_count >= self._LOOP_DETECT_THRESHOLD:
+            logger.warning(
+                f"[Bash] Loop detected: command '{command[:60]}...' has been "
+                f"executed {self._last_command_repeat_count} times in a row. "
+                f"Blocking to prevent abuse."
+            )
+            return ToolResult.fail(
+                f"Error: This command has been executed {self._last_command_repeat_count} "
+                f"times in a row. This looks like a loop. Please try a different approach "
+                f"or wait before retrying. (Anti-abuse protection)"
+            )
+
+        # 2. Rate limiting: max N calls per minute
+        # Clean old entries (older than 60 seconds)
+        self._call_history = [(t, h) for t, h in self._call_history if now - t < 60.0]
+        if len(self._call_history) >= self._MAX_CALLS_PER_MINUTE:
+            oldest = self._call_history[0][0]
+            wait_time = 60.0 - (now - oldest)
+            logger.warning(
+                f"[Bash] Rate limit hit: {len(self._call_history)} calls in the last "
+                f"60 seconds. Waiting {wait_time:.1f}s."
+            )
+            return ToolResult.fail(
+                f"Error: Rate limit reached ({self._MAX_CALLS_PER_MINUTE} bash commands "
+                f"per minute). Please wait {wait_time:.0f} seconds before trying again. "
+                f"(Anti-abuse protection)"
+            )
+
+        # 3. Minimum interval between calls
+        if self._call_history:
+            last_call_time = self._call_history[-1][0]
+            elapsed = now - last_call_time
+            if elapsed < self._MIN_INTERVAL_SECONDS:
+                sleep_time = self._MIN_INTERVAL_SECONDS - elapsed
+                logger.debug(f"[Bash] Throttling: sleeping {sleep_time:.1f}s before executing")
+                time.sleep(sleep_time)
+
+        # Record this call
+        self._call_history.append((time.time(), cmd_hash))
 
         # Security check: Prevent direct access to the credential file
         if re.search(r'\.onyx[/\\]\.env', command):
