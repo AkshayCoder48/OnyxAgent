@@ -1774,9 +1774,45 @@ class AuthLogoutHandler:
         return json.dumps({"status": "success"})
 
 
+# ── Anti-abuse: per-IP request rate limiter for message endpoint ──
+# Prevents rapid-fire /message POST requests that look like bot traffic
+# to HuggingFace's anti-abuse system.
+_message_rate_limiter = {}  # ip → list of timestamps
+_MESSAGE_RATE_LIMIT = 20   # max messages per minute per IP
+_MESSAGE_RATE_WINDOW = 60  # seconds
+
+def _check_message_rate_limit():
+    """Returns True if the request is allowed, False if rate-limited."""
+    try:
+        ip = web.ctx.env.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() or \
+             web.ctx.env.get('REMOTE_ADDR', 'unknown')
+    except Exception:
+        ip = 'unknown'
+
+    now = time.time()
+    if ip not in _message_rate_limiter:
+        _message_rate_limiter[ip] = []
+
+    # Clean old entries
+    _message_rate_limiter[ip] = [t for t in _message_rate_limiter[ip] if now - t < _MESSAGE_RATE_WINDOW]
+
+    if len(_message_rate_limiter[ip]) >= _MESSAGE_RATE_LIMIT:
+        return False
+
+    _message_rate_limiter[ip].append(now)
+    return True
+
+
 class MessageHandler:
     def POST(self):
         _require_auth()
+        # Anti-abuse: rate limit message requests to prevent HF detection
+        if not _check_message_rate_limit():
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            return json.dumps({
+                "status": "error",
+                "message": "Rate limit: too many messages. Please wait a moment."
+            })
         return WebChannel().post_message()
 
 

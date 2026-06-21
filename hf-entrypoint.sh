@@ -73,6 +73,16 @@ if [ "$IS_HF_SPACE" = true ]; then
     # Set workspace environment variable to use /data/onyx
     export AGENT_WORKSPACE=/data/onyx
 
+    # ── ANTI-ABUSE: Limit agent steps on HF Spaces ──
+    # HF Spaces will flag/ban the account if the agent runs too many
+    # tool calls in rapid succession. We limit max_steps to 10 (down
+    # from the default 20) and disable self-evolution (which can trigger
+    # background bash loops) to stay under HF's radar.
+    # The config.py loader reads env vars that match config keys (case-insensitive).
+    export agent_max_steps=10
+    export self_evolution_enabled=false
+    echo "[HF] Anti-abuse: max_steps=10, self_evolution=disabled"
+
     echo "[HF] Persistence configured:"
     echo "[HF]   Config: /data/config.json"
     echo "[HF]   Workspace: /data/onyx/"

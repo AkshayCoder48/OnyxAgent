@@ -496,10 +496,34 @@ class AgentStreamExecutor:
                     for tool_call in tool_calls:
                         # Honour cancel between tool invocations within the same turn
                         self._check_cancelled()
+
+                        # ── ANTI-ABUSE: Agent-level loop breaker ──
+                        # If the same tool+args has been called 3+ times, force-stop
+                        # the entire agent loop. This prevents infinite tool loops
+                        # that trigger HuggingFace's anti-abuse system.
+                        _tc_ahash = self._hash_args(tool_call["arguments"])
+                        _repeat_count = sum(
+                            1 for name, ahash, _ in self.tool_failure_history[-10:]
+                            if name == tool_call["name"] and ahash == _tc_ahash
+                        )
+                        if _repeat_count >= 3:
+                            logger.warning(
+                                f"🛑 CIRCUIT BREAKER: Tool '{tool_call['name']}' called "
+                                f"{_repeat_count}x with same args. Stopping agent loop "
+                                f"to prevent abuse detection."
+                            )
+                            final_response = (
+                                f"I've attempted the same action ({tool_call['name']}) "
+                                f"multiple times without success. I'll stop here to avoid "
+                                f"getting stuck in a loop. Please try a different approach."
+                            )
+                            cancelled = True
+                            break
+
                         result = self._execute_tool(tool_call)
                         tool_results.append(result)
                         
-                        # Debug: Check if tool is being called repeatedly with same args
+                        # Track tool calls for loop detection
                         if turn > 2:
                             # Check last N tool calls for repeats
                             repeat_count = sum(
