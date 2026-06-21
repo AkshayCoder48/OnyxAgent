@@ -9536,14 +9536,50 @@ function _renderDataTable(container, data) {
     const wrap = document.createElement('div');
     wrap.className = 'onyx-table';
     let html = '<table><thead><tr>';
-    headers.forEach(h => { html += `<th>${_onyxEscHtml(typeof h === 'string' ? h : (h.label || h.key || ''))}</th>`; });
+    // Build header display text + lookup key (lowercase for case-insensitive matching)
+    const headerKeys = headers.map(h => {
+        const displayText = typeof h === 'string' ? h : (h.label || h.key || '');
+        const lookupKey = (typeof h === 'string' ? h : (h.key || h.label || '')).toLowerCase().replace(/\s+/g, '_');
+        return { display: displayText, lookup: lookupKey };
+    });
+    headerKeys.forEach(hk => { html += `<th>${_onyxEscHtml(hk.display)}</th>`; });
     html += '</tr></thead><tbody>';
     rows.forEach(row => {
         html += '<tr>';
-        headers.forEach(h => {
-            const key = typeof h === 'string' ? h : (h.key || h.label || '');
-            const val = row[key] !== undefined ? row[key] : '';
-            html += `<td>${_onyxEscHtml(String(val))}</td>`;
+        const isArrayRow = Array.isArray(row);
+        headerKeys.forEach((hk, colIdx) => {
+            let val = '';
+            if (isArrayRow) {
+                // Array row: use column index
+                val = row[colIdx] !== undefined ? row[colIdx] : '';
+            } else if (typeof row === 'object' && row !== null) {
+                // Object row: try exact key, then case-insensitive, then normalized
+                const keys = Object.keys(row);
+                // Exact match
+                if (row[hk.display] !== undefined) {
+                    val = row[hk.display];
+                }
+                // Case-insensitive match
+                else {
+                    const lowerDisplay = hk.display.toLowerCase();
+                    const found = keys.find(k => k.toLowerCase() === lowerDisplay);
+                    if (found) {
+                        val = row[found];
+                    }
+                    // Normalized match (spaces → underscores)
+                    else {
+                        const foundNorm = keys.find(k => k.toLowerCase().replace(/\s+/g, '_') === hk.lookup);
+                        if (foundNorm) {
+                            val = row[foundNorm];
+                        }
+                        // Fallback: positional match by column index in object
+                        else if (row[colIdx] !== undefined) {
+                            val = row[colIdx];
+                        }
+                    }
+                }
+            }
+            html += `<td>${_onyxEscHtml(String(val ?? ''))}</td>`;
         });
         html += '</tr>';
     });
