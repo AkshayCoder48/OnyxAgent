@@ -116,11 +116,12 @@ class OpenAICompatibleBot:
             # Make API call with proper configuration
             api_key = api_config.get('api_key')
             api_base = api_config.get('api_base')
+            extra_headers = api_config.get('extra_headers')
             
             if stream:
-                return self._handle_stream_response(request_params, api_key, api_base)
+                return self._handle_stream_response(request_params, api_key, api_base, extra_headers)
             else:
-                return self._handle_sync_response(request_params, api_key, api_base)
+                return self._handle_sync_response(request_params, api_key, api_base, extra_headers)
                 
         except Exception as e:
             error_msg = str(e)
@@ -150,7 +151,7 @@ class OpenAICompatibleBot:
         proxy = conf().get("proxy") or None
         return OpenAIHTTPClient(proxy=proxy)
 
-    def _handle_sync_response(self, request_params, api_key, api_base):
+    def _handle_sync_response(self, request_params, api_key, api_base, extra_headers=None):
         """Handle synchronous chat-completion via HTTP."""
         params = dict(request_params)
         params.pop("stream", None)
@@ -162,6 +163,7 @@ class OpenAICompatibleBot:
                 api_key=api_key,
                 api_base=api_base,
                 timeout=timeout,
+                extra_headers=extra_headers,
                 stream=False,
                 **params,
             )
@@ -183,7 +185,7 @@ class OpenAICompatibleBot:
                 "status_code": 500,
             }
 
-    def _handle_stream_response(self, request_params, api_key, api_base):
+    def _handle_stream_response(self, request_params, api_key, api_base, extra_headers=None):
         """Handle streaming chat-completion via HTTP (SSE).
 
         Yields dict chunks in OpenAI's standard streaming shape:
@@ -200,6 +202,7 @@ class OpenAICompatibleBot:
                 api_key=api_key,
                 api_base=api_base,
                 timeout=timeout,
+                extra_headers=extra_headers,
                 stream=True,
                 **params,
             )

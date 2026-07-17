@@ -81,7 +81,7 @@ class ChatGPTBot(Bot, OpenAIImage, OpenAICompatibleBot):
         """Get API configuration for OpenAI-compatible base class"""
         is_custom, _ = parse_custom_bot_type(conf().get("bot_type", ""))
         if is_custom:
-            custom_key, custom_base, custom_model, _custom_headers = resolve_custom_credentials()
+            custom_key, custom_base, custom_model, custom_headers = resolve_custom_credentials()
             api_key = custom_key
             api_base = custom_base
             model = custom_model or conf().get("model", "gpt-3.5-turbo")
@@ -89,6 +89,7 @@ class ChatGPTBot(Bot, OpenAIImage, OpenAICompatibleBot):
             api_key = conf().get("open_ai_api_key")
             api_base = conf().get("open_ai_api_base")
             model = conf().get("model", "gpt-3.5-turbo")
+            custom_headers = None
         return {
             'api_key': api_key,
             'api_base': api_base,
@@ -97,6 +98,7 @@ class ChatGPTBot(Bot, OpenAIImage, OpenAICompatibleBot):
             'default_top_p': conf().get("top_p", 1.0),
             'default_frequency_penalty': conf().get("frequency_penalty", 0.0),
             'default_presence_penalty': conf().get("presence_penalty", 0.0),
+            'extra_headers': custom_headers,
         }
 
     def _get_http_client(self) -> OpenAIHTTPClient:
