@@ -196,7 +196,22 @@ class OpenAIHTTPClient:
         key = api_key if api_key is not None else self.api_key
         headers = {"Content-Type": "application/json"}
         if key:
+            # Some providers (like G4F) accept the key in different ways.
+            # Try Bearer first (standard OpenAI format). If the provider
+            # uses a different auth scheme, the user can set custom_headers
+            # in their provider config to override.
             headers["Authorization"] = f"Bearer {key}"
+        # For G4F and similar providers, also send the key as X-API-Key
+        # as a fallback (some endpoints require this instead of Bearer)
+        if key and url:
+            try:
+                host = (urlparse(url).hostname or "").lower()
+                if "g4f" in host:
+                    headers["X-API-Key"] = key
+                    # G4F also accepts the key as a query param, but
+                    # we handle that in _request via extra_query
+            except Exception:
+                pass
         if url:
             attribution = _resolve_attribution_headers(url)
             if attribution:
@@ -242,6 +257,10 @@ class OpenAIHTTPClient:
                 proxies=proxies,
                 timeout=req_timeout,
                 params=extra_query,
+                # Pass retry info for 401 fallback (G4F and similar)
+                retry_without_key=False,
+                original_api_key=api_key,
+                original_extra_headers=extra_headers,
             )
 
         try:
@@ -259,6 +278,35 @@ class OpenAIHTTPClient:
             raise OpenAIHTTPError(0, {}, f"Connection error: {e}")
         except requests.exceptions.RequestException as e:
             raise OpenAIHTTPError(0, {}, f"Request failed: {e}")
+
+        # ── 401 retry without API key ──
+        # Some providers (like G4F) return 401 even with a valid key because
+        # certain models are free and don't require auth. Retry without the
+        # Authorization header.
+        if resp.status_code == 401 and api_key:
+            try:
+                host = (urlparse(url).hostname or "").lower()
+            except Exception:
+                host = ""
+            # Only retry without key for providers known to support optional keys
+            if any(h in host for h in ["g4f", "free", "openai-proxy", "local"]):
+                logger.info(f"[HTTP] Got 401 with API key, retrying without key for {host}")
+                no_key_headers = {"Content-Type": "application/json"}
+                if self.extra_headers:
+                    no_key_headers.update(self.extra_headers)
+                if extra_headers:
+                    no_key_headers.update(extra_headers)
+                try:
+                    resp = requests.post(
+                        url,
+                        headers=no_key_headers,
+                        json=clean_payload,
+                        timeout=req_timeout,
+                        proxies=proxies,
+                        params=extra_query,
+                    )
+                except requests.exceptions.RequestException as e:
+                    raise OpenAIHTTPError(0, {}, f"Retry failed: {e}")
 
         return self._parse_response(resp)
 
@@ -284,6 +332,9 @@ class OpenAIHTTPClient:
         proxies: Optional[Dict[str, str]],
         timeout: float,
         params: Optional[Dict[str, str]] = None,
+        retry_without_key: bool = False,
+        original_api_key: Optional[str] = None,
+        original_extra_headers: Optional[Dict[str, str]] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """Stream SSE response and yield parsed JSON chunks.
 
@@ -311,6 +362,32 @@ class OpenAIHTTPClient:
         except requests.exceptions.RequestException as e:
             yield self._make_error_chunk(0, f"Request failed: {e}")
             return
+
+        # ── 401 retry without API key for G4F and similar providers ──
+        if resp.status_code == 401 and original_api_key and not retry_without_key:
+            try:
+                host = (urlparse(url).hostname or "").lower()
+            except Exception:
+                host = ""
+            if any(h in host for h in ["g4f", "free", "openai-proxy", "local"]):
+                logger.info(f"[HTTP Stream] Got 401 with API key, retrying without key for {host}")
+                # Build headers without auth
+                no_key_headers = {"Content-Type": "application/json"}
+                if self.extra_headers:
+                    no_key_headers.update(self.extra_headers)
+                if original_extra_headers:
+                    no_key_headers.update(original_extra_headers)
+                # Retry the stream
+                yield from self._stream_chat(
+                    url=url,
+                    headers=no_key_headers,
+                    payload=payload,
+                    proxies=proxies,
+                    timeout=timeout,
+                    params=params,
+                    retry_without_key=True,
+                )
+                return
 
         if resp.status_code >= 400:
             # Read full body once for error reporting
