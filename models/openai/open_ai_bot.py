@@ -28,15 +28,9 @@ user_session = dict()
 class OpenAIBot(Bot, OpenAIImage, OpenAICompatibleBot):
     def __init__(self):
         super().__init__()
-        self._api_key = conf().get("open_ai_api_key")
-        self._api_base = conf().get("open_ai_api_base") or None
-        self._proxy = conf().get("proxy") or None
-        self._http_client = OpenAIHTTPClient(
-            api_key=self._api_key,
-            api_base=self._api_base,
-            proxy=self._proxy,
-        )
-
+        # Don't cache api_key/api_base — read them dynamically from config
+        # so that changes via the UI (which writes config.json) take effect
+        # without requiring a server restart.
         self.sessions = SessionManager(OpenAISession, model=conf().get("model") or "text-davinci-003")
         self.args = {
             "model": conf().get("model") or "text-davinci-003",  # 对话模型的名称
@@ -61,6 +55,28 @@ class OpenAIBot(Bot, OpenAIImage, OpenAICompatibleBot):
             'default_frequency_penalty': conf().get("frequency_penalty", 0.0),
             'default_presence_penalty': conf().get("presence_penalty", 0.0),
         }
+
+    @property
+    def _api_key(self):
+        """Dynamically read API key from config so UI changes take effect."""
+        return conf().get("open_ai_api_key")
+
+    @property
+    def _api_base(self):
+        return conf().get("open_ai_api_base") or None
+
+    @property
+    def _proxy(self):
+        return conf().get("proxy") or None
+
+    @property
+    def _http_client(self):
+        """Recreate HTTP client on each access so it picks up config changes."""
+        return OpenAIHTTPClient(
+            api_key=self._api_key,
+            api_base=self._api_base,
+            proxy=self._proxy,
+        )
 
     def _get_http_client(self) -> OpenAIHTTPClient:
         """Reuse the per-instance HTTP client for the streaming/tool path."""

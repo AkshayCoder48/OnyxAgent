@@ -32,48 +32,50 @@ from models.baidu.baidu_wenxin_session import BaiduWenxinSession
 class ChatGPTBot(Bot, OpenAIImage, OpenAICompatibleBot):
     def __init__(self):
         super().__init__()
-        # Resolve api key / base from config (no global SDK state anymore).
+        # Don't cache api_key/api_base — read them dynamically from config
+        # so that changes via the UI (which writes config.json) take effect
+        # without requiring a server restart.
+        self.sessions = SessionManager(ChatGPTSession, model=conf().get("model") or "gpt-3.5-turbo")
+        self.args = {
+            "model": conf().get("model") or "gpt-3.5-turbo",
+            "temperature": conf().get("temperature", 0.9),
+            "max_tokens": 1200,
+            "top_p": 1,
+            "frequency_penalty": conf().get("frequency_penalty", 0.0),
+            "presence_penalty": conf().get("presence_penalty", 0.0),
+            "request_timeout": conf().get("request_timeout", None),
+            "timeout": conf().get("request_timeout", None),
+        }
+
+    @property
+    def _api_key(self):
+        """Dynamically read API key from config so UI changes take effect."""
         is_custom, _ = parse_custom_bot_type(conf().get("bot_type", ""))
-        custom_model = None
-        custom_headers = None
         if is_custom:
-            # Supports multiple custom providers via bot_type "custom:<id>"
-            # with automatic fallback to the legacy custom_api_key/base fields.
-            self._api_key, self._api_base, custom_model, custom_headers = resolve_custom_credentials()
-        else:
-            self._api_key = conf().get("open_ai_api_key")
-            self._api_base = conf().get("open_ai_api_base") or None
-        self._proxy = conf().get("proxy") or None
-        self._http_client = OpenAIHTTPClient(
+            key, _, _, _ = resolve_custom_credentials()
+            return key
+        return conf().get("open_ai_api_key")
+
+    @property
+    def _api_base(self):
+        is_custom, _ = parse_custom_bot_type(conf().get("bot_type", ""))
+        if is_custom:
+            _, base, _, _ = resolve_custom_credentials()
+            return base
+        return conf().get("open_ai_api_base") or None
+
+    @property
+    def _proxy(self):
+        return conf().get("proxy") or None
+
+    @property
+    def _http_client(self):
+        """Recreate HTTP client on each access so it picks up config changes."""
+        return OpenAIHTTPClient(
             api_key=self._api_key,
             api_base=self._api_base,
             proxy=self._proxy,
-            extra_headers=custom_headers,
         )
-        if conf().get("rate_limit_chatgpt"):
-            self.tb4chatgpt = TokenBucket(conf().get("rate_limit_chatgpt", 20))
-        # Per-provider model takes precedence over global model.
-        conf_model = custom_model or conf().get("model") or "gpt-3.5-turbo"
-        self.sessions = SessionManager(ChatGPTSession, model=conf_model)
-        # o1相关模型不支持system prompt，暂时用文心模型的session
-
-        self.args = {
-            "model": conf_model,  # 对话模型的名称
-            "temperature": conf().get("temperature", 0.9),  # 值在[0,1]之间，越大表示回复越具有不确定性
-            # "max_tokens":4096,  # 回复最大的字符数
-            "top_p": conf().get("top_p", 1),
-            "frequency_penalty": conf().get("frequency_penalty", 0.0),  # [-2,2]之间，该值越大则更倾向于产生不同的内容
-            "presence_penalty": conf().get("presence_penalty", 0.0),  # [-2,2]之间，该值越大则更倾向于产生不同的内容
-            "request_timeout": conf().get("request_timeout", None),  # 请求超时时间，openai接口默认设置为600，对于难问题一般需要较长时间
-            "timeout": conf().get("request_timeout", None),  # 重试超时时间，在这个时间内，将会自动重试
-        }
-        # 部分模型暂不支持一些参数，特殊处理
-        if conf_model in [const.O1, const.O1_MINI, const.GPT_5, const.GPT_5_MINI, const.GPT_5_NANO, const.GPT_55]:
-            remove_keys = ["temperature", "top_p", "frequency_penalty", "presence_penalty"]
-            for key in remove_keys:
-                self.args.pop(key, None)  # 如果键不存在，使用 None 来避免抛出错、
-            if conf_model in [const.O1, const.O1_MINI]:  # o1系列模型不支持系统提示词，使用文心模型的session
-                self.sessions = SessionManager(BaiduWenxinSession, model=conf().get("model") or const.O1_MINI)
 
     def get_api_config(self):
         """Get API configuration for OpenAI-compatible base class"""
