@@ -4349,10 +4349,17 @@ class SkillUploadHandler:
                 if ".." in skill_name or "/" in skill_name or "\\" in skill_name:
                     return json.dumps({"status": "error", "message": "Invalid skill name"})
 
-                # Copy to skills directory
+                # Copy to skills directory — DON'T overwrite existing skills.
+                # If a skill with the same name exists, append a number suffix.
                 skill_dest = os.path.join(skills_dir, skill_name)
                 if os.path.exists(skill_dest):
-                    shutil.rmtree(skill_dest)
+                    # Auto-rename: skill-name → skill-name-2 → skill-name-3 → ...
+                    counter = 2
+                    while os.path.exists(os.path.join(skills_dir, f"{skill_name}-{counter}")):
+                        counter += 1
+                    skill_name = f"{skill_name}-{counter}"
+                    skill_dest = os.path.join(skills_dir, skill_name)
+                    logger.info(f"[WebChannel] Skill '{custom_name or top_items[0]}' already exists, saving as '{skill_name}'")
                 shutil.copytree(content_dir, skill_dest)
 
                 # Refresh

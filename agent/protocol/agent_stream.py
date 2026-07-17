@@ -895,8 +895,11 @@ class AgentStreamExecutor:
                     reasoning_delta = delta.get("reasoning_content") or ""
                     if reasoning_delta:
                         full_reasoning += reasoning_delta
-                        if self._is_thinking_enabled():
-                            self._emit_event("reasoning_update", {"delta": reasoning_delta})
+                        # Always emit reasoning events when the API provides them,
+                        # regardless of the enable_thinking config flag. The frontend
+                        # will show a collapsible "Thinking..." bar. If there's no
+                        # reasoning_content from the API, nothing is shown.
+                        self._emit_event("reasoning_update", {"delta": reasoning_delta})
 
                     # Handle text content
                     content_delta = delta.get("content") or ""
