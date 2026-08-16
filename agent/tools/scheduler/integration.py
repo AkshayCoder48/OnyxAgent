@@ -106,9 +106,28 @@ def _is_channel_ready(channel_type: str, receiver: str) -> bool:
     """Best-effort readiness probe for outbound channels.
 
     Returns False when we know the send will drop (e.g. weixin not yet
-    logged in, web session has no polling queue), so the scheduler can
-    defer instead of consuming the task. Unknown channels return True
-    to preserve previous behaviour.
+    logged in), so the scheduler can defer instead of consuming the task.
+    Unknown channels return True to preserve previous behaviour.
+
+    IMPORTANT — web channel behaviour:
+    On a VPS deployment the user's browser tab is usually CLOSED when a
+    scheduled task fires. Previously this check returned False whenever
+    `session_queues[receiver]` was missing, which caused every scheduled
+    task to be deferred indefinitely and eventually skipped after the
+    10-minute catch-up window. That made the scheduler useless for
+    "send me a daily report at 9:27pm" use cases.
+
+    Now we ALWAYS return True for the web channel: the scheduler will
+    fire, and the message will be enqueued (the queue is auto-created
+    on demand inside `WebChannel.send` / polling endpoints). When the
+    user reconnects, two delivery paths converge:
+
+      1. Polling: `session_queues[receiver]` drains the backlog as
+         soon as the user opens the chat tab and starts polling.
+      2. Conversation history: `_remember_delivered_output` persists
+         the scheduled message to the conversation store, so it shows
+         up in `/api/history` even if the polling queue was lost
+         (e.g. process restart between fire and reconnect).
     """
     if not channel_type or channel_type == "unknown":
         return True
@@ -125,9 +144,20 @@ def _is_channel_ready(channel_type: str, receiver: str) -> bool:
             return True
 
         if channel_type == "web":
+            # Auto-create the polling queue if missing so the message can
+            # be enqueued. The user will drain it when they next open the
+            # chat tab. (Also persisted to conversation history via
+            # `_remember_delivered_output` for resilience.)
             queues = getattr(channel, "session_queues", None)
-            if not queues or receiver not in queues:
-                return False
+            if queues is None:
+                return True  # malformed channel object — let send() fail loudly
+            if receiver not in queues:
+                from queue import Queue
+                queues[receiver] = Queue()
+                logger.info(
+                    f"[Scheduler] Pre-created web polling queue for "
+                    f"receiver={receiver} (tab was closed)"
+                )
             return True
 
         return True

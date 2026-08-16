@@ -1021,13 +1021,23 @@ class ConversationStore:
             finally:
                 conn.close()
 
-        # Honour the current enable_thinking switch when building display turns
-        # so that toggling it off hides previously-saved thinking blocks too.
-        try:
-            from config import conf
-            include_thinking = bool(conf().get("enable_thinking", False))
-        except Exception:
-            include_thinking = False
+        # Always include saved thinking blocks when loading history.
+        #
+        # Previous behaviour tied display to the live `enable_thinking` config
+        # flag, which caused two problems:
+        #   1. If the user toggled thinking off after a conversation, all
+        #      previously saved reasoning traces vanished from the UI on
+        #      next reload — even though they were generated and stored.
+        #   2. If a model produced reasoning_content autonomously (e.g.
+        #      deepseek-reasoner / R1, which always thinks regardless of
+        #      the toggle), the reasoning was hidden whenever the toggle
+        #      was off — making it look like thinking was broken.
+        #
+        # The toggle should ONLY control whether new messages request
+        # thinking mode from the model. Once reasoning is produced and
+        # persisted, it must remain visible so the user can review what
+        # the model actually reasoned.
+        include_thinking = True
 
         # Strip seq for display grouping, but record max seq per visible user group
         plain_rows = [
