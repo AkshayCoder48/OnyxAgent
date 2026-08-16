@@ -515,6 +515,18 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Uncensored Mode Toggle (bottom of chat view) -->
+                    <div class="flex-shrink-0 border-t border-slate-200 dark:border-white/5 bg-white dark:bg-[#1A1A1A] px-2 sm:px-4 py-1.5 flex items-center justify-between">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <div class="relative">
+                                <input type="checkbox" id="uncensored-toggle" class="sr-only peer" onchange="toggleUncensoredMode(this.checked)">
+                                <div class="w-9 h-5 bg-slate-300 dark:bg-slate-600 rounded-full peer-checked:bg-red-500 transition-colors"></div>
+                                <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
+                            </div>
+                            <span class="text-xs text-slate-500 dark:text-slate-400">Dev Mode</span>
+                        </label>
+                        <span id="uncensored-status" class="text-[10px] text-slate-400 dark:text-slate-600"></span>
+                    </div>
                 </div>
 
                 <!-- ====================================================== -->

@@ -905,22 +905,48 @@ class AgentStreamExecutor:
                     reasoning_delta = delta.get("reasoning_content") or ""
                     if reasoning_delta:
                         full_reasoning += reasoning_delta
-                        # Always emit reasoning events when the API provides them,
-                        # regardless of the enable_thinking config flag. The frontend
-                        # will show a collapsible "Thinking..." bar. If there's no
-                        # reasoning_content from the API, nothing is shown.
                         self._emit_event("reasoning_update", {"delta": reasoning_delta})
 
                     # Handle text content
                     content_delta = delta.get("content") or ""
                     if content_delta:
-                        # Filter out <think> tags from content
-                        filtered_delta = self._filter_think_tags(content_delta)
-                        full_content += filtered_delta
-                        if filtered_delta:  # Only emit if there's content after filtering
+                        # Buffer content to handle <think> tags that span chunks
+                        self._think_buffer = getattr(self, '_think_buffer', '')
+                        self._think_buffer += content_delta
+                        
+                        import re as _re_for_think
+                        
+                        # Extract complete <think>...</think> blocks and emit as reasoning
+                        think_pattern = _re_for_think.compile(r'<think>([\s\S]*?)</think>')
+                        
+                        def _emit_think_content(m):
+                            think_content = m.group(1).strip()
+                            if think_content:
+                                self._emit_event("reasoning_update", {"delta": think_content})
+                            return ''  # Remove from content
+                        
+                        self._think_buffer = think_pattern.sub(_emit_think_content, self._think_buffer)
+                        
+                        # Check for partial <think> at end (no closing tag yet)
+                        partial_think = _re_for_think.search(r'<think>([\s\S]*)$', self._think_buffer)
+                        if partial_think:
+                            think_content = partial_think.group(1)
+                            if think_content:
+                                self._emit_event("reasoning_update", {"delta": think_content})
+                            # Keep the <think> marker in buffer for next chunk
+                            self._think_buffer = '<think>'
+                        elif '<think>' in self._think_buffer:
+                            # Stray opening tag without content
+                            self._think_buffer = self._think_buffer.replace('<think>', '')
+                        
+                        # Emit remaining content (everything that's not a pending <think>)
+                        if self._think_buffer and self._think_buffer != '<think>':
+                            filtered_delta = self._think_buffer
+                            self._think_buffer = ''
+                            full_content += filtered_delta
                             self._emit_event("message_update", {"delta": filtered_delta})
 
-                    # Handle tool calls
+# Handle tool calls
                     if "tool_calls" in delta and delta["tool_calls"]:
                         for tc_delta in delta["tool_calls"]:
                             index = tc_delta.get("index", 0)

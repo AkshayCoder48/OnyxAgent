@@ -2172,6 +2172,7 @@ class ConfigHandler:
         "custom_providers",
         "agent_max_context_tokens", "agent_max_context_turns", "agent_max_steps",
         "enable_thinking", "self_evolution_enabled", "web_password",
+        "uncensored_mode",
     }
 
     @staticmethod
@@ -2268,6 +2269,9 @@ class ConfigHandler:
         try:
             data = json.loads(web.data())
             updates = data.get("updates", {})
+            # Also accept top-level keys (for simple POST from toggle)
+            if not updates:
+                updates = {k: v for k, v in data.items() if k != 'updates'}
             if not updates:
                 return json.dumps({"status": "error", "message": "no updates provided"})
 
@@ -2278,7 +2282,7 @@ class ConfigHandler:
                     continue
                 if key in ("agent_max_context_tokens", "agent_max_context_turns", "agent_max_steps"):
                     value = int(value)
-                if key in ("use_linkai", "enable_thinking", "self_evolution_enabled"):
+                if key in ("use_linkai", "enable_thinking", "self_evolution_enabled", "uncensored_mode"):
                     value = bool(value)
                 local_config[key] = value
                 applied[key] = value

@@ -505,6 +505,39 @@ function importAllData(event) {
     event.target.value = '';
 }
 
+// =====================================================================
+// Uncensored / Developer Mode toggle
+// =====================================================================
+
+function toggleUncensoredMode(enabled) {
+    try { localStorage.setItem('onyx_uncensored_mode', enabled ? 'true' : 'false'); } catch(_) {}
+    const statusEl = document.getElementById('uncensored-status');
+    if (statusEl) {
+        statusEl.textContent = enabled ? 'ON — AI will read UNCENSORED.md' : '';
+    }
+    // Notify the backend via config API
+    fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uncensored_mode: enabled }),
+    }).then(() => {
+        console.log(`[DevMode] ${enabled ? 'enabled' : 'disabled'}`);
+    }).catch(err => {
+        console.warn('[DevMode] Failed to update config:', err);
+    });
+}
+
+// Load saved state on startup
+(function loadUncensoredState() {
+    try {
+        const saved = localStorage.getItem('onyx_uncensored_mode') === 'true';
+        const toggle = document.getElementById('uncensored-toggle');
+        if (toggle) toggle.checked = saved;
+        const statusEl = document.getElementById('uncensored-status');
+        if (statusEl && saved) statusEl.textContent = 'ON — AI will read UNCENSORED.md';
+    } catch(_) {}
+})();
+
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
