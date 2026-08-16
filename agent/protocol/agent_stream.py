@@ -239,24 +239,34 @@ class AgentStreamExecutor:
 
     def _filter_think_tags(self, text: str) -> str:
         """
-        Handle <think>...</think> blocks in content returned by some LLM providers
-        (e.g., MiniMax).
+        Handle blocks in content returned by some LLM providers
+        (DeepSeek-R1, Qwen QwQ, MiniMax, etc.).
 
-        - When inline thinking rendering is allowed (Web + thinking enabled):
-          remove only the tags, keep the content inside.
-        - Otherwise (IM channels, or thinking disabled globally): remove both
-          the tags and the content entirely.
+        Extracts the reasoning content and emits it as reasoning_update events
+        so the frontend thinking bar shows it live. Then strips the tags.
         """
         if not text:
             return text
         import re
-        if self._should_render_thinking_inline():
-            text = re.sub(r'<think>', '', text)
-            text = re.sub(r'</think>', '', text)
-        else:
-            text = re.sub(r'<think>[\s\S]*?</think>', '', text)
-            # Also strip unclosed <think> tag at the end (streaming partial)
-            text = re.sub(r'<think>[\s\S]*$', '', text)
+
+        # Extract content between <think> and </think> and emit as reasoning
+        think_pattern = re.compile(r'<think>([\s\S]*?)</think>')
+        for m in think_pattern.finditer(text):
+            think_content = m.group(1).strip()
+            if think_content:
+                self._emit_event("reasoning_update", {"delta": think_content})
+
+        # Also handle streaming partial: <think> without closing tag
+        partial_match = re.search(r'<think>([\s\S]*)$', text)
+        if partial_match:
+            think_content = partial_match.group(1)
+            if think_content:
+                self._emit_event("reasoning_update", {"delta": think_content})
+
+        # Now strip ALL think tags from the content
+        text = re.sub(r'<think>[\s\S]*?</think>', '', text)
+        text = re.sub(r'<think>[\s\S]*$', '', text)
+        text = text.replace('<think>', '').replace('</think>', '')
         return text
 
     def _hash_args(self, args: dict) -> str:
