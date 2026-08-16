@@ -74,14 +74,68 @@ if [ "$IS_HF_SPACE" = true ]; then
     export AGENT_WORKSPACE=/data/onyx
 
     # ── ANTI-ABUSE: Limit agent steps on HF Spaces ──
-    # HF Spaces will flag/ban the account if the agent runs too many
-    # tool calls in rapid succession. We limit max_steps to 10 (down
-    # from the default 20) and disable self-evolution (which can trigger
-    # background bash loops) to stay under HF's radar.
-    # The config.py loader reads env vars that match config keys (case-insensitive).
     export agent_max_steps=10
     export self_evolution_enabled=false
     echo "[HF] Anti-abuse: max_steps=10, self_evolution=disabled"
+
+    # ── Simple env var config (LLM_API_KEY + LLM_MODEL) ──
+    # Apply before the app starts so config.json has the right values
+    if [ -n "$LLM_API_KEY" ] && [ -n "$LLM_MODEL" ]; then
+        echo "[HF] Applying LLM_API_KEY + LLM_MODEL env vars..."
+        python3 -c "
+import sys, os
+sys.path.insert(0, '/app')
+from common.env_config_mapper import write_env_config_to_json
+write_env_config_to_json('/app/config.json')
+" 2>/dev/null || true
+    fi
+
+    # ── Ephemeral package replay ──
+    # Replays any pip/apt/npm installs from previous sessions
+    echo "[HF] Replaying ephemeral packages..."
+    python3 -c "
+import sys, os
+sys.path.insert(0, '/app')
+from common.keep_alive import PackageReplay
+pr = PackageReplay()
+pr.install_startup_vars()
+pr.replay()
+" 2>/dev/null || true
+
+    # ── Restore from HF Dataset backup ──
+    if [ -n "$HF_TOKEN" ]; then
+        echo "[HF] Restoring from HF Dataset backup..."
+        python3 -c "
+import sys, os
+sys.path.insert(0, '/app')
+from common.hf_backup import get_backup_manager
+backup = get_backup_manager()
+backup.restore()
+" 2>/dev/null || true
+    fi
+
+    # ── Start keep-alive + backup in background ──
+    python3 -c "
+import sys, os, threading
+sys.path.insert(0, '/app')
+from common.keep_alive import KeepAlive
+from common.hf_backup import get_backup_manager
+from common.cloudflare_proxy import configure_proxy, patch_http_client
+
+# Configure Cloudflare proxy (if env vars are set)
+configure_proxy()
+patch_http_client()
+
+# Start keep-alive
+ka = KeepAlive()
+ka.start()
+
+# Start backup sync
+backup = get_backup_manager()
+backup.start()
+
+print('[HF] Keep-alive + backup started in background')
+" 2>/dev/null &
 
     echo "[HF] Persistence configured:"
     echo "[HF]   Config: /data/config.json"
@@ -96,7 +150,21 @@ else
     mkdir -p /home/agent/onyx 2>/dev/null || true
 fi
 
-# Start the application
-echo "=== Starting OnyxAgent ==="
+# Start the application with self-healing wrapper
+echo "=== Starting OnyxAgent (self-healing) ==="
 cd /app
-exec python app.py
+python3 -c "
+import sys, os
+sys.path.insert(0, '/app')
+os.chdir('/app')
+
+# Self-healing wrapper — restarts the app if it crashes
+from common.keep_alive import SelfHealer
+
+def start_app():
+    import app
+    app.run()
+
+healer = SelfHealer(start_app, max_restarts=0, delay=5)
+healer.run()
+"
