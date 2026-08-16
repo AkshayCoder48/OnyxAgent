@@ -600,7 +600,11 @@ body, #app, #main-content {
 }
 .agent-step:last-child { margin-bottom: 0; }
 
-/* Thinking step - collapsible */
+/* Thinking step - collapsible, auto-expanded while streaming */
+.agent-thinking-step {
+  border-left: 2px solid rgba(139, 92, 246, 0.3);
+  padding-left: 8px;
+}
 .agent-thinking-step .thinking-header {
     display: flex;
     align-items: center;
@@ -610,7 +614,21 @@ body, #app, #main-content {
 }
 .agent-thinking-step .thinking-header:hover { color: #64748b; }
 .dark .agent-thinking-step .thinking-header:hover { color: #cbd5e1; }
-.agent-thinking-step .thinking-header i:first-child { font-size: 0.625rem; margin-top: 1px; }
+.agent-thinking-step .thinking-header i:first-child { font-size: 0.75rem; margin-top: 1px; }
+.agent-thinking-step .thinking-icon-pulse {
+    animation: thinking-pulse 1.5s ease-in-out infinite;
+}
+@keyframes thinking-pulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50%      { opacity: 1;   transform: scale(1.15); }
+}
+.agent-thinking-step .thinking-timer {
+    font-size: 0.625rem;
+    color: #8b5cf6;
+    font-weight: 600;
+    opacity: 0.7;
+    margin-left: 0.25rem;
+}
 .agent-thinking-step .thinking-chevron {
     font-size: 0.5rem;
     margin-left: auto;
@@ -622,10 +640,10 @@ body, #app, #main-content {
     display: none;
     margin-top: 0.375rem;
     margin-left: 1rem;
-    padding: 0.5rem;
-    background: rgba(0, 0, 0, 0.02);
-    border-radius: 6px;
-    border: 1px solid rgba(0, 0, 0, 0.04);
+    padding: 0.5rem 0.75rem;
+    background: rgba(139, 92, 246, 0.04);
+    border-radius: 8px;
+    border: 1px solid rgba(139, 92, 246, 0.1);
     font-size: 0.75rem;
     line-height: 1.5;
     color: #94a3b8;
@@ -633,8 +651,8 @@ body, #app, #main-content {
     overflow-y: auto;
 }
 .dark .agent-thinking-step .thinking-full {
-    background: rgba(255, 255, 255, 0.02);
-    border-color: rgba(255, 255, 255, 0.04);
+    background: rgba(139, 92, 246, 0.06);
+    border-color: rgba(139, 92, 246, 0.12);
 }
 .agent-thinking-step.expanded .thinking-full { display: block; }
 .agent-thinking-step .thinking-full p { margin: 0.25em 0; }

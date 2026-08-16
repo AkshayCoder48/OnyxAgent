@@ -2418,19 +2418,18 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
     function processSSEItem(item) {
             if (item.type === 'reasoning') {
                 ensureBotEl();
+                _onyxHideStillThinking(contentEl);
                 reasoningText += item.content;
                 if (!currentReasoningEl) {
                     reasoningStartTime = Date.now();
                     currentReasoningEl = document.createElement('div');
-                    currentReasoningEl.className = 'agent-step agent-thinking-step';
-                    // During streaming, use a <pre> with a single text node and
-                    // append-only updates. This avoids re-parsing markdown and
-                    // re-setting innerHTML on every chunk, which is what causes
-                    // the page to crash on long chains-of-thought.
+                    currentReasoningEl.className = 'agent-step agent-thinking-step expanded';
+                    // Auto-expand while streaming so the user sees the reasoning live
                     currentReasoningEl.innerHTML = `
                         <div class="thinking-header" onclick="this.parentElement.classList.toggle('expanded')">
-                            <i class="fas fa-lightbulb text-amber-400 flex-shrink-0"></i>
-                            <span class="thinking-summary">${t('thinking_in_progress')}</span>
+                            <i class="fas fa-brain text-violet-400 flex-shrink-0 thinking-icon-pulse"></i>
+                            <span class="thinking-summary">Thinking…</span>
+                            <span class="thinking-timer"></span>
                             <i class="fas fa-chevron-right thinking-chevron"></i>
                         </div>
                         <div class="thinking-full"><pre class="thinking-stream-pre"></pre></div>`;
@@ -2442,6 +2441,16 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                     currentReasoningEl._streamRafScheduled = false;
                     currentReasoningEl._streamCharsRendered = 0;
                     currentReasoningEl._streamCapped = false;
+                    // Start a timer to update the "Thinking… Xs" label
+                    currentReasoningEl._timerInterval = setInterval(() => {
+                        if (!currentReasoningEl.isConnected) {
+                            clearInterval(currentReasoningEl._timerInterval);
+                            return;
+                        }
+                        const elapsed = Math.round((Date.now() - reasoningStartTime) / 1000);
+                        const timerEl = currentReasoningEl.querySelector('.thinking-timer');
+                        if (timerEl) timerEl.textContent = `${elapsed}s`;
+                    }, 1000);
                 }
                 // Hard cap: once REASONING_RENDER_CAP chars are in the DOM, stop
                 // appending further deltas. The full text is still kept in
@@ -3005,10 +3014,27 @@ function _renderReasoningBody(text) {
 }
 
 function finalizeThinking(el, startTime, text) {
+    // Stop the timer interval
+    if (el._timerInterval) {
+        clearInterval(el._timerInterval);
+        el._timerInterval = null;
+    }
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    el.querySelector('.thinking-summary').textContent = t('thinking_done');
+    const summaryEl = el.querySelector('.thinking-summary');
+    if (summaryEl) summaryEl.textContent = `Thought for ${elapsed}s`;
+    // Remove the live timer text
+    const timerEl = el.querySelector('.thinking-timer');
+    if (timerEl) timerEl.textContent = '';
+    // Stop the pulsing icon
+    const iconEl = el.querySelector('.thinking-icon-pulse');
+    if (iconEl) iconEl.classList.remove('thinking-icon-pulse');
+    // Render the full reasoning text as markdown
     const fullDiv = el.querySelector('.thinking-full');
-    fullDiv.innerHTML = `<div class="thinking-duration">${t('thinking_duration')} ${elapsed}s</div>` + _renderReasoningBody(text);
+    if (fullDiv) {
+        fullDiv.innerHTML = `<div class="thinking-duration">${elapsed}s</div>` + _renderReasoningBody(text);
+    }
+    // Collapse after finalization (user can re-expand by clicking)
+    el.classList.remove('expanded');
 }
 
 function renderThinkingHtml(text) {
