@@ -1196,6 +1196,12 @@ class WebChannel(ChatChannel):
             '/api/import', 'ImportHandler',
             '/v1/chat/completions', 'OpenAIChatCompletionsHandler',
             '/v1/models', 'OpenAIModelsHandler',
+            # External cron-trigger endpoint — accepts an HTTP POST with a
+            # prompt and runs it through the agent in the background. Used by
+            # services like Cron-Job.org to fire scheduled tasks without
+            # keeping a browser tab open. Authentication is via X-API-Key
+            # header (falls back to web_password, then to no-auth).
+            '/run-task', 'RunTaskHandler',
             '/health', 'HealthHandler',
             '/assets/(.*)', 'AssetsHandler',
         )
@@ -1265,6 +1271,162 @@ class HealthHandler:
     def GET(self):
         web.header('Content-Type', 'application/json; charset=utf-8')
         return json.dumps({"status": "ok"})
+
+
+class RunTaskHandler:
+    """External cron-trigger endpoint — `POST /run-task`.
+
+    Lets external schedulers (Cron-Job.org, GitHub Actions, Render Cron, etc.)
+    fire an AI task without keeping a browser tab open. The request runs the
+    prompt through the agent in the background and returns immediately.
+
+    Authentication (any one of):
+      1. `X-API-Key: <run_task_api_key>` header — when `run_task_api_key` is set
+         in config (recommended for production).
+      2. `Authorization: Bearer <web_password>` header — when `web_password` is
+         set but `run_task_api_key` is not.
+      3. No auth — when neither is set (open mode, fine for local testing but
+         DO NOT expose publicly like this).
+
+    Request body (JSON):
+      {
+        "prompt":   "Check server logs and send me a summary",   # required
+        "receiver": "user-123"                                    # optional, defaults to "cron-trigger"
+      }
+
+    The `receiver` identifies which conversation history to append the
+    resulting message to. Use a stable string (e.g. your user id) so the
+    output shows up in your chat history when you next open the web UI.
+
+    Response (200):
+      { "status": "triggered", "request_id": "..." }
+
+    The agent runs asynchronously; the response returns before the task
+    finishes. Polling `/poll?session_id=<receiver>` will return the result
+    once the agent completes, or it will simply appear in your chat history
+    next time you open the web UI.
+    """
+
+    def POST(self):
+        web.header('Content-Type', 'application/json; charset=utf-8')
+
+        # ── Auth ──
+        cfg = conf()
+        run_task_key = str(cfg.get("run_task_api_key", "") or "")
+        web_pwd = str(cfg.get("web_password", "") or "")
+
+        # Determine the expected key: prefer run_task_api_key, fall back to web_password.
+        expected_key = run_task_key or web_pwd
+        if expected_key:
+            provided = (
+                web.ctx.env.get("HTTP_X_API_KEY", "")
+                or web.ctx.env.get("HTTP_AUTHORIZATION", "").replace("Bearer ", "").strip()
+            )
+            if provided != expected_key:
+                web.ctx.status = "401 Unauthorized"
+                return json.dumps({"status": "error", "message": "Invalid or missing API key"})
+
+        # ── Parse body ──
+        try:
+            raw = web.data()
+            body = json.loads(raw) if raw else {}
+        except (ValueError, json.JSONDecodeError) as e:
+            web.ctx.status = "400 Bad Request"
+            return json.dumps({"status": "error", "message": f"Invalid JSON: {e}"})
+
+        prompt = str(body.get("prompt", "") or "").strip()
+        if not prompt:
+            web.ctx.status = "400 Bad Request"
+            return json.dumps({"status": "error", "message": "prompt is required"})
+
+        receiver = str(body.get("receiver", "") or "").strip() or "cron-trigger"
+
+        # ── Dispatch into the web channel's polling pipeline ──
+        try:
+            # `@singleton` decorator makes WebChannel() return the shared instance.
+            wc = WebChannel()
+        except Exception as e:
+            web.ctx.status = "503 Service Unavailable"
+            return json.dumps({"status": "error", "message": f"Web channel not ready: {e}"})
+
+        import uuid as _uuid
+        request_id = f"cron_{_uuid.uuid4().hex[:12]}"
+        session_id = receiver
+
+        # Pre-create the polling queue so the response can land somewhere even
+        # if no browser is currently polling for this session.
+        if session_id not in wc.session_queues:
+            wc.session_queues[session_id] = Queue()
+        wc.request_to_session[request_id] = session_id
+
+        from bridge.context import Context, ContextType
+        from channel.chat_message import ChatMessage
+
+        msg = WebMessage(wc._generate_msg_id(), prompt)
+        msg.from_user_id = session_id
+        context = wc._compose_context(ContextType.TEXT, prompt, msg=msg, isgroup=False)
+        if context is None:
+            web.ctx.status = "500 Internal Server Error"
+            return json.dumps({"status": "error", "message": "Failed to compose context"})
+        context["session_id"] = session_id
+        context["receiver"] = session_id
+        context["request_id"] = request_id
+        context["is_scheduled_task"] = True  # prevent recursive task creation
+
+        # Run the agent in a background thread so this handler can return
+        # immediately. The result will be enqueued to session_queues[session_id]
+        # and also persisted to conversation history via the agent bridge.
+        import threading as _threading
+
+        def _run_in_background():
+            try:
+                from bridge.agent_bridge import Bridge
+                bridge = Bridge()
+                reply = bridge.agent_reply(prompt, context=context, on_event=None, clear_history=False)
+                if reply and reply.content:
+                    # Drop into the polling queue so the web UI picks it up
+                    # when the user reconnects. Also makes it visible via
+                    # /poll?session_id=<receiver> for external integrations.
+                    wc.session_queues[session_id].put({
+                        "type": str(reply.type),
+                        "content": reply.content,
+                        "timestamp": time.time(),
+                        "request_id": request_id,
+                    })
+                    logger.info(
+                        f"[RunTaskHandler] cron-trigger completed for "
+                        f"receiver={session_id}, request={request_id}"
+                    )
+                else:
+                    logger.warning(
+                        f"[RunTaskHandler] cron-trigger produced no reply for "
+                        f"receiver={session_id}, request={request_id}"
+                    )
+            except Exception as e:
+                logger.error(
+                    f"[RunTaskHandler] cron-trigger failed for "
+                    f"receiver={session_id}, request={request_id}: {e}",
+                    exc_info=True,
+                )
+                try:
+                    wc.session_queues[session_id].put({
+                        "type": "error",
+                        "content": f"❌ {e}",
+                        "timestamp": time.time(),
+                        "request_id": request_id,
+                    })
+                except Exception:
+                    pass
+
+        thread = _threading.Thread(target=_run_in_background, daemon=True, name="run-task")
+        thread.start()
+
+        return json.dumps({
+            "status": "triggered",
+            "request_id": request_id,
+            "session_id": session_id,
+            "message": "Task started. Result will be available in the chat history or via /poll?session_id=" + session_id,
+        })
 
 
 class ConnectionStatusHandler:
@@ -2173,6 +2335,16 @@ class ConfigHandler:
         "agent_max_context_tokens", "agent_max_context_turns", "agent_max_steps",
         "enable_thinking", "self_evolution_enabled", "web_password",
         "uncensored_mode",
+        # Telegram channel setup — bot token + optional proxy + admin allowlist.
+        # The token is the only required field to enable the Telegram channel;
+        # proxy is for users behind restricted networks (e.g. China);
+        # admin_ids is a comma-separated Telegram user ID list to restrict who
+        # can issue commands to the bot (empty = anyone who can DM the bot).
+        "telegram_token", "telegram_proxy", "telegram_admin_ids",
+        # External cron-trigger endpoint (/run-task) authentication. When set,
+        # callers must send `X-API-Key: <run_task_api_key>` to authorise. When
+        # empty, falls back to web_password (or no auth if web_password is empty).
+        "run_task_api_key",
     }
 
     @staticmethod
@@ -2241,6 +2413,12 @@ class ConfigHandler:
             raw_pwd = str(local_config.get("web_password", "") or "")
             masked_pwd = ("*" * len(raw_pwd)) if raw_pwd else ""
 
+            raw_tg_token = str(local_config.get("telegram_token", "") or "")
+            masked_tg_token = self._mask_key(raw_tg_token) if raw_tg_token else ""
+
+            raw_run_key = str(local_config.get("run_task_api_key", "") or "")
+            masked_run_key = self._mask_key(raw_run_key) if raw_run_key else ""
+
             return json.dumps({
                 "status": "success",
                 "use_agent": use_agent,
@@ -2258,6 +2436,14 @@ class ConfigHandler:
                 "api_keys": api_keys_masked,
                 "providers": providers,
                 "web_password_masked": masked_pwd,
+                # Telegram channel configuration. Bot token is masked for
+                # display; the admin_ids list is shown as-is because Telegram
+                # user IDs are not secret.
+                "telegram_token_masked": masked_tg_token,
+                "telegram_proxy": local_config.get("telegram_proxy", ""),
+                "telegram_admin_ids": local_config.get("telegram_admin_ids", ""),
+                # External cron-trigger (/run-task) endpoint API key.
+                "run_task_api_key_masked": masked_run_key,
             }, ensure_ascii=False)
         except Exception as e:
             logger.error(f"Error getting config: {e}")

@@ -4282,6 +4282,206 @@ function initConfigView(data) {
         });
         pwdInput._cfgBound = true;
     }
+
+    // ── Telegram channel config ──
+    initTelegramConfig(data);
+    // ── External cron-trigger (/run-task) config ──
+    initRunTaskConfig(data);
+}
+
+// =====================================================================
+// Telegram Channel config
+// =====================================================================
+
+function initTelegramConfig(data) {
+    const tokenInput = document.getElementById('cfg-telegram-token');
+    if (!tokenInput) return;
+    const maskedToken = data.telegram_token_masked || '';
+    tokenInput.value = maskedToken;
+    tokenInput.dataset.masked = maskedToken ? '1' : '';
+    tokenInput.dataset.maskedVal = maskedToken;
+    tokenInput.classList.toggle('cfg-key-masked', !!maskedToken);
+    const tokenIcon = document.querySelector('#cfg-telegram-token-toggle i');
+    if (tokenIcon) tokenIcon.className = 'fas fa-eye text-xs';
+
+    if (!tokenInput._cfgBound) {
+        tokenInput.addEventListener('focus', function() {
+            if (this.dataset.masked === '1') {
+                this.value = '';
+                this.dataset.masked = '';
+                this.classList.remove('cfg-key-masked');
+            }
+        });
+        tokenInput.addEventListener('blur', function() {
+            if (!this.value.trim() && this.dataset.maskedVal) {
+                this.value = this.dataset.maskedVal;
+                this.dataset.masked = '1';
+                this.classList.add('cfg-key-masked');
+            }
+        });
+        tokenInput.addEventListener('input', function() {
+            this.dataset.masked = '';
+        });
+        tokenInput._cfgBound = true;
+    }
+
+    const proxyInput = document.getElementById('cfg-telegram-proxy');
+    if (proxyInput) proxyInput.value = data.telegram_proxy || '';
+
+    const adminInput = document.getElementById('cfg-telegram-admin-ids');
+    if (adminInput) adminInput.value = data.telegram_admin_ids || '';
+}
+
+function toggleTelegramTokenVisibility() {
+    const input = document.getElementById('cfg-telegram-token');
+    if (!input) return;
+    const icon = document.querySelector('#cfg-telegram-token-toggle i');
+    if (input.classList.contains('cfg-key-masked')) {
+        input.classList.remove('cfg-key-masked');
+        if (icon) icon.className = 'fas fa-eye-slash text-xs';
+    } else {
+        input.classList.add('cfg-key-masked');
+        if (icon) icon.className = 'fas fa-eye text-xs';
+    }
+}
+
+function saveTelegramConfig() {
+    const updates = {};
+    const tokenInput = document.getElementById('cfg-telegram-token');
+    if (tokenInput && tokenInput.dataset.masked !== '1') {
+        const v = tokenInput.value.trim();
+        if (v) updates.telegram_token = v;
+    }
+    const proxyInput = document.getElementById('cfg-telegram-proxy');
+    if (proxyInput) updates.telegram_proxy = proxyInput.value.trim();
+    const adminInput = document.getElementById('cfg-telegram-admin-ids');
+    if (adminInput) updates.telegram_admin_ids = adminInput.value.trim();
+
+    // If nothing changed (token still masked + others unchanged), just ack.
+    if (Object.keys(updates).length === 0) {
+        showStatus('cfg-telegram-status', 'config_saved', false);
+        return;
+    }
+
+    const btn = document.getElementById('cfg-telegram-save');
+    btn.disabled = true;
+    fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showStatus('cfg-telegram-status', 'config_saved', false);
+            // Re-fetch masked token for display
+            if (data.applied && data.applied.telegram_token) {
+                const v = data.applied.telegram_token;
+                const masked = v.length > 8
+                    ? v.substring(0, 4) + '*'.repeat(v.length - 8) + v.substring(v.length - 4)
+                    : v;
+                tokenInput.value = masked;
+                tokenInput.dataset.masked = '1';
+                tokenInput.dataset.maskedVal = masked;
+                tokenInput.classList.add('cfg-key-masked');
+                const icon = document.querySelector('#cfg-telegram-token-toggle i');
+                if (icon) icon.className = 'fas fa-eye text-xs';
+            }
+        } else {
+            showStatus('cfg-telegram-status', 'config_save_error', true);
+        }
+    })
+    .catch(() => showStatus('cfg-telegram-status', 'config_save_error', true))
+    .finally(() => { btn.disabled = false; });
+}
+
+// =====================================================================
+// External Cron Trigger (/run-task) config
+// =====================================================================
+
+function initRunTaskConfig(data) {
+    const keyInput = document.getElementById('cfg-run-task-key');
+    if (!keyInput) return;
+    const maskedKey = data.run_task_api_key_masked || '';
+    keyInput.value = maskedKey;
+    keyInput.dataset.masked = maskedKey ? '1' : '';
+    keyInput.dataset.maskedVal = maskedKey;
+    keyInput.classList.toggle('cfg-key-masked', !!maskedKey);
+    const keyIcon = document.querySelector('#cfg-run-task-key-toggle i');
+    if (keyIcon) keyIcon.className = 'fas fa-eye text-xs';
+
+    if (!keyInput._cfgBound) {
+        keyInput.addEventListener('focus', function() {
+            if (this.dataset.masked === '1') {
+                this.value = '';
+                this.dataset.masked = '';
+                this.classList.remove('cfg-key-masked');
+            }
+        });
+        keyInput.addEventListener('blur', function() {
+            if (!this.value.trim() && this.dataset.maskedVal) {
+                this.value = this.dataset.maskedVal;
+                this.dataset.masked = '1';
+                this.classList.add('cfg-key-masked');
+            }
+        });
+        keyInput.addEventListener('input', function() {
+            this.dataset.masked = '';
+        });
+        keyInput._cfgBound = true;
+    }
+}
+
+function toggleRunTaskKeyVisibility() {
+    const input = document.getElementById('cfg-run-task-key');
+    if (!input) return;
+    const icon = document.querySelector('#cfg-run-task-key-toggle i');
+    if (input.classList.contains('cfg-key-masked')) {
+        input.classList.remove('cfg-key-masked');
+        if (icon) icon.className = 'fas fa-eye-slash text-xs';
+    } else {
+        input.classList.add('cfg-key-masked');
+        if (icon) icon.className = 'fas fa-eye text-xs';
+    }
+}
+
+function saveRunTaskConfig() {
+    const keyInput = document.getElementById('cfg-run-task-key');
+    if (!keyInput || keyInput.dataset.masked === '1') {
+        showStatus('cfg-run-task-status', 'config_saved', false);
+        return;
+    }
+    const updates = { run_task_api_key: keyInput.value.trim() };
+
+    const btn = document.getElementById('cfg-run-task-save');
+    btn.disabled = true;
+    fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showStatus('cfg-run-task-status', 'config_saved', false);
+            if (data.applied && data.applied.run_task_api_key) {
+                const v = data.applied.run_task_api_key;
+                const masked = v.length > 8
+                    ? v.substring(0, 4) + '*'.repeat(v.length - 8) + v.substring(v.length - 4)
+                    : v;
+                keyInput.value = masked;
+                keyInput.dataset.masked = '1';
+                keyInput.dataset.maskedVal = masked;
+                keyInput.classList.add('cfg-key-masked');
+                const icon = document.querySelector('#cfg-run-task-key-toggle i');
+                if (icon) icon.className = 'fas fa-eye text-xs';
+            }
+        } else {
+            showStatus('cfg-run-task-status', 'config_save_error', true);
+        }
+    })
+    .catch(() => showStatus('cfg-run-task-status', 'config_save_error', true))
+    .finally(() => { btn.disabled = false; });
 }
 
 function detectProvider(model) {
