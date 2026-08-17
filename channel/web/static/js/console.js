@@ -2974,6 +2974,24 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                         w.style.display = '';
                         delete w.dataset.onyxCardPending;
                     });
+                    // PRD fix: final delayed pass to catch any JSON cards that weren't
+                    // rendered by the initial applyHighlighting call. The 30ms delay
+                    // inside applyHighlighting's hook isn't always enough if the DOM
+                    // was just rebuilt by renderMarkdown. This 200ms pass is a safety net.
+                    setTimeout(() => {
+                        try {
+                            _addCodeBlockHeaders(contentEl);
+                            _restoreCachedCards(contentEl);
+                            _addCustomJsonCards(contentEl);
+                            // Re-unhide any remaining pending blocks that didn't become cards
+                            contentEl.querySelectorAll('.code-block-wrapper[data-onyx-card-pending="true"]').forEach(w => {
+                                w.style.display = '';
+                                delete w.dataset.onyxCardPending;
+                            });
+                        } catch (e) {
+                            console.warn('[card final-pass] failed:', e);
+                        }
+                    }, 200);
                 }
 
                 // Backfill seq metadata so edit/regenerate buttons can call
@@ -4776,6 +4794,9 @@ function initTelegramConfig(data) {
 
     const adminInput = document.getElementById('cfg-telegram-admin-ids');
     if (adminInput) adminInput.value = data.telegram_admin_ids || '';
+
+    // Streaming toggle
+    updateTelegramStreamingUI(data.telegram_streaming === true);
 }
 
 function toggleTelegramTokenVisibility() {
@@ -5060,6 +5081,47 @@ function updateTelegramConnBadge(running, botUsername) {
     } else {
         badge.textContent = 'Not running';
         badge.className = 'text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400';
+    }
+}
+
+// PRD: Telegram streaming toggle
+function toggleTelegramStreaming() {
+    const btn = document.getElementById('cfg-telegram-streaming-toggle');
+    if (!btn) return;
+    const isOn = btn.classList.contains('streaming-on');
+    const newState = !isOn;
+    fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: { telegram_streaming: newState } }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            updateTelegramStreamingUI(newState);
+            if (typeof showToast === 'function') {
+                showToast(`Telegram streaming ${newState ? 'enabled' : 'disabled'}`, 'info');
+            }
+        }
+    })
+    .catch(() => {
+        if (typeof toastError === 'function') toastError('Failed to toggle streaming');
+    });
+}
+
+function updateTelegramStreamingUI(enabled) {
+    const btn = document.getElementById('cfg-telegram-streaming-toggle');
+    if (!btn) return;
+    if (enabled) {
+        btn.classList.add('streaming-on');
+        btn.style.background = 'rgb(99, 102, 241)';
+        const span = btn.querySelector('span');
+        if (span) span.style.transform = 'translateX(20px)';
+    } else {
+        btn.classList.remove('streaming-on');
+        btn.style.background = '#d1d5db';
+        const span = btn.querySelector('span');
+        if (span) span.style.transform = 'translateX(2px)';
     }
 }
 

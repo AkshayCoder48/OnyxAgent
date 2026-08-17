@@ -36,7 +36,13 @@ class Ls(BaseTool):
     
     def __init__(self, config: dict = None):
         self.config = config or {}
-        self.cwd = self.config.get("cwd", os.getcwd())
+        # Default to the agent workspace (same path the web UI file browser uses).
+        # This ensures files created via the web UI are visible to the agent when
+        # invoked from any channel (Telegram, web, etc.).
+        from config import conf
+        from common.utils import expand_path
+        workspace = expand_path(conf().get("agent_workspace", "~/onyx"))
+        self.cwd = self.config.get("cwd", workspace)
     
     def execute(self, args: Dict[str, Any]) -> ToolResult:
         """

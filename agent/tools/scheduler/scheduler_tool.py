@@ -9,7 +9,7 @@ IST setting "7am" had it stored as 7am UTC.
 
 import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 from croniter import croniter
 

@@ -2431,6 +2431,10 @@ class ConfigHandler:
         # admin_ids is a comma-separated Telegram user ID list to restrict who
         # can issue commands to the bot (empty = anyone who can DM the bot).
         "telegram_token", "telegram_proxy", "telegram_admin_ids",
+        # Telegram streaming: when true, the bot edits its message in real-time
+        # as tokens arrive (like ChatGPT). When false, it sends the complete
+        # response only after the agent finishes.
+        "telegram_streaming",
         # Manual timezone override (IANA name like "Asia/Kolkata").
         # When set, the scheduler interprets all user-supplied times in this tz.
         # When empty, the scheduler auto-detects tz from the inbound IP
@@ -2543,6 +2547,7 @@ class ConfigHandler:
                 "telegram_token_masked": masked_tg_token,
                 "telegram_proxy": local_config.get("telegram_proxy", ""),
                 "telegram_admin_ids": local_config.get("telegram_admin_ids", ""),
+                "telegram_streaming": bool(local_config.get("telegram_streaming", False)),
                 # Timezone config — `timezone` is the manual override (empty =
                 # auto-detect from IP). `detected_timezone` is what IP
                 # geolocation returned. `effective_timezone` is what the

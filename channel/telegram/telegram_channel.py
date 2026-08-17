@@ -292,6 +292,128 @@ class TelegramChannel(ChatChannel):
         logger.info("[Telegram] stop() completed")
 
     # ------------------------------------------------------------------
+    # Tool status notifications (PRD: show tool used + arguments + output)
+    # ------------------------------------------------------------------
+
+    def _make_telegram_event_callback(self, chat_id: int):
+        """Build an on_event callback that sends tool status notifications to Telegram.
+
+        For each tool call, the user sees:
+          🔧 Running: <tool_name>
+          📋 Arguments: <truncated args>
+        And when the tool finishes:
+          ✅ Done: <tool_name> (<execution_time>s)
+        Or on error:
+          ❌ Failed: <tool_name> — <error>
+
+        For streaming (if telegram_streaming is enabled in config), token
+        deltas are also forwarded as message edits.
+        """
+        streaming_enabled = bool(conf().get("telegram_streaming", False))
+        # Track the streaming message ID so we can edit it as tokens arrive.
+        stream_msg_id = [None]  # mutable closure container
+        stream_text = [""]
+        stream_last_edit = [0]  # throttle edits to every 1s
+
+        def on_event(event: dict):
+            try:
+                event_type = event.get("type", "")
+                data = event.get("data", {})
+
+                if event_type == "tool_execution_start":
+                    tool_name = data.get("tool_name", "tool")
+                    arguments = data.get("arguments", {})
+                    args_str = str(arguments)
+                    if len(args_str) > 200:
+                        args_str = args_str[:200] + "..."
+                    text = f"🔧 *Running:* `{tool_name}`\n📋 Args: `{args_str}`"
+                    asyncio.run_coroutine_threadsafe(
+                        self._bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown"),
+                        self._loop,
+                    )
+
+                elif event_type == "tool_execution_end":
+                    tool_name = data.get("tool_name", "tool")
+                    status = data.get("status", "success")
+                    exec_time = data.get("execution_time", 0)
+                    result = data.get("result", "")
+
+                    if status == "success":
+                        result_str = str(result)
+                        if len(result_str) > 300:
+                            result_str = result_str[:300] + "..."
+                        text = f"✅ *Done:* `{tool_name}` ({exec_time:.1f}s)\n📤 Result: `{result_str}`"
+                    else:
+                        text = f"❌ *Failed:* `{tool_name}` — {result}"
+
+                    asyncio.run_coroutine_threadsafe(
+                        self._bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown"),
+                        self._loop,
+                    )
+
+                elif event_type == "reasoning_update" and streaming_enabled:
+                    # Show reasoning in streaming mode (throttled)
+                    delta = data.get("delta", "")
+                    if delta:
+                        stream_text[0] += delta
+                        now = time.time()
+                        if now - stream_last_edit[0] > 1.0:
+                            stream_last_edit[0] = now
+                            asyncio.run_coroutine_threadsafe(
+                                self._edit_or_send_stream(chat_id, stream_msg_id, stream_text[0]),
+                                self._loop,
+                            )
+
+                elif event_type == "message_update" and streaming_enabled:
+                    delta = data.get("delta", "")
+                    if delta:
+                        stream_text[0] += delta
+                        now = time.time()
+                        if now - stream_last_edit[0] > 1.0:
+                            stream_last_edit[0] = now
+                            asyncio.run_coroutine_threadsafe(
+                                self._edit_or_send_stream(chat_id, stream_msg_id, stream_text[0]),
+                                self._loop,
+                            )
+
+                elif event_type == "message_end" and streaming_enabled:
+                    # Final edit with the complete text
+                    if stream_text[0] and stream_msg_id[0]:
+                        asyncio.run_coroutine_threadsafe(
+                            self._bot.edit_message_text(
+                                chat_id=chat_id,
+                                message_id=stream_msg_id[0],
+                                text=stream_text[0][:4000],
+                            ),
+                            self._loop,
+                        )
+                    stream_msg_id[0] = None
+                    stream_text[0] = ""
+
+            except Exception as e:
+                logger.debug(f"[Telegram] on_event error: {e}")
+
+        return on_event
+
+    async def _edit_or_send_stream(self, chat_id, msg_id_ref, text):
+        """Edit the streaming message if it exists, otherwise send a new one."""
+        try:
+            truncated = text[:4000]
+            if msg_id_ref[0]:
+                await self._bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=msg_id_ref[0],
+                    text=truncated,
+                )
+            else:
+                msg = await self._bot.send_message(chat_id=chat_id, text=truncated)
+                msg_id_ref[0] = msg.message_id
+        except Exception as e:
+            # "Message is not modified" is expected when text hasn't changed
+            if "not modified" not in str(e).lower():
+                logger.debug(f"[Telegram] stream edit failed: {e}")
+
+    # ------------------------------------------------------------------
     # Inbound: telegram update -> ChatMessage -> ChatChannel.produce
     # ------------------------------------------------------------------
 
@@ -580,6 +702,29 @@ class TelegramChannel(ChatChannel):
                 context["receiver"] = str(chat.id)
                 context["telegram_chat_id"] = chat.id
                 context["telegram_reply_to_msg_id"] = message.message_id if is_group else None
+
+                # PRD: tool status notifications for Telegram.
+                # The on_event callback intercepts tool_execution_start/end events
+                # and sends a compact notification to the user's Telegram chat so
+                # they can see what the agent is doing (e.g. "🔧 Running: browser",
+                # "✅ Done: write (index.html)").
+                context["on_event"] = self._make_telegram_event_callback(chat.id)
+
+                # PRD: persist Telegram conversations to the conversation store
+                # so they're mirrored on the web UI. The store is shared across
+                # all channels — writing here makes the session appear in the
+                # web sidebar and its history is loadable via /api/history.
+                try:
+                    from agent.memory import get_conversation_store
+                    store = get_conversation_store()
+                    store.ensure_session(
+                        session_id,
+                        channel_type="telegram",
+                        title=f"Telegram: {chat.first_name or chat.title or chat.id}",
+                    )
+                except Exception as e:
+                    logger.debug(f"[Telegram] ensure_session failed (non-fatal): {e}")
+
                 self.produce(context)
             logger.debug(f"[Telegram] received: type={ctype}, content={str(tg_msg.content)[:80]}")
 

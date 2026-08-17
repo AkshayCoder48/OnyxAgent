@@ -244,6 +244,9 @@ def _build_tooling_section(tools: List[Any], language: str) -> List[str]:
             "scheduler": "manage scheduled tasks and reminders",
             "send": "send a local file to the user (local files only; put URLs directly in the reply text)",
             "vision": "analyze images (recognition, description, OCR, etc.)",
+            "ask": "ask the user a question (single-select, multi-select, text, or confirm) and wait for their answer — use this instead of outputting raw JSON when you need input",
+            "todo": "manage todo lists (create, add, complete, edit, delete items)",
+            "workflow": "create and manage reusable AI workflows",
         }
     else:
         core_summaries = {
@@ -264,6 +267,9 @@ def _build_tooling_section(tools: List[Any], language: str) -> List[str]:
             "scheduler": "管理定时任务和提醒",
             "send": "发送本地文件给用户（仅限本地文件，URL直接放在回复文本中）",
             "vision": "分析图片内容（识别、描述、OCR文字提取等）",
+            "ask": "向用户提问（单选、多选、文本、确认）并等待回答 — 需要用户输入时使用此工具，不要输出原始JSON",
+            "todo": "管理待办列表（创建、添加、完成、编辑、删除）",
+            "workflow": "创建和管理可复用的AI工作流",
         }
 
     # Preferred display order
@@ -273,6 +279,7 @@ def _build_tooling_section(tools: List[Any], language: str) -> List[str]:
         "web_search", "web_fetch", "browser",
         "memory_search", "memory_get",
         "env_config", "scheduler", "send", "vision",
+        "ask", "todo", "workflow",
     ]
 
     # Build name -> summary mapping for available tools
