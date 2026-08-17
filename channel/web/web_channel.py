@@ -1195,6 +1195,7 @@ class WebChannel(ChatChannel):
             '/api/scheduler/edit', 'SchedulerEditHandler',
             '/api/scheduler/delete', 'SchedulerDeleteHandler',
             '/api/scheduler/toggle', 'SchedulerToggleHandler',
+            '/api/scheduler/purge', 'SchedulerPurgeHandler',
             '/api/answer', 'AnswerHandler',
             '/api/sessions', 'SessionsHandler',
             '/api/sessions/(.*)/generate_title', 'SessionTitleHandler',
@@ -2435,6 +2436,11 @@ class ConfigHandler:
         # as tokens arrive (like ChatGPT). When false, it sends the complete
         # response only after the agent finishes.
         "telegram_streaming",
+        # Telegram tool notifications: when true, the bot sends a message for
+        # each tool call showing the tool name, arguments, and (optionally)
+        # the result. Only the ARGS are always shown; the result output is
+        # gated by this toggle.
+        "telegram_show_tools",
         # Manual timezone override (IANA name like "Asia/Kolkata").
         # When set, the scheduler interprets all user-supplied times in this tz.
         # When empty, the scheduler auto-detects tz from the inbound IP
@@ -2548,6 +2554,7 @@ class ConfigHandler:
                 "telegram_proxy": local_config.get("telegram_proxy", ""),
                 "telegram_admin_ids": local_config.get("telegram_admin_ids", ""),
                 "telegram_streaming": bool(local_config.get("telegram_streaming", False)),
+                "telegram_show_tools": bool(local_config.get("telegram_show_tools", True)),
                 # Timezone config — `timezone` is the manual override (empty =
                 # auto-detect from IP). `detected_timezone` is what IP
                 # geolocation returned. `effective_timezone` is what the
@@ -5436,6 +5443,50 @@ class SchedulerToggleHandler:
             logger.info(f"[SchedulerUI] Toggled task {task_id} -> enabled={enabled}")
             return json.dumps({"status": "success"})
         except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class SchedulerPurgeHandler:
+    """POST /api/scheduler/purge — delete ALL scheduled tasks.
+
+    Used when the VPS was rebuilt/wiped and orphaned tasks from the old
+    instance are still firing (e.g. email reminders keep sending because
+    tasks.json survived on persistent storage). This endpoint wipes the
+    entire tasks.json so the scheduler has nothing to fire.
+
+    Body (optional):
+      { "confirm": true }   — required to actually purge (safety net)
+    """
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or "{}")
+            if not body.get("confirm"):
+                return json.dumps({
+                    "status": "error",
+                    "message": 'Confirmation required: send {"confirm": true} to purge all tasks.',
+                })
+
+            store = _scheduler_store()
+            tasks = store.list_tasks()
+            count = len(tasks)
+
+            # Delete the tasks.json file entirely so the scheduler starts fresh.
+            import os
+            if os.path.exists(store.store_path):
+                os.remove(store.store_path)
+                logger.info(f"[SchedulerUI] Purged {count} task(s) — deleted {store.store_path}")
+            else:
+                logger.info("[SchedulerUI] No tasks.json to purge")
+
+            return json.dumps({
+                "status": "success",
+                "purged": count,
+                "message": f"Deleted {count} scheduled task(s). The scheduler will start fresh.",
+            })
+        except Exception as e:
+            logger.error(f"[SchedulerPurgeHandler] error: {e}", exc_info=True)
             return json.dumps({"status": "error", "message": str(e)})
 
 

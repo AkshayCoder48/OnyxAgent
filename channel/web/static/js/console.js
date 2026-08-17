@@ -4797,6 +4797,8 @@ function initTelegramConfig(data) {
 
     // Streaming toggle
     updateTelegramStreamingUI(data.telegram_streaming === true);
+    // Tool output toggle
+    updateTelegramShowToolsUI(data.telegram_show_tools !== false);
 }
 
 function toggleTelegramTokenVisibility() {
@@ -5122,6 +5124,77 @@ function updateTelegramStreamingUI(enabled) {
         btn.style.background = '#d1d5db';
         const span = btn.querySelector('span');
         if (span) span.style.transform = 'translateX(2px)';
+    }
+}
+
+// PRD: Toggle tool output visibility in Telegram
+function toggleTelegramShowTools() {
+    const btn = document.getElementById('cfg-telegram-show-tools-toggle');
+    if (!btn) return;
+    const isOn = btn.classList.contains('tools-on');
+    const newState = !isOn;
+    fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: { telegram_show_tools: newState } }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            updateTelegramShowToolsUI(newState);
+            if (typeof showToast === 'function') {
+                showToast(`Tool notifications ${newState ? 'enabled' : 'disabled'}`, 'info');
+            }
+        }
+    })
+    .catch(() => {
+        if (typeof toastError === 'function') toastError('Failed to toggle tool notifications');
+    });
+}
+
+function updateTelegramShowToolsUI(enabled) {
+    const btn = document.getElementById('cfg-telegram-show-tools-toggle');
+    if (!btn) return;
+    if (enabled) {
+        btn.classList.add('tools-on');
+        btn.style.background = 'rgb(99, 102, 241)';
+        const span = btn.querySelector('span');
+        if (span) span.style.transform = 'translateX(20px)';
+    } else {
+        btn.classList.remove('tools-on');
+        btn.style.background = '#d1d5db';
+        const span = btn.querySelector('span');
+        if (span) span.style.transform = 'translateX(2px)';
+    }
+}
+
+// PRD: Purge all scheduled tasks — used when the VPS was rebuilt/wiped and
+// orphaned tasks from the old instance are still firing.
+async function purgeAllTasks() {
+    if (!confirm('Delete ALL scheduled tasks permanently? This cannot be undone. Use this if your VPS was rebuilt and old tasks are still firing.')) {
+        return;
+    }
+    try {
+        const res = await fetch('/api/scheduler/purge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: true }),
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            if (typeof toastSuccess === 'function') {
+                toastSuccess(data.message || `Purged ${data.purged} task(s)`);
+            }
+            // Reload the tasks list
+            if (typeof loadTasksView === 'function') loadTasksView();
+            else setTimeout(() => window.location.reload(), 1500);
+        } else {
+            if (typeof toastError === 'function') {
+                toastError(data.message || 'Failed to purge tasks');
+            }
+        }
+    } catch (err) {
+        if (typeof toastError === 'function') toastError(err.message);
     }
 }
 

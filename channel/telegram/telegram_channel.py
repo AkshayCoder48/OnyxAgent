@@ -308,31 +308,48 @@ class TelegramChannel(ChatChannel):
 
         For streaming (if telegram_streaming is enabled in config), token
         deltas are also forwarded as message edits.
+
+        Config keys:
+          - telegram_streaming: bool — edit message in real-time
+          - telegram_show_tools: bool — show tool status notifications (default True)
+            When True: shows 🔧 Running + ✅ Done (with args + result).
+            When False: suppresses all tool notifications.
         """
         streaming_enabled = bool(conf().get("telegram_streaming", False))
+        show_tools = bool(conf().get("telegram_show_tools", True))
         # Track the streaming message ID so we can edit it as tokens arrive.
         stream_msg_id = [None]  # mutable closure container
         stream_text = [""]
-        stream_last_edit = [0]  # throttle edits to every 1s
+        stream_last_edit = [0.0]  # throttle edits to every 1s
+
+        def _safe_schedule(coro_factory):
+            """Schedule a coroutine on the Telegram loop, swallowing errors."""
+            try:
+                loop = self._loop
+                if loop is None or not loop.is_running():
+                    return
+                asyncio.run_coroutine_threadsafe(coro_factory(), loop)
+            except Exception as e:
+                logger.debug(f"[Telegram] _safe_schedule failed: {e}")
 
         def on_event(event: dict):
             try:
                 event_type = event.get("type", "")
                 data = event.get("data", {})
 
-                if event_type == "tool_execution_start":
+                # Tool notifications (gated by telegram_show_tools)
+                if show_tools and event_type == "tool_execution_start":
                     tool_name = data.get("tool_name", "tool")
                     arguments = data.get("arguments", {})
                     args_str = str(arguments)
                     if len(args_str) > 200:
                         args_str = args_str[:200] + "..."
                     text = f"🔧 *Running:* `{tool_name}`\n📋 Args: `{args_str}`"
-                    asyncio.run_coroutine_threadsafe(
-                        self._bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown"),
-                        self._loop,
-                    )
+                    _safe_schedule(lambda: self._bot.send_message(
+                        chat_id=chat_id, text=text, parse_mode="Markdown",
+                    ))
 
-                elif event_type == "tool_execution_end":
+                elif show_tools and event_type == "tool_execution_end":
                     tool_name = data.get("tool_name", "tool")
                     status = data.get("status", "success")
                     exec_time = data.get("execution_time", 0)
@@ -346,47 +363,30 @@ class TelegramChannel(ChatChannel):
                     else:
                         text = f"❌ *Failed:* `{tool_name}` — {result}"
 
-                    asyncio.run_coroutine_threadsafe(
-                        self._bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown"),
-                        self._loop,
-                    )
+                    _safe_schedule(lambda: self._bot.send_message(
+                        chat_id=chat_id, text=text, parse_mode="Markdown",
+                    ))
 
-                elif event_type == "reasoning_update" and streaming_enabled:
-                    # Show reasoning in streaming mode (throttled)
+                # Streaming (gated by telegram_streaming)
+                elif streaming_enabled and event_type in ("reasoning_update", "message_update"):
                     delta = data.get("delta", "")
                     if delta:
                         stream_text[0] += delta
                         now = time.time()
                         if now - stream_last_edit[0] > 1.0:
                             stream_last_edit[0] = now
-                            asyncio.run_coroutine_threadsafe(
-                                self._edit_or_send_stream(chat_id, stream_msg_id, stream_text[0]),
-                                self._loop,
-                            )
+                            _safe_schedule(lambda: self._edit_or_send_stream(
+                                chat_id, stream_msg_id, stream_text[0],
+                            ))
 
-                elif event_type == "message_update" and streaming_enabled:
-                    delta = data.get("delta", "")
-                    if delta:
-                        stream_text[0] += delta
-                        now = time.time()
-                        if now - stream_last_edit[0] > 1.0:
-                            stream_last_edit[0] = now
-                            asyncio.run_coroutine_threadsafe(
-                                self._edit_or_send_stream(chat_id, stream_msg_id, stream_text[0]),
-                                self._loop,
-                            )
-
-                elif event_type == "message_end" and streaming_enabled:
+                elif streaming_enabled and event_type == "message_end":
                     # Final edit with the complete text
                     if stream_text[0] and stream_msg_id[0]:
-                        asyncio.run_coroutine_threadsafe(
-                            self._bot.edit_message_text(
-                                chat_id=chat_id,
-                                message_id=stream_msg_id[0],
-                                text=stream_text[0][:4000],
-                            ),
-                            self._loop,
-                        )
+                        _safe_schedule(lambda: self._bot.edit_message_text(
+                            chat_id=chat_id,
+                            message_id=stream_msg_id[0],
+                            text=stream_text[0][:4000],
+                        ))
                     stream_msg_id[0] = None
                     stream_text[0] = ""
 
