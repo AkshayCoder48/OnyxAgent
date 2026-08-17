@@ -1166,6 +1166,49 @@ class ConversationStore:
             finally:
                 conn.close()
 
+    def ensure_session(
+        self,
+        session_id: str,
+        channel_type: str = "",
+        title: str = "",
+    ) -> None:
+        """Create a session row if it doesn't already exist.
+
+        Used by the scheduler to auto-create a dedicated chat session per
+        scheduled task so the user can see all run details + outputs in
+        one place, with the task name as the title.
+        """
+        import time as _time
+        with self._lock:
+            conn = self._connect()
+            try:
+                with conn:
+                    existing = conn.execute(
+                        "SELECT 1 FROM sessions WHERE session_id = ?",
+                        (session_id,),
+                    ).fetchone()
+                    if existing:
+                        # Optionally update the title if one was provided
+                        # and the existing title is empty.
+                        if title:
+                            conn.execute(
+                                "UPDATE sessions SET title = COALESCE(NULLIF(title, ''), ?), "
+                                "                channel_type = COALESCE(NULLIF(channel_type, ''), ?), "
+                                "                last_active = ? "
+                                "WHERE session_id = ? AND (title IS NULL OR title = '')",
+                                (title, channel_type, int(_time.time()), session_id),
+                            )
+                        return
+                    conn.execute(
+                        "INSERT INTO sessions (session_id, channel_type, title, "
+                        "created_at, last_active, msg_count) "
+                        "VALUES (?, ?, ?, ?, ?, 0)",
+                        (session_id, channel_type or "", title or "",
+                         _time.time(), int(_time.time())),
+                    )
+            finally:
+                conn.close()
+
     def get_stats(self) -> Dict[str, Any]:
         """Return basic stats keyed by channel_type, for monitoring."""
         with self._lock:

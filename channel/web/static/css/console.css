@@ -636,8 +636,17 @@ body, #app, #main-content {
     opacity: 0.5;
 }
 .agent-thinking-step.expanded .thinking-chevron { transform: rotate(90deg); }
+
+/* IMPORTANT: While streaming, the reasoning should be VISIBLE so the user
+   can watch the AI think. The previous rule (`display: none` on
+   `.thinking-full`) caused the streaming text to be invisible until the user
+   manually clicked to expand. Now we show `.thinking-full` by default and
+   only collapse it after finalizeThinking() runs (which removes the
+   `expanded` class — but the user can click to re-expand at any time). */
 .agent-thinking-step .thinking-full {
-    display: none;
+    /* Visible by default during streaming; finalizeThinking() collapses by
+       removing the `expanded` class, after which the rule below hides it. */
+    display: block;
     margin-top: 0.375rem;
     margin-left: 1rem;
     padding: 0.5rem 0.75rem;
@@ -653,6 +662,12 @@ body, #app, #main-content {
 .dark .agent-thinking-step .thinking-full {
     background: rgba(139, 92, 246, 0.06);
     border-color: rgba(139, 92, 246, 0.12);
+}
+
+/* After finalization (collapsed state), hide the full content unless the
+   user explicitly expands it. The `.expanded` class is added on click. */
+.agent-thinking-step:not(.expanded) .thinking-full {
+    display: none;
 }
 .agent-thinking-step.expanded .thinking-full { display: block; }
 .agent-thinking-step .thinking-full p { margin: 0.25em 0; }
@@ -679,6 +694,119 @@ body, #app, #main-content {
     word-break: break-word;
     overflow-wrap: anywhere;
 }
+
+/* ── AI Question Card ──────────────────────────────────────────────────
+   Rendered when the AI calls the `ask` tool to ask the user a question.
+   The card appears AFTER the AI's text response completes streaming, and
+   each question appears one-by-one (not batched) because the AskTool
+   blocks until each answer is received.
+   ──────────────────────────────────────────────────────────────────── */
+.agent-question-card {
+    border: 1px solid var(--onyx-primary-rgb, 99, 102, 241);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 10px;
+    background: rgba(99, 102, 241, 0.03);
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 0;
+}
+.dark .agent-question-card {
+    background: rgba(99, 102, 241, 0.06);
+    border-color: rgba(99, 102, 241, 0.4);
+}
+.agent-question-card .question-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.625rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #1f2937;
+}
+.dark .agent-question-card .question-header { color: #e5e7eb; }
+.agent-question-card .question-prompt { flex: 1; line-height: 1.4; }
+.agent-question-card .question-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+.agent-question-card .question-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-size: 0.8125rem;
+    border: 1px solid transparent;
+}
+.agent-question-card .question-option:hover {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: rgba(99, 102, 241, 0.2);
+}
+.agent-question-card .question-option input { margin: 0; cursor: pointer; }
+.agent-question-card .question-text-input {
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.8125rem;
+    resize: vertical;
+    min-height: 60px;
+    background: white;
+    color: #1f2937;
+}
+.dark .agent-question-card .question-text-input {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #e5e7eb;
+}
+.agent-question-card .question-text-input:focus {
+    outline: none;
+    border-color: rgb(99, 102, 241);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+.agent-question-card .question-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+}
+.agent-question-card .question-submit {
+    padding: 0.375rem 0.875rem;
+    background: rgb(99, 102, 241);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.agent-question-card .question-submit:hover:not(:disabled) {
+    background: rgb(79, 70, 249);
+}
+.agent-question-card .question-submit:disabled {
+    background: #d1d5db;
+    cursor: not-allowed;
+    color: #6b7280;
+}
+.dark .agent-question-card .question-submit:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: #6b7280;
+}
+.agent-question-card .question-submit.submitted {
+    background: #10b981;
+    color: white;
+    cursor: default;
+}
+.agent-question-card .question-status {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+.agent-question-card .question-status.answered { color: #10b981; font-weight: 500; }
+.agent-question-card .question-status.error { color: #ef4444; }
 
 /* Content step - real text output frozen before tool calls */
 .agent-content-step {

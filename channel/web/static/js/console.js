@@ -2642,6 +2642,28 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                 toolElements.delete(item.tool_call_id);
                 scrollChatToBottom();
 
+            } else if (item.type === 'question') {
+                // AI asked the user a question via the Ask tool. Render an
+                // interactive UI card. Questions appear AFTER the AI's text
+                // response finishes streaming (the Ask tool is called after
+                // the text), so they show up one by one — not batched.
+                ensureBotEl();
+                if (currentReasoningEl) {
+                    finalizeThinking(currentReasoningEl, reasoningStartTime, reasoningText);
+                    currentReasoningEl = null;
+                    reasoningText = '';
+                }
+                const qEl = renderQuestionCard(item);
+                if (qEl) {
+                    stepsEl.appendChild(qEl);
+                    scrollChatToBottom();
+                    // Auto-focus the input if it's a text question.
+                    if (item.question_type === 'text') {
+                        const input = qEl.querySelector('.question-text-input');
+                        if (input) input.focus();
+                    }
+                }
+
             } else if (item.type === 'image') {
                 ensureBotEl();
                 const imgEl = document.createElement('img');
@@ -3082,6 +3104,167 @@ function renderThinkingHtml(text) {
     </div>
     <div class="thinking-full">${_renderReasoningBody(full)}</div>
 </div>`;
+}
+
+// =====================================================================
+// AI Question Card — interactive UI for when the AI asks the user a question.
+// Different question types render different controls:
+//   - single_select : radio-button list (pick exactly one)
+//   - multi_select  : checkbox list (pick any subset)
+//   - text          : free-form textarea
+//   - confirm       : Yes / No buttons (shortcut for single_select)
+//
+// The card sends the answer to POST /api/answer, which wakes up the blocked
+// AskTool call on the backend so the agent can continue with the new info.
+// =====================================================================
+
+function renderQuestionCard(item) {
+    if (!item || !item.question_id) return null;
+
+    const qid = item.question_id;
+    const qtype = item.question_type || 'text';
+    const question = escapeHtml(item.question || '');
+    const options = Array.isArray(item.options) ? item.options : [];
+    const placeholder = escapeHtml(item.placeholder || '');
+    const defaultVal = escapeHtml(item.default || '');
+
+    const card = document.createElement('div');
+    card.className = 'agent-step agent-question-card';
+    card.dataset.questionId = qid;
+    card.dataset.questionType = qtype;
+
+    // Build the input HTML based on question type.
+    let inputHtml = '';
+    if (qtype === 'single_select' || qtype === 'confirm') {
+        inputHtml = options.map((opt, i) => `
+            <label class="question-option" data-value="${escapeHtml(opt)}">
+                <input type="radio" name="question-${qid}" value="${escapeHtml(opt)}" ${opt === defaultVal ? 'checked' : ''}>
+                <span>${escapeHtml(opt)}</span>
+            </label>
+        `).join('');
+        inputHtml += `
+            <div class="question-actions">
+                <button class="question-submit" data-qid="${qid}" disabled>Select an option to continue</button>
+            </div>
+        `;
+    } else if (qtype === 'multi_select') {
+        inputHtml = options.map((opt) => `
+            <label class="question-option" data-value="${escapeHtml(opt)}">
+                <input type="checkbox" name="question-${qid}" value="${escapeHtml(opt)}">
+                <span>${escapeHtml(opt)}</span>
+            </label>
+        `).join('');
+        inputHtml += `
+            <div class="question-actions">
+                <button class="question-submit" data-qid="${qid}" disabled>Select at least one option</button>
+            </div>
+        `;
+    } else { // text
+        inputHtml = `
+            <textarea class="question-text-input" rows="3" placeholder="${placeholder || 'Type your answer here…'}">${defaultVal}</textarea>
+            <div class="question-actions">
+                <button class="question-submit" data-qid="${qid}">Submit answer</button>
+            </div>
+        `;
+    }
+
+    card.innerHTML = `
+        <div class="question-header">
+            <i class="fas fa-circle-question text-primary-400 flex-shrink-0"></i>
+            <span class="question-prompt">${question}</span>
+        </div>
+        <div class="question-body">
+            ${inputHtml}
+        </div>
+        <div class="question-status"></div>
+    `;
+
+    // Wire up the submit button + input handlers.
+    const submitBtn = card.querySelector('.question-submit');
+    const statusEl = card.querySelector('.question-status');
+
+    function setSubmitted(answer) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '✓ Submitted';
+        submitBtn.classList.add('submitted');
+        statusEl.textContent = `Answer: ${Array.isArray(answer) ? answer.join(', ') : answer}`;
+        statusEl.classList.add('answered');
+        // Disable inputs after submission.
+        card.querySelectorAll('input, textarea').forEach(el => el.disabled = true);
+    }
+
+    function enableSubmit() { submitBtn.disabled = false; submitBtn.textContent = 'Submit answer'; }
+
+    if (qtype === 'single_select' || qtype === 'confirm') {
+        card.querySelectorAll(`input[name="question-${qid}"]`).forEach(input => {
+            input.addEventListener('change', () => enableSubmit());
+        });
+    } else if (qtype === 'multi_select') {
+        card.querySelectorAll(`input[name="question-${qid}"]`).forEach(input => {
+            input.addEventListener('change', () => {
+                const anyChecked = card.querySelectorAll(`input[name="question-${qid}"]:checked`).length > 0;
+                submitBtn.disabled = !anyChecked;
+                submitBtn.textContent = anyChecked ? 'Submit answer' : 'Select at least one option';
+            });
+        });
+    } else { // text
+        const textInput = card.querySelector('.question-text-input');
+        textInput.addEventListener('input', () => {
+            submitBtn.disabled = !textInput.value.trim();
+        });
+        textInput.addEventListener('keydown', (e) => {
+            // Ctrl+Enter or Cmd+Enter submits.
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                if (!submitBtn.disabled) submitBtn.click();
+            }
+        });
+        // Initial state.
+        submitBtn.disabled = !textInput.value.trim();
+    }
+
+    submitBtn.addEventListener('click', async () => {
+        let answer;
+        if (qtype === 'single_select' || qtype === 'confirm') {
+            const selected = card.querySelector(`input[name="question-${qid}"]:checked`);
+            if (!selected) return;
+            answer = selected.value;
+        } else if (qtype === 'multi_select') {
+            const selected = Array.from(card.querySelectorAll(`input[name="question-${qid}"]:checked`));
+            answer = selected.map(s => s.value);
+            if (answer.length === 0) return;
+        } else {
+            const textInput = card.querySelector('.question-text-input');
+            answer = textInput.value.trim();
+            if (!answer) return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting…';
+        try {
+            const res = await fetch('/api/answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question_id: qid, answer }),
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                setSubmitted(answer);
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit answer';
+                statusEl.textContent = `⚠️ ${data.message || 'Failed to submit'}`;
+                statusEl.classList.add('error');
+            }
+        } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit answer';
+            statusEl.textContent = `⚠️ ${err.message}`;
+            statusEl.classList.add('error');
+        }
+    });
+
+    return card;
 }
 
 function renderStepsHtml(steps) {
@@ -4287,6 +4470,54 @@ function initConfigView(data) {
     initTelegramConfig(data);
     // Refresh the running/not-running badge from the server's perspective.
     refreshTelegramStatus();
+
+    // ── Timezone config ──
+    initTimezoneConfig(data);
+}
+
+// =====================================================================
+// Timezone config
+// =====================================================================
+
+function initTimezoneConfig(data) {
+    const tzInput = document.getElementById('cfg-timezone');
+    const detectedEl = document.getElementById('cfg-tz-detected');
+    const effectiveEl = document.getElementById('cfg-tz-effective');
+    if (!tzInput) return;
+    tzInput.value = data.timezone || '';
+    if (detectedEl) detectedEl.textContent = data.detected_timezone || '—';
+    if (effectiveEl) effectiveEl.textContent = data.effective_timezone || '—';
+}
+
+function saveTimezoneConfig() {
+    const tzInput = document.getElementById('cfg-timezone');
+    if (!tzInput) return;
+    const tz = tzInput.value.trim();
+
+    const btn = document.getElementById('cfg-tz-save');
+    btn.disabled = true;
+    fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: { timezone: tz } }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showStatus('cfg-tz-status', 'config_saved', false);
+            // Refresh the displayed effective timezone.
+            fetch('/config').then(r => r.json()).then(cfg => {
+                const detectedEl = document.getElementById('cfg-tz-detected');
+                const effectiveEl = document.getElementById('cfg-tz-effective');
+                if (detectedEl) detectedEl.textContent = cfg.detected_timezone || '—';
+                if (effectiveEl) effectiveEl.textContent = cfg.effective_timezone || '—';
+            }).catch(() => {});
+        } else {
+            showStatus('cfg-tz-status', 'config_save_error', true);
+        }
+    })
+    .catch(() => showStatus('cfg-tz-status', 'config_save_error', true))
+    .finally(() => { btn.disabled = false; });
 }
 
 // =====================================================================

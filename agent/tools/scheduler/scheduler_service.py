@@ -4,22 +4,54 @@ Background scheduler service for executing scheduled tasks
 
 import time
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 from croniter import croniter
 from common.log import logger
 
+# Import tz helpers — but tolerate circular import issues at module load time
+# by deferring the actual call to runtime.
+try:
+    from agent.tools.scheduler.tz_utils import (
+        get_configured_tz,
+        now_in_tz,
+        to_naive_utc,
+        from_naive_utc,
+    )
+    _HAS_TZ_UTILS = True
+except Exception:
+    _HAS_TZ_UTILS = False
+    get_configured_tz = None  # type: ignore
+    now_in_tz = None  # type: ignore
+    to_naive_utc = None  # type: ignore
+    from_naive_utc = None  # type: ignore
 
-def _parse_naive_local(iso_str: str) -> datetime:
-    """Parse an ISO datetime and coerce it to tz-naive local time.
 
-    The scheduler uses ``datetime.now()`` (tz-naive) for all comparisons,
-    so any persisted timestamp must be normalized to the same flavor —
-    otherwise comparing naive vs aware raises TypeError.
+def _now_naive_utc() -> datetime:
+    """Current time as a tz-naive UTC datetime.
+
+    The task store persists all timestamps as naive UTC (see scheduler_tool).
+    Comparing against `datetime.now()` would be WRONG on a UTC server because
+    `datetime.now()` returns the server's wall clock — which on a Linux VPS is
+    UTC anyway, but on a user's local dev machine would be local time.
+
+    Using `datetime.utcnow()` always returns UTC regardless of system tz,
+    which matches what we stored. This is the correct comparison value.
+    """
+    return datetime.utcnow()
+
+
+def _parse_naive_utc(iso_str: str) -> datetime:
+    """Parse a stored ISO timestamp and normalise to tz-naive UTC.
+
+    Legacy tasks stored their times as `datetime.now().isoformat()` which on
+    a UTC server was effectively naive UTC. New tasks use `to_naive_utc()`
+    explicitly. Either way we end up with naive UTC for comparison.
     """
     dt = datetime.fromisoformat(iso_str)
     if dt.tzinfo is not None:
-        dt = dt.astimezone().replace(tzinfo=None)
+        # Was stored tz-aware — convert to UTC and strip tzinfo.
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
     return dt
 
 
@@ -81,9 +113,9 @@ class SchedulerService:
     
     def _check_and_execute_tasks(self):
         """Check for due tasks and execute them"""
-        now = datetime.now()
+        now = _now_naive_utc()
         tasks = self.task_store.list_tasks(enabled_only=True)
-        
+
         for task in tasks:
             try:
                 if self._is_task_due(task, now):
@@ -91,8 +123,6 @@ class SchedulerService:
                     ok = self._execute_task(task)
                     if not ok:
                         # Leave next_run_at as-is so the next loop retries.
-                        # Cron tasks within the catch-up window will keep
-                        # firing; beyond it _is_task_due will reschedule.
                         logger.warning(
                             f"[Scheduler] Task {task['id']} delivery failed, will retry next tick"
                         )
@@ -101,7 +131,7 @@ class SchedulerService:
                     next_run = self._calculate_next_run(task, now)
                     if next_run:
                         self.task_store.update_task(task['id'], {
-                            "next_run_at": next_run.isoformat(),
+                            "next_run_at": to_naive_utc(next_run).isoformat() if _HAS_TZ_UTILS and next_run.tzinfo else next_run.isoformat(),
                             "last_run_at": now.isoformat()
                         })
                     else:
@@ -109,14 +139,14 @@ class SchedulerService:
                         logger.info(f"[Scheduler] One-time task completed and removed: {task['id']}")
             except Exception as e:
                 logger.error(f"[Scheduler] Error processing task {task.get('id')}: {e}")
-    
+
     def _is_task_due(self, task: dict, now: datetime) -> bool:
         """
         Check if a task is due to run
 
         Args:
             task: Task dictionary
-            now: Current datetime
+            now: Current datetime (tz-naive UTC)
 
         Returns:
             True if task should run now
@@ -126,14 +156,15 @@ class SchedulerService:
             # Calculate initial next_run_at
             next_run = self._calculate_next_run(task, now)
             if next_run:
+                store_str = to_naive_utc(next_run).isoformat() if _HAS_TZ_UTILS and next_run.tzinfo else next_run.isoformat()
                 self.task_store.update_task(task['id'], {
-                    "next_run_at": next_run.isoformat()
+                    "next_run_at": store_str
                 })
                 return False
             return False
 
         try:
-            next_run = _parse_naive_local(next_run_str)
+            next_run = _parse_naive_utc(next_run_str)
 
             if next_run < now:
                 time_diff = (now - next_run).total_seconds()
@@ -141,14 +172,10 @@ class SchedulerService:
                 schedule_type = schedule.get("type")
 
                 # Catch-up window: fire if we're within 1 HOUR of the
-                # scheduled tick. Previously this was 10 minutes, which was
-                # too aggressive — if the process was busy or restarting
-                # when the tick fired, the task would be silently skipped.
-                #
-                # For one-time tasks we fire even if we're very late — the
-                # user explicitly wanted this task to run at this time and
+                # scheduled tick. For one-time tasks we fire even if very
+                # late — the user explicitly wanted this task to run and
                 # would rather get a late notification than none at all.
-                # For recurring tasks we still skip after 1 hour to avoid
+                # For recurring tasks we skip after 1 hour to avoid
                 # spamming the user with a backlog of missed ticks.
                 if schedule_type == "once":
                     return True
@@ -168,8 +195,9 @@ class SchedulerService:
 
                 next_next_run = self._calculate_next_run(task, now)
                 if next_next_run:
+                    store_str = to_naive_utc(next_next_run).isoformat() if _HAS_TZ_UTILS and next_next_run.tzinfo else next_next_run.isoformat()
                     self.task_store.update_task(task['id'], {
-                        "next_run_at": next_next_run.isoformat()
+                        "next_run_at": store_str
                     })
                     logger.info(f"[Scheduler] Rescheduled task {task['id']} to {next_next_run}")
                 return False
@@ -181,58 +209,71 @@ class SchedulerService:
                 f"{task.get('id')} (next_run_at={next_run_str!r}): {e}"
             )
             return False
-    
+
     def _calculate_next_run(self, task: dict, from_time: datetime) -> Optional[datetime]:
         """
         Calculate next run time for a task
-        
+
         Args:
             task: Task dictionary
-            from_time: Calculate from this time
-            
+            from_time: Calculate from this time (tz-naive UTC)
+
         Returns:
-            Next run datetime or None for one-time tasks
+            Next run datetime (tz-aware in configured tz) or None
         """
         schedule = task.get("schedule", {})
         schedule_type = schedule.get("type")
-        
+
+        # Convert from_time back to tz-aware in configured tz for croniter
+        # (cron expressions like "0 9 * * *" should fire at 9am in the user's
+        # tz, not 9am UTC).
+        if _HAS_TZ_UTILS:
+            from_aware = from_time.replace(tzinfo=timezone.utc).astimezone(get_configured_tz())
+        else:
+            from_aware = from_time.replace(tzinfo=timezone.utc)
+
         if schedule_type == "cron":
-            # Cron expression
             expression = schedule.get("expression")
             if not expression:
                 return None
-            
             try:
-                cron = croniter(expression, from_time)
+                # croniter with tz-aware datetime returns tz-aware datetime
+                cron = croniter(expression, from_aware)
                 return cron.get_next(datetime)
             except Exception as e:
                 logger.error(f"[Scheduler] Invalid cron expression '{expression}': {e}")
                 return None
-        
+
         elif schedule_type == "interval":
-            # Interval in seconds
             seconds = schedule.get("seconds", 0)
             if seconds <= 0:
                 return None
-            return from_time + timedelta(seconds=seconds)
-        
+            return from_aware + timedelta(seconds=seconds)
+
+        elif schedule_type == "frequency_per_day":
+            # Same as interval internally — evenly spaced.
+            seconds = schedule.get("seconds", 0)
+            if seconds <= 0:
+                return None
+            return from_aware + timedelta(seconds=seconds)
+
         elif schedule_type == "once":
-            # One-time task at specific time
             run_at_str = schedule.get("run_at")
             if not run_at_str:
                 return None
-            
             try:
-                run_at = _parse_naive_local(run_at_str)
-                if run_at > from_time:
-                    return run_at
+                parsed = datetime.fromisoformat(run_at_str)
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                if parsed > from_aware:
+                    return parsed
             except Exception as e:
                 logger.error(
                     f"[Scheduler] Failed to parse once-task run_at "
                     f"{run_at_str!r}: {e}"
                 )
             return None
-        
+
         return None
     
     def _execute_task(self, task: dict) -> bool:
@@ -251,6 +292,6 @@ class SchedulerService:
             logger.error(f"[Scheduler] Error executing task {task['id']}: {e}")
             self.task_store.update_task(task['id'], {
                 "last_error": str(e),
-                "last_error_at": datetime.now().isoformat()
+                "last_error_at": _now_naive_utc().isoformat()
             })
             return False

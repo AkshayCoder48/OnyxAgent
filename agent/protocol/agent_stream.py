@@ -1245,6 +1245,13 @@ class AgentStreamExecutor:
                     "message": message,
                 }
             )
+            # Give tools access to the event emitter so they can emit custom
+            # events (e.g. the AskTool emits `user_question` events that the
+            # web channel renders as interactive UI cards).
+            tool.on_event = lambda event: self._emit_event(
+                event.get("type", "tool_event"),
+                event.get("data", {}) or {},
+            )
 
             # Execute tool
             start_time = time.time()
@@ -1252,6 +1259,7 @@ class AgentStreamExecutor:
                 result: ToolResult = tool.execute_tool(arguments)
             finally:
                 tool.progress_callback = None
+                tool.on_event = None
             execution_time = time.time() - start_time
 
             result_dict = {

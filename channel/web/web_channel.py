@@ -572,6 +572,21 @@ class WebChannel(ChatChannel):
                     "file_name": file_name,
                 })
 
+            elif event_type == "user_question":
+                # AI asked the user a question via the Ask tool. Forward the
+                # full question payload to the frontend so it can render an
+                # interactive UI card (single-select / multi-select / text /
+                # confirm). The user's answer comes back via POST /api/answer.
+                q.put({
+                    "type": "question",
+                    "question_id": data.get("question_id"),
+                    "question": data.get("question", ""),
+                    "question_type": data.get("type", "text"),
+                    "options": data.get("options", []),
+                    "placeholder": data.get("placeholder", ""),
+                    "default": data.get("default", ""),
+                })
+
         return on_event
 
     # ------------------------------------------------------------------
@@ -1176,6 +1191,11 @@ class WebChannel(ChatChannel):
             '/api/knowledge/read', 'KnowledgeReadHandler',
             '/api/knowledge/graph', 'KnowledgeGraphHandler',
             '/api/scheduler', 'SchedulerHandler',
+            '/api/scheduler/create', 'SchedulerCreateHandler',
+            '/api/scheduler/edit', 'SchedulerEditHandler',
+            '/api/scheduler/delete', 'SchedulerDeleteHandler',
+            '/api/scheduler/toggle', 'SchedulerToggleHandler',
+            '/api/answer', 'AnswerHandler',
             '/api/sessions', 'SessionsHandler',
             '/api/sessions/(.*)/generate_title', 'SessionTitleHandler',
             '/api/sessions/(.*)/clear_context', 'SessionClearContextHandler',
@@ -2411,6 +2431,12 @@ class ConfigHandler:
         # admin_ids is a comma-separated Telegram user ID list to restrict who
         # can issue commands to the bot (empty = anyone who can DM the bot).
         "telegram_token", "telegram_proxy", "telegram_admin_ids",
+        # Manual timezone override (IANA name like "Asia/Kolkata").
+        # When set, the scheduler interprets all user-supplied times in this tz.
+        # When empty, the scheduler auto-detects tz from the inbound IP
+        # (cached for 24h in ~/.onyx/tz_cache.json), then falls back to the
+        # system local tz, then UTC.
+        "timezone",
     }
 
     @staticmethod
@@ -2482,6 +2508,18 @@ class ConfigHandler:
             raw_tg_token = str(local_config.get("telegram_token", "") or "")
             masked_tg_token = self._mask_key(raw_tg_token) if raw_tg_token else ""
 
+            # Timezone: explicit override + auto-detected value (for display).
+            configured_tz = str(local_config.get("timezone", "") or "").strip()
+            try:
+                from agent.tools.scheduler.tz_utils import (
+                    get_configured_tz, _detect_tz_from_ip, _system_local_tz_name,
+                )
+                detected_tz = _detect_tz_from_ip() or _system_local_tz_name()
+                effective_tz = str(get_configured_tz())
+            except Exception:
+                detected_tz = "UTC"
+                effective_tz = configured_tz or "UTC"
+
             return json.dumps({
                 "status": "success",
                 "use_agent": use_agent,
@@ -2505,6 +2543,13 @@ class ConfigHandler:
                 "telegram_token_masked": masked_tg_token,
                 "telegram_proxy": local_config.get("telegram_proxy", ""),
                 "telegram_admin_ids": local_config.get("telegram_admin_ids", ""),
+                # Timezone config — `timezone` is the manual override (empty =
+                # auto-detect from IP). `detected_timezone` is what IP
+                # geolocation returned. `effective_timezone` is what the
+                # scheduler will actually use (manual override wins).
+                "timezone": configured_tz,
+                "detected_timezone": detected_tz,
+                "effective_timezone": effective_tz,
             }, ensure_ascii=False)
         except Exception as e:
             logger.error(f"Error getting config: {e}")
@@ -5153,9 +5198,278 @@ class SchedulerHandler:
             store_path = os.path.join(workspace_root, "scheduler", "tasks.json")
             store = TaskStore(store_path)
             tasks = store.list_tasks()
-            return json.dumps({"status": "success", "tasks": tasks}, ensure_ascii=False)
+
+            # Convert stored UTC times to the configured tz for display.
+            try:
+                from agent.tools.scheduler.tz_utils import format_display, get_configured_tz
+                tz_name = str(get_configured_tz())
+                for t in tasks:
+                    t["next_run_display"] = format_display(t.get("next_run_at"), "%Y-%m-%d %H:%M %Z")
+                    t["last_run_display"] = format_display(t.get("last_run_at"), "%Y-%m-%d %H:%M %Z")
+                    t["created_display"] = format_display(t.get("created_at"), "%Y-%m-%d %H:%M")
+            except Exception:
+                tz_name = "UTC"
+
+            return json.dumps({
+                "status": "success",
+                "tasks": tasks,
+                "timezone": tz_name,
+            }, ensure_ascii=False)
         except Exception as e:
             logger.error(f"[WebChannel] Scheduler API error: {e}")
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+def _scheduler_store():
+    """Get the scheduler task store (singleton)."""
+    from agent.tools.scheduler.task_store import TaskStore
+    workspace_root = _get_workspace_root()
+    store_path = os.path.join(workspace_root, "scheduler", "tasks.json")
+    return TaskStore(store_path)
+
+
+class SchedulerCreateHandler:
+    """POST /api/scheduler/create — create a scheduled task from the UI.
+
+    Body:
+      {
+        "name": "Daily standup reminder",
+        "type": "message" | "ai_task",
+        "content": "<message text>" or "<ai task description>",
+        "schedule_type": "once|interval|cron|frequency_per_day",
+        "schedule_value": "<value>",
+        "receiver": "<session_id or telegram chat_id>",
+        "is_group": false,
+        "channel_type": "web" | "telegram" | ...
+      }
+    """
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or "{}")
+            name = str(body.get("name", "")).strip()
+            task_type = str(body.get("type", "message")).strip()
+            content = str(body.get("content", "")).strip()
+            schedule_type = str(body.get("schedule_type", "")).strip()
+            schedule_value = str(body.get("schedule_value", "")).strip()
+            receiver = str(body.get("receiver", "")).strip()
+            is_group = bool(body.get("is_group", False))
+            channel_type = str(body.get("channel_type", "web")).strip()
+
+            if not name or not content or not schedule_type or not schedule_value:
+                return json.dumps({"status": "error", "message": "name, content, schedule_type, schedule_value are required"})
+
+            from agent.tools.scheduler.scheduler_tool import SchedulerTool
+            from agent.tools.scheduler.tz_utils import now_in_tz, to_naive_utc, get_configured_tz
+            import uuid as _uuid
+
+            tool = SchedulerTool(config={"channel_type": channel_type})
+            tool.task_store = _scheduler_store()
+
+            # Build a synthetic context so the tool can capture receiver info.
+            from bridge.context import Context, ContextType
+            ctx = Context(ContextType.TEXT, content)
+            ctx["receiver"] = receiver or "scheduler-ui"
+            ctx["session_id"] = receiver or "scheduler-ui"
+            ctx["isgroup"] = is_group
+            ctx["channel_type"] = channel_type
+            tool.current_context = ctx
+
+            schedule = tool._parse_schedule(schedule_type, schedule_value)
+            if not schedule:
+                return json.dumps({"status": "error", "message": f"Invalid schedule: type={schedule_type}, value={schedule_value}"})
+
+            task_id = str(_uuid.uuid4())[:8]
+            action = {
+                "type": "send_message" if task_type == "message" else "agent_task",
+                "receiver": receiver or "scheduler-ui",
+                "receiver_name": "scheduler-ui",
+                "is_group": is_group,
+                "channel_type": channel_type,
+                "notify_session_id": receiver or "scheduler-ui",
+            }
+            if task_type == "message":
+                action["content"] = content
+            else:
+                action["task_description"] = content
+
+            task_data = {
+                "id": task_id,
+                "name": name,
+                "enabled": True,
+                "created_at": now_in_tz().isoformat(),
+                "updated_at": now_in_tz().isoformat(),
+                "schedule": schedule,
+                "action": action,
+                "timezone": str(get_configured_tz()),
+            }
+
+            next_run = tool._calculate_next_run(task_data)
+            if next_run:
+                task_data["next_run_at"] = to_naive_utc(next_run).isoformat()
+
+            tool.task_store.add_task(task_data)
+            logger.info(f"[SchedulerUI] Created task {task_id}: {name}")
+
+            return json.dumps({
+                "status": "success",
+                "task_id": task_id,
+                "task": task_data,
+            }, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[SchedulerCreateHandler] error: {e}", exc_info=True)
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class SchedulerEditHandler:
+    """POST /api/scheduler/edit — edit a scheduled task.
+    Body: {task_id, ...fields to update}
+    """
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or "{}")
+            task_id = str(body.get("task_id", "")).strip()
+            if not task_id:
+                return json.dumps({"status": "error", "message": "task_id is required"})
+
+            store = _scheduler_store()
+            task = store.get_task(task_id)
+            if not task:
+                return json.dumps({"status": "error", "message": f"task '{task_id}' not found"})
+
+            updates = {}
+            if body.get("name"):
+                updates["name"] = str(body["name"]).strip()
+            if body.get("content"):
+                updates.setdefault("action", dict(task.get("action", {})))
+                new_content = str(body["content"]).strip()
+                if body.get("type") == "ai_task" or task["action"].get("type") == "agent_task":
+                    updates["action"]["type"] = "agent_task"
+                    updates["action"]["task_description"] = new_content
+                    updates["action"].pop("content", None)
+                else:
+                    updates["action"]["type"] = "send_message"
+                    updates["action"]["content"] = new_content
+                    updates["action"].pop("task_description", None)
+            if body.get("schedule_type") and body.get("schedule_value"):
+                from agent.tools.scheduler.scheduler_tool import SchedulerTool
+                from agent.tools.scheduler.tz_utils import to_naive_utc, get_configured_tz
+                tool = SchedulerTool(config={"channel_type": task["action"].get("channel_type", "web")})
+                new_schedule = tool._parse_schedule(body["schedule_type"], body["schedule_value"])
+                if not new_schedule:
+                    return json.dumps({"status": "error", "message": "invalid schedule"})
+                updates["schedule"] = new_schedule
+                updates["timezone"] = str(get_configured_tz())
+
+                # Recalculate next_run
+                merged = dict(task)
+                merged.update(updates)
+                next_run = tool._calculate_next_run(merged)
+                if next_run:
+                    updates["next_run_at"] = to_naive_utc(next_run).isoformat()
+                else:
+                    updates["next_run_at"] = None
+
+            if not updates:
+                return json.dumps({"status": "error", "message": "no fields to update"})
+
+            from agent.tools.scheduler.tz_utils import now_in_tz
+            updates["updated_at"] = now_in_tz().isoformat()
+            store.update_task(task_id, updates)
+            logger.info(f"[SchedulerUI] Edited task {task_id}: {list(updates.keys())}")
+
+            return json.dumps({"status": "success", "task_id": task_id})
+        except Exception as e:
+            logger.error(f"[SchedulerEditHandler] error: {e}", exc_info=True)
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class SchedulerDeleteHandler:
+    """POST /api/scheduler/delete — delete a scheduled task.
+    Body: {task_id}
+    """
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or "{}")
+            task_id = str(body.get("task_id", "")).strip()
+            if not task_id:
+                return json.dumps({"status": "error", "message": "task_id is required"})
+
+            store = _scheduler_store()
+            task = store.get_task(task_id)
+            if not task:
+                return json.dumps({"status": "error", "message": f"task '{task_id}' not found"})
+
+            store.delete_task(task_id)
+            logger.info(f"[SchedulerUI] Deleted task {task_id}")
+            return json.dumps({"status": "success"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class SchedulerToggleHandler:
+    """POST /api/scheduler/toggle — enable/disable a task.
+    Body: {task_id, enabled: true|false}
+    """
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or "{}")
+            task_id = str(body.get("task_id", "")).strip()
+            enabled = bool(body.get("enabled", True))
+            if not task_id:
+                return json.dumps({"status": "error", "message": "task_id is required"})
+
+            store = _scheduler_store()
+            store.enable_task(task_id, enabled)
+            logger.info(f"[SchedulerUI] Toggled task {task_id} -> enabled={enabled}")
+            return json.dumps({"status": "success"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class AnswerHandler:
+    """POST /api/answer — submit the user's answer to an AI-asked question.
+
+    Body:
+      {
+        "question_id": "abc123def456",
+        "answer": "PDF"               # string for single_select / text / confirm
+                                       # OR array of strings for multi_select
+      }
+
+    Returns:
+      { "status": "ok" }    — answer was delivered to the waiting tool
+      { "status": "error" } — question_id was not found (already answered
+                              or never asked)
+    """
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or "{}")
+            question_id = str(body.get("question_id", "")).strip()
+            answer = body.get("answer")
+            if not question_id:
+                return json.dumps({"status": "error", "message": "question_id is required"})
+
+            from agent.tools.ask.ask import submit_answer
+            ok = submit_answer(question_id, answer)
+            if not ok:
+                return json.dumps({
+                    "status": "error",
+                    "message": "question not found (already answered or expired)",
+                })
+            logger.info(f"[AnswerHandler] answer submitted for question {question_id}")
+            return json.dumps({"status": "ok"})
+        except Exception as e:
+            logger.error(f"[AnswerHandler] error: {e}", exc_info=True)
             return json.dumps({"status": "error", "message": str(e)})
 
 
@@ -5164,11 +5478,16 @@ class SessionsHandler:
         _require_auth()
         web.header('Content-Type', 'application/json; charset=utf-8')
         try:
-            params = web.input(page='1', page_size='50')
+            params = web.input(page='1', page_size='50', channel_type='web')
             from agent.memory import get_conversation_store
             store = get_conversation_store()
+            # Allow listing all sessions (no channel_type filter) when
+            # channel_type=all is passed — used by the Sessions sidebar to
+            # show scheduler-created chats (which use channel_type="telegram"
+            # or other channels) alongside regular web chats.
+            ct_filter = params.channel_type if params.channel_type != "all" else None
             result = store.list_sessions(
-                channel_type="web",
+                channel_type=ct_filter,
                 page=int(params.page),
                 page_size=int(params.page_size),
             )

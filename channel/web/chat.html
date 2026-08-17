@@ -883,6 +883,57 @@
                                 <!-- Language Config Card removed — the app is English-only. -->
 
                                 <!-- ================================================== -->
+                                <!-- Timezone Card                                       -->
+                                <!-- ================================================== -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <div class="flex items-center gap-3 mb-5">
+                                        <div class="w-9 h-9 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
+                                            <i class="fas fa-globe text-violet-500 text-sm"></i>
+                                        </div>
+                                        <div class="flex-1">
+                                            <h3 class="font-semibold text-slate-800 dark:text-slate-100">Timezone</h3>
+                                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                                                All scheduled task times are interpreted in this timezone. Auto-detected from your IP — override if needed.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-4">
+                                        <!-- Detected timezone -->
+                                        <div id="cfg-tz-detected-row" class="rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-3 text-xs">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <span class="text-slate-500 dark:text-slate-400 font-medium">Auto-detected</span>
+                                                <span id="cfg-tz-detected" class="font-mono text-slate-700 dark:text-slate-200">—</span>
+                                            </div>
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-slate-500 dark:text-slate-400 font-medium">Effective</span>
+                                                <span id="cfg-tz-effective" class="font-mono text-emerald-600 dark:text-emerald-400">—</span>
+                                            </div>
+                                        </div>
+                                        <!-- Manual override -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Manual override (IANA name)</label>
+                                            <input id="cfg-timezone" type="text" autocomplete="off"
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                                          focus:outline-none focus:border-primary-500 font-mono transition-colors"
+                                                   placeholder="e.g., Asia/Kolkata, America/New_York, Europe/London">
+                                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                                                Leave empty to use auto-detected timezone. Full list at
+                                                <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank" class="text-primary-500 hover:underline">Wikipedia</a>.
+                                            </p>
+                                        </div>
+                                        <!-- Save -->
+                                        <div class="flex items-center justify-end gap-3 pt-1">
+                                            <span id="cfg-tz-status" class="text-xs text-primary-500 opacity-0 transition-opacity duration-300"></span>
+                                            <button id="cfg-tz-save"
+                                                    class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium
+                                                           cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onclick="saveTimezoneConfig()">Save</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ================================================== -->
                                 <!-- Telegram Channel Card                              -->
                                 <!-- ================================================== -->
                                 <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">

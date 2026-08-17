@@ -336,7 +336,21 @@ def _execute_agent_task(task: dict, agent_bridge) -> bool:
         # Create a unique session_id for this scheduled task to avoid polluting user's conversation
         # Format: scheduler_<receiver>_<task_id> to ensure isolation
         scheduler_session_id = f"scheduler_{receiver}_{task['id']}"
-        
+
+        # Auto-create a dedicated chat session for this task so the user can
+        # see all run details + output in one place. The session title is the
+        # task name so it shows up nicely in the sidebar.
+        try:
+            from agent.memory import get_conversation_store
+            store = get_conversation_store()
+            store.ensure_session(
+                scheduler_session_id,
+                channel_type=channel_type,
+                title=f"⏰ {task.get('name', 'Scheduled task')}",
+            )
+        except Exception as e:
+            logger.debug(f"[Scheduler] ensure_session failed (non-fatal): {e}")
+
         # Create context for Agent
         context = Context(ContextType.TEXT, task_description)
         context["receiver"] = receiver
@@ -384,13 +398,36 @@ def _execute_agent_task(task: dict, agent_bridge) -> bool:
                 if request_id:
                     channel.request_to_session[request_id] = receiver
 
+            # Send to the original receiver (the user's chat) so they get
+            # the result directly. Also persist to the dedicated scheduler
+            # session so all run details are visible in one place.
             try:
                 channel.send(reply, context)
             except Exception as e:
                 logger.error(f"[Scheduler] Failed to send result: {e}")
                 return False
 
+            # Persist to BOTH the dedicated scheduler session (full run log)
+            # AND the user's main chat session (so they see the output
+            # inline next time they open the chat).
             _remember_delivered_output(agent_bridge, task, channel_type, reply.content)
+
+            # Also persist directly into the dedicated scheduler session so
+            # the user can review the full task history in one place.
+            try:
+                from agent.memory import get_conversation_store
+                store = get_conversation_store()
+                store.append_messages(
+                    scheduler_session_id,
+                    [
+                        {"role": "user", "content": [{"type": "text", "text": f"⏰ Scheduled task: {task.get('name', '—')}"}]},
+                        {"role": "assistant", "content": [{"type": "text", "text": reply.content}]},
+                    ],
+                    channel_type=channel_type,
+                )
+            except Exception as e:
+                logger.debug(f"[Scheduler] append to dedicated session failed (non-fatal): {e}")
+
             logger.info(f"[Scheduler] Task {task['id']} executed successfully, result sent to {receiver}")
             return True
 

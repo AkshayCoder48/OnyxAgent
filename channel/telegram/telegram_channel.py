@@ -33,8 +33,13 @@ from config import conf
 # Bot command menu, aligned with Web slash commands.
 # Top-level commands only; sub-commands are entered with a space (e.g. "/skill list").
 TELEGRAM_BOT_COMMANDS = [
-    ("help", "Show command help"),
-    ("status", "Show running status"),
+    ("start",   "Start the bot"),
+    ("help",    "Show command help"),
+    ("status",  "Show running status"),
+    ("tasks",   "List scheduled tasks"),
+    ("models",  "List available AI models"),
+    ("skills",  "List installed skills"),
+    ("tools",   "List available tools"),
     ("context", "View/clear conversation context (sub: clear)"),
     ("skill", "Manage skills (list/search/install/...)"),
     ("memory", "Manage memory (sub: dream)"),
@@ -44,6 +49,38 @@ TELEGRAM_BOT_COMMANDS = [
     ("logs", "Show recent logs"),
     ("version", "Show version"),
 ]
+
+
+def _format_schedule_short(schedule: dict) -> str:
+    """Compact one-line description of a schedule for inline display in lists."""
+    if not schedule:
+        return "—"
+    t = schedule.get("type")
+    if t == "cron":
+        expr = schedule.get("expression", "")
+        common = {
+            "0 0 * * *": "Daily at midnight",
+            "0 9 * * *": "Daily at 9am",
+            "0 12 * * *": "Daily at noon",
+            "0 18 * * *": "Daily at 6pm",
+            "0 21 * * *": "Daily at 9pm",
+            "0 */1 * * *": "Hourly",
+            "0 */6 * * *": "Every 6h",
+            "0 */12 * * *": "Every 12h",
+            "*/30 * * * *": "Every 30m",
+        }
+        return common.get(expr, f"Cron {expr}")
+    if t == "interval":
+        s = schedule.get("seconds", 0)
+        if s >= 86400: return f"Every {s // 86400}d"
+        if s >= 3600: return f"Every {s // 3600}h"
+        if s >= 60:   return f"Every {s // 60}m"
+        return f"Every {s}s"
+    if t == "frequency_per_day":
+        return f"{schedule.get('count', 0)}x/day"
+    if t == "once":
+        return "Once"
+    return t or "—"
 
 
 @singleton
@@ -169,8 +206,13 @@ class TelegramChannel(ChatChannel):
                 logger.warning(f"[Telegram] set_my_commands failed: {e}")
 
         # Handlers:
-        # 1) /cancel uses the fast-path
+        # 1) Fast-path commands that don't need the agent loop
         application.add_handler(CommandHandler("cancel", self._on_cancel))
+        application.add_handler(CommandHandler("start", self._on_start))
+        application.add_handler(CommandHandler("tasks", self._on_list_tasks))
+        application.add_handler(CommandHandler("models", self._on_list_models))
+        application.add_handler(CommandHandler("skills", self._on_list_skills))
+        application.add_handler(CommandHandler("tools", self._on_list_tools))
         # 2) Normal messages (text + media)
         application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, self._on_message))
         # 3) Other slash commands are forwarded as plain text for the agent to handle
@@ -268,6 +310,171 @@ class TelegramChannel(ChatChannel):
                 await update.effective_message.reply_text(f"⚠️ /cancel failed: {e}")
             except Exception:
                 pass
+
+    async def _on_start(self, update, _context):
+        """Handle /start — sent automatically when a user first opens the chat
+        with the bot. Returns a friendly welcome message describing what the
+        bot can do and which commands are available.
+        """
+        try:
+            chat = update.effective_chat
+            user = update.effective_user
+            user_name = user.first_name or user.username or "there"
+
+            me = await self._bot.get_me() if self._bot else None
+            bot_name = (me.first_name if me else "Onyx") or "Onyx"
+            bot_username = f"@{me.username}" if me and me.username else ""
+
+            text = (
+                f"👋 Hi {user_name}! I'm {bot_name} {bot_username}, your AI assistant.\n\n"
+                f"I'm now running on the server and ready to chat. Here's what I can do:\n\n"
+                f"📝 *Send me a message* — I'll respond with AI-generated text, code, or analysis.\n"
+                f"📎 *Send a photo, file, voice, or video* — I can see and analyse it.\n"
+                f"⏰ *Schedule tasks* — say \"remind me at 7am\" or \"every day at 9pm send me a summary of X\"\n"
+                f"🛠 *Use tools* — web search, file operations, browser, code execution\n\n"
+                f"*Quick commands:*\n"
+                f"  /tasks — list your scheduled tasks\n"
+                f"  /models — show available AI models\n"
+                f"  /skills — list installed skills\n"
+                f"  /tools — list available tools\n"
+                f"  /status — show running status\n"
+                f"  /cancel — cancel a running task\n"
+                f"  /help — full help\n\n"
+                f"⚠️ Tasks you schedule will fire automatically at the set time, even if you "
+                f"don't have this chat open. You'll get a notification when each task starts."
+            )
+            await update.effective_message.reply_text(text, parse_mode="Markdown")
+            logger.info(f"[Telegram] /start from chat_id={chat.id}, user={user.id}")
+        except Exception as e:
+            logger.error(f"[Telegram] /start error: {e}", exc_info=True)
+            # Fallback without markdown
+            try:
+                await update.effective_message.reply_text(
+                    f"👋 Hi! I'm your AI assistant. Send me a message, photo, file, or voice. "
+                    f"Use /tasks, /models, /skills, /tools, /help."
+                )
+            except Exception:
+                pass
+
+    async def _on_list_tasks(self, update, _context):
+        """Handle /tasks — list all scheduled tasks."""
+        try:
+            from agent.tools.scheduler.integration import get_task_store
+            store = get_task_store()
+            if not store:
+                await update.effective_message.reply_text("⚠️ Scheduler not initialised.")
+                return
+
+            tasks = store.list_tasks()
+            if not tasks:
+                await update.effective_message.reply_text("📋 You have no scheduled tasks.\n\nSay something like \"remind me at 7am tomorrow to check logs\" and I'll create one for you.")
+                return
+
+            from agent.tools.scheduler.tz_utils import format_display, get_configured_tz
+            tz_name = str(get_configured_tz())
+
+            lines = [f"📋 *Scheduled tasks* ({len(tasks)}) — times in {tz_name}\n"]
+            for t in tasks:
+                status = "✅" if t.get("enabled", True) else "❌"
+                schedule = t.get("schedule", {})
+                sched_desc = _format_schedule_short(schedule)
+                next_str = format_display(t.get("next_run_at"), "%m-%d %H:%M %Z")
+                lines.append(f"{status} *{t['name']}* (id: `{t['id']}`)")
+                lines.append(f"   ⏰ {sched_desc} | next: {next_str}\n")
+
+            await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
+        except Exception as e:
+            logger.error(f"[Telegram] /tasks error: {e}", exc_info=True)
+            await update.effective_message.reply_text(f"⚠️ /tasks failed: {e}")
+
+    async def _on_list_models(self, update, _context):
+        """Handle /models — list available AI models from config."""
+        try:
+            from config import conf
+            cfg = conf()
+            current_model = cfg.get("model", "—")
+
+            # Collect all provider API keys; any that are set indicate an
+            # available model family.
+            providers = []
+            model_families = {
+                "deepseek_api_key":      "DeepSeek (deepseek-chat, deepseek-reasoner, deepseek-v4-flash)",
+                "open_ai_api_key":       "OpenAI (gpt-4o, gpt-4o-mini, gpt-5)",
+                "claude_api_key":        "Anthropic Claude (claude-3-5-sonnet, claude-opus-4)",
+                "gemini_api_key":        "Google Gemini (gemini-2.0-flash, gemini-2.5-pro)",
+                "zhipu_ai_api_key":      "ZhipuAI GLM (glm-4-flash, glm-4.6, glm-4.7)",
+                "qianfan_api_key":       "Baidu Qianfan (ernie-4.0, ernie-speed)",
+                "dashscope_api_key":     "Alibaba DashScope (qwen-max, qwen-plus, qwen3-coder)",
+                "moonshot_api_key":      "Moonshot Kimi (kimi-k2, moonshot-v1-128k)",
+                "minimax_api_key":       "MiniMax (abab6.5-chat, abab7-chat)",
+                "ark_api_key":           "Volcengine Ark (doubao-pro, seedream-4.0)",
+                "linkai_api_key":        "LinkAI proxy (any model the proxy exposes)",
+            }
+            for key, label in model_families.items():
+                val = str(cfg.get(key, "") or "").strip()
+                if val:
+                    providers.append(f"✅ {label}")
+                else:
+                    providers.append(f"⬜ {label}")
+
+            text = (
+                f"🤖 *Current model:* `{current_model}`\n\n"
+                f"*Available providers* (✅ = API key configured):\n"
+                + "\n".join(providers)
+                + "\n\n_To switch models, ask me directly or use the web UI config page._"
+            )
+            await update.effective_message.reply_text(text, parse_mode="Markdown")
+        except Exception as e:
+            logger.error(f"[Telegram] /models error: {e}", exc_info=True)
+            await update.effective_message.reply_text(f"⚠️ /models failed: {e}")
+
+    async def _on_list_skills(self, update, _context):
+        """Handle /skills — list installed skills."""
+        try:
+            from agent.skills.manager import SkillManager
+            mgr = SkillManager()
+            skill_entries = mgr.list_skills() or []
+
+            if not skill_entries:
+                await update.effective_message.reply_text(
+                    "📦 No skills installed.\n\n"
+                    "Skills add new capabilities (image generation, knowledge wiki, etc.). "
+                    "Browse and install from the web UI's Skills page."
+                )
+                return
+
+            lines = [f"📦 *Installed skills* ({len(skill_entries)})\n"]
+            for entry in skill_entries:
+                skill = entry.skill if hasattr(entry, "skill") else None
+                name = getattr(skill, "name", "—") if skill else "—"
+                desc = (getattr(skill, "description", "") or "").strip().split("\n")[0][:80] if skill else ""
+                lines.append(f"• *{name}*\n   {desc}\n")
+
+            await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
+        except Exception as e:
+            logger.error(f"[Telegram] /skills error: {e}", exc_info=True)
+            await update.effective_message.reply_text(f"⚠️ /skills failed: {e}")
+
+    async def _on_list_tools(self, update, _context):
+        """Handle /tools — list available agent tools."""
+        try:
+            from agent.tools.tool_manager import ToolManager
+            mgr = ToolManager()
+            tools_dict = mgr.list_tools() or {}
+
+            if not tools_dict:
+                await update.effective_message.reply_text("🛠 No tools registered.")
+                return
+
+            lines = [f"🛠 *Available tools* ({len(tools_dict)})\n"]
+            for name, info in tools_dict.items():
+                desc = (info.get("description") or "").strip().split("\n")[0][:80]
+                lines.append(f"• *{name}* — {desc}")
+
+            await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
+        except Exception as e:
+            logger.error(f"[Telegram] /tools error: {e}", exc_info=True)
+            await update.effective_message.reply_text(f"⚠️ /tools failed: {e}")
 
     async def _on_command_passthrough(self, update, _context):
         """All non-/cancel commands fall through to plain message handling."""

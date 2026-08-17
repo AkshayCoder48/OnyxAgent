@@ -13,6 +13,10 @@ from agent.tools.send.send import Send
 # Import todo tool (no external dependencies)
 from agent.tools.todo.todo import TodoTool
 
+# Import ask tool (no external dependencies) — lets the AI ask the user
+# questions and wait for answers via an interactive UI card.
+from agent.tools.ask.ask import AskTool
+
 # Import counterfactual reasoning tool (no external dependencies)
 from agent.tools.counterfactual.counterfactual import CounterfactualTool
 
@@ -149,6 +153,7 @@ __all__ = [
     'Ls',
     'Send',
     'TodoTool',
+    'AskTool',
     'CounterfactualTool',
     'WorkflowTool',
     'SecurityAuditTool',
