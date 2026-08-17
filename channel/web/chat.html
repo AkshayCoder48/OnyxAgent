@@ -38,6 +38,21 @@
     <script src="assets/vendor/highlightjs/languages/go.min.js"></script>
     <script src="assets/vendor/highlightjs/languages/bash.min.js"></script>
     <script>
+    /* ── Tailwind config (PRD §41, §42) ─────────────────────────────────
+       Maps the `primary` palette and key semantic colors to CSS variables
+       so they update instantly when the user changes appearance or accent
+       color — no class swapping, no rebuild.
+
+       Hardcoded `primary` palette (#FFF1F2 ... #881337) was REMOVED. The
+       previous definition meant `bg-primary-500` was always rose-500 no
+       matter what the user picked in the Appearance settings. Now every
+       primary-* shade derives from --accent-h, so changing the accent
+       color via the picker instantly re-tints the entire UI.
+
+       Because Tailwind CDN compiles class names at runtime from this
+       config, we use a function form (`hsl(var(--accent-h) / <alpha>)`)
+       for each step so opacity utilities like `bg-primary-500/20` work.
+       ─────────────────────────────────────────────────────────────────── */
     tailwind.config = {
         darkMode: 'class',
         theme: {
@@ -47,15 +62,67 @@
                     mono: ['"JetBrains Mono"', '"Fira Code"', 'Consolas', 'monospace'],
                 },
                 colors: {
+                    /* Primary = user-selected accent color, all shades derive
+                       from the single --accent-h HSL channel via opacity. */
                     primary: {
-                        50: '#FFF1F2', 100: '#FFE4E6', 200: '#FECDD3', 300: '#FDA4AF',
-                        400: '#FB7185', 500: '#F43F5E', 600: '#E11D48', 700: '#BE123C',
-                        800: '#9F1239', 900: '#881337',
-                    }
+                        50:  function() { return 'hsl(var(--accent-h) / 0.05)'; },
+                        100: function() { return 'hsl(var(--accent-h) / 0.10)'; },
+                        200: function() { return 'hsl(var(--accent-h) / 0.20)'; },
+                        300: function() { return 'hsl(var(--accent-h) / 0.35)'; },
+                        400: function() { return 'hsl(var(--accent-h) / 0.65)'; },
+                        500: function() { return 'hsl(var(--accent-h) / 0.85)'; },
+                        600: function() { return 'hsl(var(--accent-h-strong) / 0.90)'; },
+                        700: function() { return 'hsl(var(--accent-h-strong) / 0.95)'; },
+                        800: function() { return 'hsl(var(--accent-h-strong) / 1)'; },
+                        900: function() { return 'hsl(var(--accent-h-strong) / 1)'; },
+                    },
+                    /* Semantic tokens that map directly to CSS variables */
+                    bg: 'hsl(var(--bg))',
+                    fg: 'hsl(var(--fg))',
+                    muted: 'hsl(var(--muted))',
+                    'muted-fg': 'hsl(var(--muted-fg))',
+                    card: 'hsl(var(--card))',
+                    'card-fg': 'hsl(var(--card-fg))',
+                    popover: 'hsl(var(--popover))',
+                    'popover-fg': 'hsl(var(--popover-fg))',
+                    border: 'hsl(var(--border))',
+                    input: 'hsl(var(--input))',
+                    ring: 'hsl(var(--ring))',
+                    /* Status colors */
+                    destructive: 'hsl(var(--destructive))',
+                    'destructive-fg': 'hsl(var(--destructive-fg))',
+                    success: 'hsl(var(--success))',
+                    'success-fg': 'hsl(var(--success-fg))',
+                    warning: 'hsl(var(--warning))',
+                    'warning-fg': 'hsl(var(--warning-fg))',
+                    info: 'hsl(var(--info))',
+                    'info-fg': 'hsl(var(--info-fg))',
+                },
+                borderRadius: {
+                    sm: 'var(--radius-sm)',
+                    DEFAULT: 'var(--radius)',
+                    md: 'var(--radius-md)',
+                    lg: 'var(--radius-lg)',
+                    xl: 'var(--radius-xl)',
+                    '2xl': 'var(--radius-2xl)',
                 },
                 animation: {
                     'pulse-dot': 'pulseDot 1.4s infinite ease-in-out both',
-                }
+                    'fade-in': 'fadeIn 200ms ease-out',
+                    'slide-in-right': 'slideInRight 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    'slide-up': 'slideUp 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+                },
+                keyframes: {
+                    fadeIn: { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+                    slideInRight: {
+                        '0%': { transform: 'translateX(100%)', opacity: 0 },
+                        '100%': { transform: 'translateX(0)', opacity: 1 },
+                    },
+                    slideUp: {
+                        '0%': { transform: 'translateY(8px)', opacity: 0 },
+                        '100%': { transform: 'translateY(0)', opacity: 1 },
+                    },
+                },
             }
         }
     }
@@ -87,15 +154,30 @@
         // Backend-resolved default language (from onyx_lang config / auto-detect).
         window.__ONYX_DEFAULT_LANG__ = '{{Onyx_DEFAULT_LANG}}';
         var theme = localStorage.getItem('onyx_theme') || 'dark';
-        if (theme === 'dark') document.documentElement.classList.add('dark');
+        // PRD §32 — appearance: 'system' follows the OS preference via
+        // matchMedia('(prefers-color-scheme: dark)'). 'light' and 'dark'
+        // are explicit overrides. Stored in localStorage('onyx_theme').
+        if (theme === 'system') {
+            var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (prefersDark) document.documentElement.classList.add('dark');
+        } else if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+        // 'light' = no .dark class, nothing to do.
+
+        // PRD §33 — accent color: read from localStorage and apply as a
+        // data-accent attribute on <html>. Falls back to 'rose' (legacy).
+        var accent = localStorage.getItem('onyx_accent') || 'rose';
+        document.documentElement.setAttribute('data-accent', accent);
+
         document.documentElement.setAttribute('lang', window.__onyxResolveLang__());
     })();
     </script>
 </head>
-<body class="h-dvh overflow-hidden bg-gray-50 dark:bg-[#111111] text-slate-800 dark:text-slate-200 font-sans">
+<body class="h-dvh overflow-hidden bg-bg text-fg font-sans">
 
     <!-- Login Overlay -->
-    <div id="login-overlay" class="fixed inset-0 z-[200] bg-gray-50 dark:bg-[#111111] flex items-center justify-center hidden">
+    <div id="login-overlay" class="fixed inset-0 z-[200] bg-bg flex items-center justify-center hidden">
         <div class="w-full max-w-sm mx-4">
             <div class="flex flex-col items-center mb-8">
                 <img src="assets/logo.svg" alt="OnyxAgent" class="w-16 h-16 rounded-2xl mb-4 shadow-lg">
@@ -133,28 +215,28 @@
         <!-- ================================================================ -->
         <!-- SIDEBAR                                                          -->
         <!-- ================================================================ -->
-        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-52 bg-[#0A0A0A] text-neutral-400 flex flex-col
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-52 flex flex-col
                                     transform -translate-x-full lg:relative lg:translate-x-0
-                                    transition-transform duration-300 ease-in-out">
+                                    transition-transform duration-300 ease-in-out onyx-sidebar">
             <!-- Logo -->
-            <div class="flex items-center gap-3 px-5 h-14 border-b border-white/10 flex-shrink-0">
+            <div class="flex items-center gap-3 px-5 h-14 border-b flex-shrink-0 onyx-sidebar-header">
                 <img src="assets/logo.svg" alt="OnyxAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
                 <div class="flex flex-col min-w-0">
-                    <span class="text-white font-semibold text-sm truncate">OnyxAgent</span>
-                    <span class="text-neutral-500 text-xs" data-i18n="console">Console</span>
+                    <span class="font-semibold text-sm truncate onyx-sidebar-title">OnyxAgent</span>
+                    <span class="text-xs onyx-sidebar-subtitle" data-i18n="console">Console</span>
                 </div>
             </div>
 
             <!-- Navigation -->
-            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1 onyx-sidebar-nav">
                 <!-- Chat Group -->
                 <div class="menu-group open" data-group="chat">
-                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors duration-150">
+                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer transition-colors duration-150 onyx-sidebar-group-label">
                         <i class="fas fa-chevron-right text-[10px] chevron"></i>
                         <span data-i18n="nav_chat">Chat</span>
                     </button>
                     <div class="menu-group-items pl-2">
-                        <a class="sidebar-item active flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item active flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="chat">
                             <i class="fas fa-message item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_chat">Chat</span>
@@ -164,57 +246,57 @@
 
                 <!-- Management Group -->
                 <div class="menu-group open" data-group="manage">
-                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors duration-150">
+                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer transition-colors duration-150 onyx-sidebar-group-label">
                         <i class="fas fa-chevron-right text-[10px] chevron"></i>
                         <span data-i18n="nav_manage">Management</span>
                     </button>
                     <div class="menu-group-items pl-2">
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="config">
                             <i class="fas fa-sliders item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_config">Config</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="models">
                             <i class="fas fa-microchip item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_models">Model</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="skills">
                             <i class="fas fa-bolt item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_skills">Skills</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="workflows">
                             <i class="fas fa-diagram-project item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_workflows">Workflows</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="security">
                             <i class="fas fa-shield-halved item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_security">Security</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="memory">
                             <i class="fas fa-brain item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_memory">Memory</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="knowledge">
                             <i class="fas fa-book item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_knowledge">Knowledge</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="files">
                             <i class="fas fa-folder-tree item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_files">Files</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="tasks">
                             <i class="fas fa-clock item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_tasks">Tasks</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="fonts">
                             <i class="fas fa-font item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_fonts">Fonts</span>
@@ -224,12 +306,12 @@
 
                 <!-- Monitor Group -->
                 <div class="menu-group open" data-group="monitor">
-                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors duration-150">
+                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer transition-colors duration-150 onyx-sidebar-group-label">
                         <i class="fas fa-chevron-right text-[10px] chevron"></i>
                         <span data-i18n="nav_monitor">Monitor</span>
                     </button>
                     <div class="menu-group-items pl-2">
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
                            data-view="logs">
                             <i class="fas fa-terminal item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_logs">Logs</span>
@@ -239,8 +321,8 @@
             </nav>
 
             <!-- Sidebar Footer -->
-            <div class="px-4 py-3 border-t border-white/10 flex-shrink-0">
-                <div class="flex items-center gap-2 text-xs text-neutral-600">
+            <div class="px-4 py-3 border-t flex-shrink-0 onyx-sidebar-footer">
+                <div class="flex items-center gap-2 text-xs onyx-sidebar-version">
                     <i class="fas fa-circle text-[6px] text-primary-400"></i>
                     <a id="sidebar-version"
                        href="https://github.com/AkshayCoder48/OnyxAgent/releases"
@@ -665,6 +747,92 @@
                                 </div>
                             </div>
                             <div class="grid gap-6">
+
+                                <!-- ================================================== -->
+                                <!-- Appearance Card (PRD §31, §32, §33)               -->
+                                <!-- ================================================== -->
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-4 sm:p-6">
+                                    <div class="flex items-center gap-3 mb-5">
+                                        <div class="w-9 h-9 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
+                                            <i class="fas fa-palette text-violet-500"></i>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <h3 class="text-base font-semibold text-slate-700 dark:text-slate-200">Appearance</h3>
+                                            <p class="text-xs text-slate-400 dark:text-slate-500">Customize how OnyxAgent looks. Changes apply instantly across the entire app.</p>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-5">
+
+                                        <!-- Theme mode selector -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Theme</label>
+                                            <div class="grid grid-cols-3 gap-2 max-w-md">
+                                                <button onclick="setAppearance('light')"
+                                                        class="onyx-appearance-btn"
+                                                        data-appearance="light">
+                                                    <i class="fas fa-sun text-base mb-1.5"></i>
+                                                    <span class="text-xs font-medium">Light</span>
+                                                </button>
+                                                <button onclick="setAppearance('dark')"
+                                                        class="onyx-appearance-btn"
+                                                        data-appearance="dark">
+                                                    <i class="fas fa-moon text-base mb-1.5"></i>
+                                                    <span class="text-xs font-medium">Dark</span>
+                                                </button>
+                                                <button onclick="setAppearance('system')"
+                                                        class="onyx-appearance-btn"
+                                                        data-appearance="system">
+                                                    <i class="fas fa-desktop text-base mb-1.5"></i>
+                                                    <span class="text-xs font-medium">System</span>
+                                                </button>
+                                            </div>
+                                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                                                <span id="onyx-appearance-hint">Follows your OS setting when "System" is selected.</span>
+                                            </p>
+                                        </div>
+
+                                        <!-- Accent color picker -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Accent Color</label>
+                                            <div class="flex flex-wrap gap-2.5">
+                                                <button onclick="setAccentColor('rose')" class="onyx-accent-swatch" data-accent="rose" title="Rose" aria-label="Rose accent">
+                                                    <span class="onyx-accent-dot" style="background: hsl(347 77% 60%)"></span>
+                                                </button>
+                                                <button onclick="setAccentColor('indigo')" class="onyx-accent-swatch" data-accent="indigo" title="Indigo" aria-label="Indigo accent">
+                                                    <span class="onyx-accent-dot" style="background: hsl(243 75% 59%)"></span>
+                                                </button>
+                                                <button onclick="setAccentColor('emerald')" class="onyx-accent-swatch" data-accent="emerald" title="Emerald" aria-label="Emerald accent">
+                                                    <span class="onyx-accent-dot" style="background: hsl(142 71% 45%)"></span>
+                                                </button>
+                                                <button onclick="setAccentColor('amber')" class="onyx-accent-swatch" data-accent="amber" title="Amber" aria-label="Amber accent">
+                                                    <span class="onyx-accent-dot" style="background: hsl(38 92% 50%)"></span>
+                                                </button>
+                                                <button onclick="setAccentColor('sky')" class="onyx-accent-swatch" data-accent="sky" title="Sky" aria-label="Sky accent">
+                                                    <span class="onyx-accent-dot" style="background: hsl(199 89% 48%)"></span>
+                                                </button>
+                                                <button onclick="setAccentColor('violet')" class="onyx-accent-swatch" data-accent="violet" title="Violet" aria-label="Violet accent">
+                                                    <span class="onyx-accent-dot" style="background: hsl(262 83% 58%)"></span>
+                                                </button>
+                                                <button onclick="setAccentColor('pink')" class="onyx-accent-swatch" data-accent="pink" title="Pink" aria-label="Pink accent">
+                                                    <span class="onyx-accent-dot" style="background: hsl(329 81% 60%)"></span>
+                                                </button>
+                                                <button onclick="setAccentColor('orange')" class="onyx-accent-swatch" data-accent="orange" title="Orange" aria-label="Orange accent">
+                                                    <span class="onyx-accent-dot" style="background: hsl(25 95% 53%)"></span>
+                                                </button>
+                                                <button onclick="setAccentColor('teal')" class="onyx-accent-swatch" data-accent="teal" title="Teal" aria-label="Teal accent">
+                                                    <span class="onyx-accent-dot" style="background: hsl(173 80% 40%)"></span>
+                                                </button>
+                                                <button onclick="setAccentColor('cyan')" class="onyx-accent-swatch" data-accent="cyan" title="Cyan" aria-label="Cyan accent">
+                                                    <span class="onyx-accent-dot" style="background: hsl(187 85% 43%)"></span>
+                                                </button>
+                                            </div>
+                                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                                                The selected color applies to buttons, links, active navigation, focus rings, and progress indicators across the entire app.
+                                            </p>
+                                        </div>
+
+                                    </div>
+                                </div>
 
                                 <!-- Export / Import Card -->
                                 <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-4 sm:p-6">

@@ -364,28 +364,234 @@ function installCfgTipPortal() {
 // =====================================================================
 // Theme
 // =====================================================================
-let currentTheme = localStorage.getItem('onyx_theme') || 'dark';
+// PRD §32 — appearance: 'system' | 'light' | 'dark'.
+// 'system' follows the OS preference via matchMedia and updates live when
+// the user changes their OS theme.
+let currentTheme = localStorage.getItem('onyx_theme') || 'system';
+let _systemThemeMql = null;  // matchMedia listener handle
+
+function _isSystemDark() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
+function _resolveTheme(theme) {
+    // Returns 'dark' or 'light' — the actual class to apply.
+    if (theme === 'system') return _isSystemDark() ? 'dark' : 'light';
+    return theme === 'dark' ? 'dark' : 'light';
+}
 
 function applyTheme() {
     const root = document.documentElement;
-    if (currentTheme === 'dark') {
+    const resolved = _resolveTheme(currentTheme);
+    if (resolved === 'dark') {
         root.classList.add('dark');
-        document.getElementById('theme-icon').className = 'fas fa-sun';
-        document.getElementById('hljs-light').disabled = true;
-        document.getElementById('hljs-dark').disabled = false;
     } else {
         root.classList.remove('dark');
-        document.getElementById('theme-icon').className = 'fas fa-moon';
-        document.getElementById('hljs-light').disabled = false;
-        document.getElementById('hljs-dark').disabled = true;
+    }
+    // Update the icon to reflect the *configured* theme, not the resolved one
+    // — so clicking "system" still shows a system icon, not a sun/moon.
+    const iconEl = document.getElementById('theme-icon');
+    if (iconEl) {
+        if (currentTheme === 'system') iconEl.className = 'fas fa-desktop';
+        else if (currentTheme === 'dark') iconEl.className = 'fas fa-sun';  // sun = click to go light
+        else iconEl.className = 'fas fa-moon';
+    }
+    // Swap highlight.js theme
+    const hljsLight = document.getElementById('hljs-light');
+    const hljsDark = document.getElementById('hljs-dark');
+    if (hljsLight && hljsDark) {
+        hljsLight.disabled = (resolved === 'dark');
+        hljsDark.disabled = (resolved !== 'dark');
+    }
+
+    // PRD §33 — also apply the accent color attribute (in case it was
+    // changed in another tab).
+    const accent = localStorage.getItem('onyx_accent') || 'rose';
+    root.setAttribute('data-accent', accent);
+
+    // Live-update the PWA theme-color meta so the mobile browser chrome
+    // matches the accent. Falls back to bg color if accent unknown.
+    try {
+        const accentH = getComputedStyle(root).getPropertyValue('--accent-h-strong').trim();
+        if (accentH) {
+            const meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.content = `hsl(${accentH})`;
+        }
+    } catch (e) { /* ignore */ }
+}
+
+// Cycle: light → dark → system → light. (Three states per PRD §32.)
+function toggleTheme() {
+    if (currentTheme === 'light') currentTheme = 'dark';
+    else if (currentTheme === 'dark') currentTheme = 'system';
+    else currentTheme = 'light';
+    localStorage.setItem('onyx_theme', currentTheme);
+    applyTheme();
+    // Show a toast so the user knows what state they're in.
+    if (typeof showToast === 'function') {
+        const label = currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1);
+        showToast(`Appearance: ${label}`, 'info');
     }
 }
 
-function toggleTheme() {
-    currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('onyx_theme', currentTheme);
-    applyTheme();
+// Set up live system-theme following. When the user is on 'system' mode
+// and changes their OS theme, the app should update immediately.
+function _initSystemThemeListener() {
+    if (!window.matchMedia) return;
+    _systemThemeMql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e) => {
+        if (currentTheme === 'system') applyTheme();
+    };
+    // addEventListener is the modern API; addListener is the Safari < 14 fallback.
+    if (_systemThemeMql.addEventListener) _systemThemeMql.addEventListener('change', handler);
+    else if (_systemThemeMql.addListener) _systemThemeMql.addListener(handler);
 }
+
+// PRD §33 — set accent color (called from the Appearance settings card).
+function setAccentColor(color) {
+    if (!color) return;
+    const valid = ['rose','indigo','emerald','amber','sky','violet','pink','orange','teal','cyan'];
+    if (!valid.includes(color)) {
+        console.warn('[appearance] invalid accent color:', color);
+        return;
+    }
+    localStorage.setItem('onyx_accent', color);
+    document.documentElement.setAttribute('data-accent', color);
+    applyTheme();  // also updates the PWA theme-color meta
+    _updateAppearanceUI();
+    if (typeof showToast === 'function') {
+        showToast(`Accent color: ${color}`, 'success');
+    }
+}
+
+function getAccentColor() {
+    return localStorage.getItem('onyx_accent') || 'rose';
+}
+
+function getAppearance() {
+    return localStorage.getItem('onyx_theme') || 'system';
+}
+
+function setAppearance(mode) {
+    if (!['light','dark','system'].includes(mode)) return;
+    currentTheme = mode;
+    localStorage.setItem('onyx_theme', mode);
+    applyTheme();
+    _updateAppearanceUI();
+    if (typeof showToast === 'function') {
+        const label = mode.charAt(0).toUpperCase() + mode.slice(1);
+        showToast(`Theme: ${label}`, 'info');
+    }
+}
+
+// Highlight the active option in the Appearance settings card.
+function _updateAppearanceUI() {
+    const theme = getAppearance();
+    const accent = getAccentColor();
+    document.querySelectorAll('.onyx-appearance-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.appearance === theme);
+    });
+    document.querySelectorAll('.onyx-accent-swatch').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.accent === accent);
+    });
+}
+
+// Call on page load (after DOM is ready).
+document.addEventListener('DOMContentLoaded', _updateAppearanceUI);
+
+// =====================================================================
+// Toast notification system (PRD §29)
+// =====================================================================
+// Replaces the previous pattern of inline status spans + alert() calls.
+// Toasts auto-stack in the bottom-right corner (top-right on mobile to
+// avoid the keyboard), auto-dismiss after 3.5s, and respect the user's
+// accent color via --accent-h.
+
+let _toastContainer = null;
+const _TOAST_ICONS = {
+    success: 'fa-circle-check',
+    error: 'fa-circle-exclamation',
+    warning: 'fa-triangle-exclamation',
+    info: 'fa-circle-info',
+};
+
+function _initToastContainer() {
+    if (_toastContainer && _toastContainer.isConnected) return;
+    _toastContainer = document.createElement('div');
+    _toastContainer.id = 'onyx-toast-container';
+    _toastContainer.className = 'onyx-toast-container';
+    _toastContainer.setAttribute('role', 'region');
+    _toastContainer.setAttribute('aria-live', 'polite');
+    _toastContainer.setAttribute('aria-label', 'Notifications');
+    document.body.appendChild(_toastContainer);
+}
+
+/**
+ * Show a toast notification.
+ * @param {string} message - The message to display.
+ * @param {'success'|'error'|'warning'|'info'} type - Visual style.
+ * @param {object} opts - { durationMs, action: {label, onClick} }
+ */
+function showToast(message, type = 'info', opts = {}) {
+    _initToastContainer();
+    const duration = opts.durationMs || 3500;
+
+    const toast = document.createElement('div');
+    toast.className = `onyx-toast onyx-toast-${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+
+    const iconClass = _TOAST_ICONS[type] || _TOAST_ICONS.info;
+    toast.innerHTML = `
+        <i class="fas ${iconClass} onyx-toast-icon"></i>
+        <span class="onyx-toast-message"></span>
+        ${opts.action ? `<button class="onyx-toast-action"></button>` : ''}
+        <button class="onyx-toast-close" aria-label="Dismiss">
+            <i class="fas fa-xmark"></i>
+        </button>
+    `;
+
+    // Set textContent (not innerHTML) to prevent XSS.
+    toast.querySelector('.onyx-toast-message').textContent = message;
+    if (opts.action) {
+        const btn = toast.querySelector('.onyx-toast-action');
+        btn.textContent = opts.action.label;
+        btn.addEventListener('click', () => {
+            try { opts.action.onClick(); } catch (e) { /* ignore */ }
+            _dismissToast(toast);
+        });
+    }
+    toast.querySelector('.onyx-toast-close').addEventListener('click', () => _dismissToast(toast));
+
+    _toastContainer.appendChild(toast);
+    // Trigger entrance animation on next frame.
+    requestAnimationFrame(() => toast.classList.add('onyx-toast-visible'));
+
+    // Auto-dismiss after `duration` ms.
+    const timeoutId = setTimeout(() => _dismissToast(toast), duration);
+    toast._timeoutId = timeoutId;
+
+    // Pause auto-dismiss on hover.
+    toast.addEventListener('mouseenter', () => clearTimeout(toast._timeoutId));
+    toast.addEventListener('mouseleave', () => {
+        toast._timeoutId = setTimeout(() => _dismissToast(toast), 1500);
+    });
+
+    return toast;
+}
+
+function _dismissToast(toast) {
+    if (!toast || !toast.isConnected) return;
+    if (toast._timeoutId) clearTimeout(toast._timeoutId);
+    toast.classList.remove('onyx-toast-visible');
+    toast.classList.add('onyx-toast-leaving');
+    setTimeout(() => toast.remove(), 250);
+}
+
+// Convenience wrappers
+function toastSuccess(msg, opts) { return showToast(msg, 'success', opts); }
+function toastError(msg, opts)   { return showToast(msg, 'error', opts); }
+function toastWarning(msg, opts){ return showToast(msg, 'warning', opts); }
+function toastInfo(msg, opts)   { return showToast(msg, 'info', opts); }
 
 // =====================================================================
 // PWA Install
@@ -1273,7 +1479,15 @@ messagesDiv.addEventListener('click', (e) => {
             const codeText = codeEl.textContent;
             copyToClipboard(codeText).then(() => {
                 const icon = codeCopyBtn.querySelector('i');
-                if (icon) { icon.className = 'fas fa-check'; setTimeout(() => { icon.className = 'fas fa-copy'; }, 1500); }
+                if (icon) {
+                    icon.className = 'fas fa-check';
+                    codeCopyBtn.classList.add('copied');
+                    setTimeout(() => {
+                        icon.className = 'fas fa-copy';
+                        codeCopyBtn.classList.remove('copied');
+                    }, 1500);
+                }
+                if (typeof toastSuccess === 'function') toastSuccess('Code copied to clipboard');
             });
         }
         return;
@@ -1289,6 +1503,7 @@ messagesDiv.addEventListener('click', (e) => {
             copyToClipboard(rawMd).then(() => {
                 const icon = copyBtn.querySelector('i');
                 if (icon) { icon.className = 'fas fa-check'; setTimeout(() => { icon.className = 'fas fa-copy'; }, 1500); }
+                if (typeof toastSuccess === 'function') toastSuccess('Message copied');
             });
         }
         return;
@@ -2416,7 +2631,7 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
         botEl.innerHTML = `
             <img src="assets/ai-avatar.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-0.5 shadow-sm ring-1 ring-slate-200/60 dark:ring-white/10">
             <div class="min-w-0 flex-1 max-w-[85%]">
-                <div class="bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content text-slate-700 dark:text-slate-200">
+                <div class="onyx-bot-bubble rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content">
                     <div class="agent-steps"></div>
                     <div class="answer-content sse-streaming"></div>
                     <div class="media-content"></div>
@@ -2990,7 +3205,7 @@ function createUserMessageEl(content, timestamp, attachments) {
     const textHtml = content ? renderMarkdown(content) : '';
     el.innerHTML = `
         <div class="max-w-[75%] sm:max-w-[60%]">
-            <div class="bg-primary-400 text-white rounded-2xl px-4 py-2.5 text-sm leading-relaxed msg-content user-bubble">
+            <div class="onyx-user-bubble rounded-2xl px-4 py-2.5 text-sm leading-relaxed msg-content user-bubble">
                 ${attachHtml}${textHtml}
             </div>
             <div class="flex items-center justify-end gap-2 mt-1.5">
@@ -3394,7 +3609,7 @@ function createBotMessageEl(content, timestamp, requestId, msg) {
     el.innerHTML = `
         <img src="assets/ai-avatar.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-0.5 shadow-sm ring-1 ring-slate-200/60 dark:ring-white/10">
         <div class="min-w-0 flex-1 max-w-[85%]">
-            <div class="bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content text-slate-700 dark:text-slate-200">
+            <div class="onyx-bot-bubble rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content">
                 ${evolutionBadge}
                 ${stepsHtml ? `<div class="agent-steps">${stepsHtml}</div>` : ''}
                 <div class="answer-content">${renderMarkdown(displayContent)}</div>
@@ -3691,7 +3906,7 @@ function addLoadingIndicator() {
     el.className = 'flex gap-3 px-4 sm:px-6 py-3';
     el.innerHTML = `
         <img src="assets/ai-avatar.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-0.5 shadow-sm ring-1 ring-slate-200/60 dark:ring-white/10">
-        <div class="bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3">
+        <div class="onyx-bot-bubble rounded-2xl px-4 py-3">
             <div class="flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-primary-400 animate-pulse-dot" style="animation-delay: 0s"></span>
                 <span class="w-2 h-2 rounded-full bg-primary-400 animate-pulse-dot" style="animation-delay: 0.2s"></span>
@@ -5821,7 +6036,7 @@ function marketplaceInstall(ev, slug) {
                     btn.disabled = false;
                     btn.textContent = 'Install';
                 }
-                alert(`Install failed: ${data.message || 'unknown error'}`);
+                toastError(`Install failed: ${data.message || 'unknown error'}`);
             }
         })
         .catch(err => {
@@ -5829,7 +6044,7 @@ function marketplaceInstall(ev, slug) {
                 btn.disabled = false;
                 btn.textContent = 'Install';
             }
-            alert(`Network error: ${err}`);
+            toastError(`Network error: ${err}`);
         });
 }
 
@@ -5982,12 +6197,12 @@ function toggleSkill(name, currentlyEnabled) {
             }
         } else {
             if (card) card.style.opacity = '1';
-            alert(t('skill_toggle_error'));
+            toastError(t('skill_toggle_error'));
         }
     })
     .catch(() => {
         if (card) card.style.opacity = '1';
-        alert(t('skill_toggle_error'));
+        toastError(t('skill_toggle_error'));
     });
 }
 
@@ -6030,11 +6245,11 @@ function confirmDeleteSkill() {
                 if (count <= 0) badge.classList.add('hidden');
             }
         } else {
-            alert(t('skills_delete_error') + ': ' + (data.message || ''));
+            toastError(t('skills_delete_error') + ': ' + (data.message || ''));
         }
     })
     .catch(() => {
-        alert(t('skills_delete_error'));
+        toastError(t('skills_delete_error'));
     });
 }
 
@@ -6115,7 +6330,7 @@ function handleSkillZipDrop(event) {
             filenameEl.textContent = file.name;
             filenameEl.classList.remove('hidden');
         } else {
-            alert(t('skills_upload_error') + ': Only .zip files are supported');
+            toastError(t('skills_upload_error') + ': Only .zip files are supported');
         }
     }
 }
@@ -8982,14 +9197,14 @@ function openFileEditor(path) {
         .then(r => r.json())
         .then(data => {
             if (data.status === 'error') {
-                alert(data.message);
+                toastError(data.message);
                 return;
             }
             document.getElementById('file-editor-title').textContent = path.split('/').pop();
             document.getElementById('file-editor-content').value = data.content || '';
             document.getElementById('file-editor-modal').classList.remove('hidden');
         })
-        .catch(err => alert('Failed to read file'));
+        .catch(err => toastError('Failed to read file'));
 }
 
 function saveFileContent() {
@@ -9006,10 +9221,10 @@ function saveFileContent() {
             closeFileEditor();
             filesLoadDirectory();
         } else {
-            alert(data.message);
+            toastError(data.message);
         }
     })
-    .catch(err => alert('Failed to save file'));
+    .catch(err => toastError('Failed to save file'));
 }
 
 function closeFileEditor() {
@@ -9043,10 +9258,10 @@ function confirmRename() {
             closeRenameDialog();
             filesLoadDirectory();
         } else {
-            alert(data.message);
+            toastError(data.message);
         }
     })
-    .catch(err => alert('Failed to rename'));
+    .catch(err => toastError('Failed to rename'));
 }
 
 function deleteFile(path) {
@@ -9060,10 +9275,10 @@ function deleteFile(path) {
         if (data.status === 'success') {
             filesLoadDirectory();
         } else {
-            alert(data.message);
+            toastError(data.message);
         }
     })
-    .catch(err => alert('Failed to delete'));
+    .catch(err => toastError('Failed to delete'));
 }
 
 function showMkdirDialog() {
@@ -9091,10 +9306,10 @@ function confirmMkdir() {
             closeMkdirDialog();
             filesLoadDirectory();
         } else {
-            alert(data.message);
+            toastError(data.message);
         }
     })
-    .catch(err => alert('Failed to create folder'));
+    .catch(err => toastError('Failed to create folder'));
 }
 
 function showNewFileDialog() {
@@ -9125,10 +9340,10 @@ function confirmNewFile() {
             filesSelectedPath = path;
             openFileEditor(path);
         } else {
-            alert(data.message);
+            toastError(data.message);
         }
     })
-    .catch(err => alert('Failed to create file'));
+    .catch(err => toastError('Failed to create file'));
 }
 
 function showFileUploadDialog() {
@@ -9216,6 +9431,8 @@ document.addEventListener('click', function(e) {
 // Initialization
 // =====================================================================
 applyTheme();
+_initSystemThemeListener();  // PRD §32 — live-follow OS theme changes
+_initToastContainer();        // PRD §29 — toast notification system
 applyI18n();
 
 fetch('/auth/check').then(r => r.json()).then(data => {
@@ -12381,7 +12598,7 @@ function handleFontUpload(files) {
     Array.from(files).forEach(file => {
         const ext = file.name.split('.').pop().toLowerCase();
         if (!['ttf', 'otf', 'woff2'].includes(ext)) {
-            alert('Unsupported font format: .' + ext + '\nPlease use .ttf, .otf, or .woff2 files.');
+            toastWarning('Unsupported font format: .' + ext + '. Please use .ttf, .otf, or .woff2 files.');
             return;
         }
 
@@ -12656,7 +12873,7 @@ handleFontUpload = function(files) {
     Array.from(files).forEach(file => {
         const ext = file.name.split('.').pop().toLowerCase();
         if (!['ttf', 'otf', 'woff2'].includes(ext)) {
-            alert('Unsupported font format: .' + ext + '\nPlease use .ttf, .otf, or .woff2 files.');
+            toastWarning('Unsupported font format: .' + ext + '. Please use .ttf, .otf, or .woff2 files.');
             return;
         }
         const fontName = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');

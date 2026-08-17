@@ -2,17 +2,307 @@
    OnyxAgent Console Styles
    ===================================================================== */
 
-/* Global Font Stack */
+/* ─────────────────────────────────────────────────────────────────────
+   DESIGN TOKENS (PRD §7, §41)
+   ─────────────────────────────────────────────────────────────────────
+   The full shadcn-style token system. Every component MUST consume these
+   variables rather than hardcoding colors.
+
+   Two layers:
+     1. Raw palette (HSL channels) — used to compose semantic tokens.
+     2. Semantic tokens — what components actually reference.
+
+   Accent color: defaults to a rose (the legacy brand color) but is
+   user-selectable via the Appearance settings card. The selection
+   writes to localStorage('onyx_accent') and overrides --accent-* here.
+   ───────────────────────────────────────────────────────────────────── */
+
 :root {
+    /* ── Raw palette (HSL space-separated for alpha composability) ── */
+    --onyx-slate-0:   0 0% 100%;
+    --onyx-slate-50:  210 40% 98%;
+    --onyx-slate-100: 210 40% 96%;
+    --onyx-slate-200: 214 32% 91%;
+    --onyx-slate-300: 213 27% 84%;
+    --onyx-slate-400: 215 20% 65%;
+    --onyx-slate-500: 215 16% 47%;
+    --onyx-slate-600: 215 19% 35%;
+    --onyx-slate-700: 217 19% 27%;
+    --onyx-slate-800: 217 19% 18%;
+    --onyx-slate-900: 222 22% 11%;
+    --onyx-slate-950: 229 24% 8%;
+    --onyx-slate-1000: 230 25% 5%;
+
+    /* ── Accent color palette (user-selectable) ──
+       Default: rose (legacy brand). Override by setting
+       --accent-h, --accent-s, --accent-l on :root from JS, OR
+       by adding a data-accent attribute on <html>:
+           <html data-accent="rose">      (default)
+           <html data-accent="indigo">
+           <html data-accent="emerald">
+           <html data-accent="amber">
+           <html data-accent="sky">
+           <html data-accent="violet">
+           <html data-accent="pink">
+           <html data-accent="orange">
+       See accent-color.css for the per-color overrides.
+    */
+    --accent-h: 347 77% 60%;       /* rose-400 default */
+    --accent-h-strong: 347 77% 50%; /* rose-500 */
+    --accent-h-fg: 0 0% 100%;       /* white-on-accent text */
+
+    /* ── Semantic tokens — LIGHT MODE defaults ── */
+    --bg:               var(--onyx-slate-0);
+    --fg:               var(--onyx-slate-900);
+    --muted:            var(--onyx-slate-100);
+    --muted-fg:         var(--onyx-slate-500);
+    --card:             var(--onyx-slate-0);
+    --card-fg:          var(--onyx-slate-900);
+    --popover:          var(--onyx-slate-0);
+    --popover-fg:       var(--onyx-slate-900);
+    --border:           var(--onyx-slate-200);
+    --input:            var(--onyx-slate-200);
+    --ring:             var(--accent-h);
+
+    /* Primary = accent (so shadcn-style `bg-primary` maps to user-selected accent) */
+    --primary:          var(--accent-h-strong);
+    --primary-fg:       var(--accent-h-fg);
+    --primary-hover:    var(--accent-h-strong);
+    --primary-foreground: var(--accent-h-fg);
+
+    /* Secondary (neutral) */
+    --secondary:        var(--onyx-slate-100);
+    --secondary-fg:     var(--onyx-slate-900);
+
+    /* Status colors */
+    --destructive:      0 72% 51%;
+    --destructive-fg:   0 0% 100%;
+    --success:           142 71% 45%;
+    --success-fg:        0 0% 100%;
+    --warning:          38 92% 50%;
+    --warning-fg:       0 0% 100%;
+    --info:             199 89% 48%;
+    --info-fg:           0 0% 100%;
+
+    /* Radius scale */
+    --radius-sm: 4px;
+    --radius:    6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 24px;
+
+    /* Sidebar (theme-aware — was hardcoded #0A0A0A) */
+    --sidebar-bg:       var(--onyx-slate-50);
+    --sidebar-fg:       var(--onyx-slate-600);
+    --sidebar-active-bg: hsl(var(--accent-h) / 0.10);
+    --sidebar-active-fg: hsl(var(--accent-h-strong));
+    --sidebar-border:   var(--onyx-slate-200);
+
+    /* Chat bubbles */
+    --bubble-user-bg:   hsl(var(--accent-h) / 0.95);
+    --bubble-user-fg:   var(--accent-h-fg);
+    --bubble-bot-bg:    var(--onyx-slate-0);
+    --bubble-bot-fg:    var(--onyx-slate-700);
+    --bubble-bot-border: var(--onyx-slate-200);
+
+    /* Fonts */
     --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-display: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace;
     --chat-font-size: 14px;
     --code-font-size: 13px;
+
+    /* Motion tokens — respect prefers-reduced-motion */
+    --onyx-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --onyx-fast: 150ms;
+    --onyx-med: 250ms;
+    --onyx-slow: 350ms;
+}
+
+/* ── DARK MODE semantic tokens ────────────────────────────────────────
+   Triggered by `.dark` on <html> (Tailwind `class` strategy, unchanged).
+   Only semantic tokens are overridden — raw palette stays the same.
+   ───────────────────────────────────────────────────────────────────── */
+.dark {
+    --bg:               var(--onyx-slate-1000);
+    --fg:               var(--onyx-slate-100);
+    --muted:            hsl(var(--onyx-slate-800) / 0.5);
+    --muted-fg:         var(--onyx-slate-400);
+    --card:             hsl(217 19% 12%);
+    --card-fg:          var(--onyx-slate-100);
+    --popover:          hsl(217 19% 14%);
+    --popover-fg:       var(--onyx-slate-100);
+    --border:           hsl(217 19% 22%);
+    --input:            hsl(217 19% 22%);
+    --ring:             var(--accent-h);
+
+    --secondary:        hsl(217 19% 18%);
+    --secondary-fg:     var(--onyx-slate-100);
+
+    /* Status colors stay the same hue, slightly brighter for dark bg */
+    --destructive:      0 72% 60%;
+    --destructive-fg:   0 0% 100%;
+    --success:           142 71% 55%;
+    --success-fg:        0 0% 100%;
+    --warning:          38 92% 55%;
+    --warning-fg:       0 0% 100%;
+    --info:             199 89% 55%;
+    --info-fg:           0 0% 100%;
+
+    /* Sidebar (dark) */
+    --sidebar-bg:       var(--onyx-slate-1000);
+    --sidebar-fg:       var(--onyx-slate-400);
+    --sidebar-active-bg: hsl(var(--accent-h) / 0.18);
+    --sidebar-active-fg: hsl(var(--accent-h));
+    --sidebar-border:   hsl(217 19% 18%);
+
+    /* Chat bubbles */
+    --bubble-user-bg:   hsl(var(--accent-h) / 0.95);
+    --bubble-user-fg:   var(--accent-h-fg);
+    --bubble-bot-bg:    hsl(217 19% 12%);
+    --bubble-bot-fg:    var(--onyx-slate-100);
+    --bubble-bot-border: hsl(217 19% 22%);
+}
+
+/* ── Accent color presets (PRD §33) ──────────────────────────────────
+   Apply by setting data-accent on <html>. Each preset overrides the
+   --accent-h / --accent-h-strong HSL channels.
+   ───────────────────────────────────────────────────────────────────── */
+html[data-accent="rose"]     { --accent-h: 347 77% 60%; --accent-h-strong: 347 77% 50%; }
+html[data-accent="indigo"]   { --accent-h: 243 75% 59%; --accent-h-strong: 243 75% 49%; }
+html[data-accent="emerald"]  { --accent-h: 142 71% 45%; --accent-h-strong: 142 71% 40%; }
+html[data-accent="amber"]    { --accent-h: 38 92% 50%;  --accent-h-strong: 38 92% 45%; }
+html[data-accent="sky"]      { --accent-h: 199 89% 48%; --accent-h-strong: 199 89% 42%; }
+html[data-accent="violet"]   { --accent-h: 262 83% 58%; --accent-h-strong: 262 83% 50%; }
+html[data-accent="pink"]     { --accent-h: 329 81% 60%; --accent-h-strong: 329 81% 50%; }
+html[data-accent="orange"]   { --accent-h: 25 95% 53%;  --accent-h-strong: 25 95% 48%; }
+html[data-accent="teal"]     { --accent-h: 173 80% 40%; --accent-h-strong: 173 80% 35%; }
+html[data-accent="cyan"]     { --accent-h: 187 85% 43%; --accent-h-strong: 187 85% 38%; }
+
+.dark html[data-accent="emerald"],
+.dark[data-accent="emerald"] { --accent-h: 142 71% 55%; --accent-h-strong: 142 71% 50%; }
+.dark html[data-accent="amber"],
+.dark[data-accent="amber"]   { --accent-h: 38 92% 55%;  --accent-h-strong: 38 92% 50%; }
+.dark html[data-accent="sky"],
+.dark[data-accent="sky"]     { --accent-h: 199 89% 55%; --accent-h-strong: 199 89% 50%; }
+
+/* ── Reduced motion (PRD §34) ────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
 
 body {
     font-family: var(--font-body);
+    background-color: hsl(var(--bg));
+    color: hsl(var(--fg));
+}
+
+/* ── Toast notifications (PRD §29) ─────────────────────────────────────
+   Auto-stacking toasts that respect the user's accent color. Used for
+   "Saved", "Copied", "Deleted", "Updated", "Failed", "Connection status"
+   notifications. Replaces inline status spans + alert() calls.
+   ───────────────────────────────────────────────────────────────────── */
+.onyx-toast-container {
+    position: fixed;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column-reverse;  /* newest at bottom */
+    gap: 0.5rem;
+    pointer-events: none;  /* let toasts themselves capture events */
+    /* Default: bottom-right (desktop) */
+    bottom: 1rem;
+    right: 1rem;
+    max-width: calc(100vw - 2rem);
+}
+@media (max-width: 640px) {
+    .onyx-toast-container {
+        /* On mobile: top-right to avoid the keyboard */
+        bottom: auto;
+        top: 4rem;  /* below the header */
+        right: 0.5rem;
+        left: 0.5rem;
+        max-width: none;
+    }
+}
+
+.onyx-toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    min-width: 280px;
+    max-width: 420px;
+    border-radius: var(--radius-md);
+    background: hsl(var(--card));
+    color: hsl(var(--card-fg));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: opacity 200ms ease, transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.onyx-toast.onyx-toast-visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+.onyx-toast.onyx-toast-leaving {
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+.onyx-toast-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.onyx-toast-success .onyx-toast-icon { color: hsl(var(--success)); }
+.onyx-toast-error .onyx-toast-icon   { color: hsl(var(--destructive)); }
+.onyx-toast-warning .onyx-toast-icon { color: hsl(var(--warning)); }
+.onyx-toast-info .onyx-toast-icon    { color: hsl(var(--info)); }
+
+.onyx-toast-message {
+    flex: 1;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.onyx-toast-action {
+    background: hsl(var(--accent-h) / 0.12);
+    color: hsl(var(--accent-h-strong));
+    border: none;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 150ms ease;
+    white-space: nowrap;
+}
+.onyx-toast-action:hover {
+    background: hsl(var(--accent-h) / 0.22);
+}
+
+.onyx-toast-close {
+    background: transparent;
+    border: none;
+    color: hsl(var(--muted-fg));
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    transition: background 150ms ease, color 150ms ease;
+}
+.onyx-toast-close:hover {
+    background: hsl(var(--muted));
+    color: hsl(var(--fg));
 }
 
 /* Mobile-First Viewport Fix */
@@ -32,6 +322,156 @@ body, #app, #main-content {
     display: flex;
     flex-direction: column;
     min-height: 0; /* critical for flex overflow */
+}
+
+/* ── Sidebar (PRD §10, §11) ────────────────────────────────────────────
+   Was hardcoded `bg-[#0A0A0A]` (always black). Now theme-aware via the
+   --sidebar-* token set. Sidebar uses a subtle accent-tinted active
+   state instead of an overwhelming filled block.
+   ───────────────────────────────────────────────────────────────────── */
+.onyx-sidebar {
+    background-color: hsl(var(--sidebar-bg));
+    color: hsl(var(--sidebar-fg));
+    border-right: 1px solid hsl(var(--sidebar-border));
+}
+.onyx-sidebar-header {
+    border-color: hsl(var(--sidebar-border));
+}
+.onyx-sidebar-title {
+    color: hsl(var(--fg));
+}
+.onyx-sidebar-subtitle {
+    color: hsl(var(--muted-fg));
+}
+.onyx-sidebar-group-label {
+    color: hsl(var(--muted-fg));
+}
+.onyx-sidebar-group-label:hover {
+    color: hsl(var(--fg));
+}
+.onyx-sidebar-footer {
+    border-color: hsl(var(--sidebar-border));
+}
+.onyx-sidebar-version {
+    color: hsl(var(--muted-fg));
+}
+.onyx-sidebar-version a {
+    color: inherit;
+}
+
+/* Sidebar item — hover + active states use accent color subtly */
+.onyx-sidebar-item {
+    color: hsl(var(--sidebar-fg));
+}
+.onyx-sidebar-item:hover {
+    background-color: hsl(var(--accent-h) / 0.08);
+    color: hsl(var(--fg));
+}
+.onyx-sidebar-item.active {
+    /* Subtle accent-tinted background, not an overwhelming filled block */
+    background-color: hsl(var(--accent-h) / 0.12);
+    color: hsl(var(--accent-h-strong));
+    font-weight: 500;
+}
+.onyx-sidebar-item.active .item-icon {
+    color: hsl(var(--accent-h-strong));
+}
+/* Focus ring for keyboard navigation (PRD §39) */
+.onyx-sidebar-item:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+/* ── Appearance buttons (PRD §32) ──────────────────────────────────────
+   Theme mode selector buttons. The active one gets an accent-tinted
+   background + ring. Hover state is subtle.
+   ───────────────────────────────────────────────────────────────────── */
+.onyx-appearance-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 0.5rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    background: hsl(var(--card));
+    color: hsl(var(--muted-fg));
+    cursor: pointer;
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.onyx-appearance-btn:hover {
+    border-color: hsl(var(--accent-h) / 0.4);
+    color: hsl(var(--fg));
+}
+.onyx-appearance-btn.active {
+    background: hsl(var(--accent-h) / 0.10);
+    border-color: hsl(var(--accent-h) / 0.5);
+    color: hsl(var(--accent-h-strong));
+    box-shadow: 0 0 0 1px hsl(var(--accent-h) / 0.3);
+}
+.onyx-appearance-btn:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+/* ── Accent color swatches (PRD §33) ──────────────────────────────────
+   Color dots the user picks from. Selected one gets a ring + checkmark.
+   ───────────────────────────────────────────────────────────────────── */
+.onyx-accent-swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid hsl(var(--border));
+    background: hsl(var(--card));
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+.onyx-accent-swatch:hover {
+    transform: scale(1.1);
+    border-color: hsl(var(--muted-fg));
+}
+.onyx-accent-swatch.active {
+    border-color: hsl(var(--fg));
+    box-shadow: 0 0 0 2px hsl(var(--card)), 0 0 0 4px hsl(var(--accent-h) / 0.4);
+}
+.onyx-accent-swatch.active::after {
+    content: '✓';
+    position: absolute;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+.onyx-accent-swatch:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+.onyx-accent-dot {
+    display: block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+}
+
+/* ── Chat bubbles (PRD §13, §14) ───────────────────────────────────────
+   User bubbles use the accent color; AI responses use a neutral card
+   surface so they read as content rather than chat-bubbles. Both are
+   theme-aware via the --bubble-* tokens.
+   ───────────────────────────────────────────────────────────────────── */
+.onyx-user-bubble {
+    background-color: hsl(var(--bubble-user-bg));
+    color: hsl(var(--bubble-user-fg));
+}
+.onyx-bot-bubble {
+    background-color: hsl(var(--bubble-bot-bg));
+    color: hsl(var(--bubble-bot-fg));
+    border: 1px solid hsl(var(--bubble-bot-border));
 }
 /* Chat view must fill the content-area */
 #view-chat {
@@ -156,10 +596,10 @@ body, #app, #main-content {
 
 /* Sidebar */
 .sidebar-item.active {
-    background: rgba(255, 255, 255, 0.08);
-    color: #FFFFFF;
+    background: hsl(var(--accent-h) / 0.12);
+    color: hsl(var(--accent-h-strong));
 }
-.sidebar-item.active .item-icon { color: #FB7185; }
+.sidebar-item.active .item-icon { color: hsl(var(--accent-h-strong)); }
 
 /* Session Panel */
 .session-panel {
@@ -1713,20 +2153,17 @@ body, #app, #main-content {
 }
 
 /* =====================================================================
-   Code Block Enhancements
+   Code Block Enhancements (PRD §25)
+   Modernized: filename + language + copy button, theme-aware via tokens,
+   horizontal scroll on mobile, proper syntax highlighting in both modes.
    ===================================================================== */
 .code-block-wrapper {
     position: relative;
     margin: 1em 0;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     overflow: hidden;
-    background: #f8f9fa;
-    border: 1px solid #e2e8f0;
-}
-
-.dark .code-block-wrapper {
-    background: #1e293b;
-    border-color: #334155;
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
 }
 
 .code-block-header {
@@ -1734,55 +2171,55 @@ body, #app, #main-content {
     justify-content: space-between;
     align-items: center;
     padding: 0.5em 1em;
-    background: #e2e8f0;
-    border-bottom: 1px solid #cbd5e1;
+    background: hsl(var(--secondary));
+    border-bottom: 1px solid hsl(var(--border));
     font-size: 0.85em;
 }
 
-.dark .code-block-header {
-    background: #0f172a;
-    border-bottom-color: #334155;
-}
-
 .code-block-lang {
-    color: #64748b;
+    color: hsl(var(--muted-fg));
     font-weight: 500;
     text-transform: lowercase;
-}
-
-.dark .code-block-lang {
-    color: #94a3b8;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
 }
 
 .code-copy-btn {
     background: transparent;
     border: none;
-    color: #64748b;
+    color: hsl(var(--muted-fg));
     cursor: pointer;
     padding: 0.25em 0.5em;
-    border-radius: 4px;
-    transition: all 0.2s;
+    border-radius: var(--radius-sm);
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
     font-size: 0.9em;
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
 }
 
 .code-copy-btn:hover {
-    background: rgba(100, 116, 139, 0.1);
-    color: #475569;
+    background: hsl(var(--accent-h) / 0.10);
+    color: hsl(var(--accent-h-strong));
 }
 
-.dark .code-copy-btn {
-    color: #94a3b8;
+.code-copy-btn:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
 }
 
-.dark .code-copy-btn:hover {
-    background: rgba(148, 163, 184, 0.1);
-    color: #cbd5e1;
+.code-copy-btn.copied {
+    color: hsl(var(--success));
 }
 
 .code-block-wrapper pre {
     margin: 0;
     border-radius: 0;
     border: none;
+    /* PRD §25: horizontal scrolling on mobile, no wrap */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* =====================================================================
