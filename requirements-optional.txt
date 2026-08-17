@@ -23,3 +23,8 @@ python-pptx
 
 # browser tool (Chromium is installed separately via Dockerfile or playwright install chromium)
 playwright>=1.40.0
+
+# stealth browser (optional, for Cloudflare bypass)
+playwright-extra>=4.0.0
+playwright-extra-plugin-stealth>=0.1.0
+

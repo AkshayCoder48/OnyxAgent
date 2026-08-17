@@ -596,10 +596,10 @@ body, #app, #main-content {
 
 /* Sidebar */
 .sidebar-item.active {
-    background: hsl(var(--accent-h) / 0.12);
-    color: hsl(var(--accent-h-strong));
+    background: rgba(255, 255, 255, 0.08);
+    color: #FFFFFF;
 }
-.sidebar-item.active .item-icon { color: hsl(var(--accent-h-strong)); }
+.sidebar-item.active .item-icon { color: #FB7185; }
 
 /* Session Panel */
 .session-panel {
@@ -1000,14 +1000,14 @@ body, #app, #main-content {
 .msg-content th { background: #f1f5f9; font-weight: 600; }
 .dark .msg-content th { background: #111111; }
 .msg-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 0.5em 0; object-fit: contain; }
-.msg-content a { color: hsl(var(--accent-h-strong)); text-decoration: underline; overflow-wrap: anywhere; word-break: break-all; }
+.msg-content a { color: #e11d48; text-decoration: underline; overflow-wrap: anywhere; word-break: break-all; }
 .msg-content a:hover { opacity: 0.85; }
 
-/* Overrides for user bubble — uses accent color via --bubble-user-* tokens */
+/* Overrides for user bubble (white text on rose bg) */
 .user-bubble { overflow-wrap: anywhere; word-break: break-word; }
-.user-bubble.msg-content a { color: hsl(var(--bubble-user-fg)) !important; text-decoration: underline; text-decoration-color: hsl(var(--bubble-user-fg) / 0.6); overflow-wrap: anywhere; word-break: break-all; }
-.user-bubble.msg-content a:hover { opacity: 0.85; }
-.user-bubble.msg-content :not(pre) > code { background: hsl(var(--bubble-user-fg) / 0.2); color: hsl(var(--bubble-user-fg)); word-break: break-all; }
+.user-bubble.msg-content a { color: #ffffff !important; text-decoration: underline; text-decoration-color: rgba(255,255,255,0.6); overflow-wrap: anywhere; word-break: break-all; }
+.user-bubble.msg-content a:hover { color: #ffe4e6 !important; text-decoration-color: #ffe4e6; }
+.user-bubble.msg-content :not(pre) > code { background: rgba(255,255,255,0.2); color: #ffffff; word-break: break-all; }
 .msg-content hr { border: none; height: 1px; background: #e2e8f0; margin: 1.2em 0; }
 .dark .msg-content hr { background: rgba(255,255,255,0.1); }
 
@@ -1017,7 +1017,7 @@ body, #app, #main-content {
     content: '▋';
     display: inline-block;
     margin-left: 2px;
-    color: hsl(var(--accent-h));
+    color: #FB7185;
     animation: blink 0.9s step-end infinite;
     font-size: 0.85em;
     vertical-align: middle;

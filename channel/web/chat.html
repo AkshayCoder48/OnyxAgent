@@ -38,21 +38,6 @@
     <script src="assets/vendor/highlightjs/languages/go.min.js"></script>
     <script src="assets/vendor/highlightjs/languages/bash.min.js"></script>
     <script>
-    /* ── Tailwind config (PRD §41, §42) ─────────────────────────────────
-       Maps the `primary` palette and key semantic colors to CSS variables
-       so they update instantly when the user changes appearance or accent
-       color — no class swapping, no rebuild.
-
-       Hardcoded `primary` palette (#FFF1F2 ... #881337) was REMOVED. The
-       previous definition meant `bg-primary-500` was always rose-500 no
-       matter what the user picked in the Appearance settings. Now every
-       primary-* shade derives from --accent-h, so changing the accent
-       color via the picker instantly re-tints the entire UI.
-
-       Because Tailwind CDN compiles class names at runtime from this
-       config, we use a function form (`hsl(var(--accent-h) / <alpha>)`)
-       for each step so opacity utilities like `bg-primary-500/20` work.
-       ─────────────────────────────────────────────────────────────────── */
     tailwind.config = {
         darkMode: 'class',
         theme: {
@@ -62,53 +47,11 @@
                     mono: ['"JetBrains Mono"', '"Fira Code"', 'Consolas', 'monospace'],
                 },
                 colors: {
-                    /* Primary = user-selected accent color. All shades derive
-                       from the single --accent-h HSL channel via opacity.
-                       IMPORTANT: must use STRING values, not functions —
-                       Tailwind CDN's JIT compiler does not support function-form
-                       colors. Using functions caused bg-primary-* to resolve to
-                       nothing, making user bubbles invisible. */
                     primary: {
-                        50:  'hsl(var(--accent-h) / 0.05)',
-                        100: 'hsl(var(--accent-h) / 0.10)',
-                        200: 'hsl(var(--accent-h) / 0.20)',
-                        300: 'hsl(var(--accent-h) / 0.35)',
-                        400: 'hsl(var(--accent-h) / 0.65)',
-                        500: 'hsl(var(--accent-h) / 0.85)',
-                        600: 'hsl(var(--accent-h-strong) / 0.90)',
-                        700: 'hsl(var(--accent-h-strong) / 0.95)',
-                        800: 'hsl(var(--accent-h-strong) / 1)',
-                        900: 'hsl(var(--accent-h-strong) / 1)',
-                    },
-                    /* Semantic tokens that map directly to CSS variables */
-                    bg: 'hsl(var(--bg))',
-                    fg: 'hsl(var(--fg))',
-                    muted: 'hsl(var(--muted))',
-                    'muted-fg': 'hsl(var(--muted-fg))',
-                    card: 'hsl(var(--card))',
-                    'card-fg': 'hsl(var(--card-fg))',
-                    popover: 'hsl(var(--popover))',
-                    'popover-fg': 'hsl(var(--popover-fg))',
-                    border: 'hsl(var(--border))',
-                    input: 'hsl(var(--input))',
-                    ring: 'hsl(var(--ring))',
-                    /* Status colors */
-                    destructive: 'hsl(var(--destructive))',
-                    'destructive-fg': 'hsl(var(--destructive-fg))',
-                    success: 'hsl(var(--success))',
-                    'success-fg': 'hsl(var(--success-fg))',
-                    warning: 'hsl(var(--warning))',
-                    'warning-fg': 'hsl(var(--warning-fg))',
-                    info: 'hsl(var(--info))',
-                    'info-fg': 'hsl(var(--info-fg))',
-                },
-                borderRadius: {
-                    sm: 'var(--radius-sm)',
-                    DEFAULT: 'var(--radius)',
-                    md: 'var(--radius-md)',
-                    lg: 'var(--radius-lg)',
-                    xl: 'var(--radius-xl)',
-                    '2xl': 'var(--radius-2xl)',
+                        50: '#FFF1F2', 100: '#FFE4E6', 200: '#FECDD3', 300: '#FDA4AF',
+                        400: '#FB7185', 500: '#F43F5E', 600: '#E11D48', 700: '#BE123C',
+                        800: '#9F1239', 900: '#881337',
+                    }
                 },
                 animation: {
                     'pulse-dot': 'pulseDot 1.4s infinite ease-in-out both',
@@ -178,22 +121,22 @@
     })();
     </script>
 </head>
-<body class="h-dvh overflow-hidden bg-bg text-fg font-sans">
+<body class="h-dvh overflow-hidden bg-gray-50 dark:bg-[#111111] text-slate-800 dark:text-slate-200 font-sans">
 
     <!-- Login Overlay -->
-    <div id="login-overlay" class="fixed inset-0 z-[200] bg-bg flex items-center justify-center hidden">
+    <div id="login-overlay" class="fixed inset-0 z-[200] bg-gray-50 dark:bg-[#111111] flex items-center justify-center hidden">
         <div class="w-full max-w-sm mx-4">
             <div class="flex flex-col items-center mb-8">
                 <img src="assets/logo.svg" alt="OnyxAgent" class="w-16 h-16 rounded-2xl mb-4 shadow-lg">
-                <h1 class="text-xl font-bold text-card-fg">OnyxAgent</h1>
+                <h1 class="text-xl font-bold text-slate-800 dark:text-slate-200">OnyxAgent</h1>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" id="login-subtitle">Enter password to access the console</p>
             </div>
             <form id="login-form" class="space-y-4" onsubmit="return false;">
                 <div class="relative">
                     <input id="login-password" type="password" autocomplete="current-password"
                            placeholder="Password"
-                           class="w-full px-4 py-3 rounded-xl border border-border
-                                  bg-card text-card-fg
+                           class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10
+                                  bg-white dark:bg-[#1A1A1A] text-slate-800 dark:text-slate-200
                                   placeholder-slate-400 dark:placeholder-slate-500
                                   focus:outline-none focus:ring-2 focus:ring-primary-400/50 focus:border-primary-400
                                   transition-all duration-150 text-sm">
@@ -219,28 +162,28 @@
         <!-- ================================================================ -->
         <!-- SIDEBAR                                                          -->
         <!-- ================================================================ -->
-        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-52 flex flex-col
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-52 bg-[#0A0A0A] text-neutral-400 flex flex-col
                                     transform -translate-x-full lg:relative lg:translate-x-0
-                                    transition-transform duration-300 ease-in-out onyx-sidebar">
+                                    transition-transform duration-300 ease-in-out">
             <!-- Logo -->
-            <div class="flex items-center gap-3 px-5 h-14 border-b flex-shrink-0 onyx-sidebar-header">
+            <div class="flex items-center gap-3 px-5 h-14 border-b border-white/10 flex-shrink-0">
                 <img src="assets/logo.svg" alt="OnyxAgent" class="w-8 h-8 rounded-lg flex-shrink-0">
                 <div class="flex flex-col min-w-0">
-                    <span class="font-semibold text-sm truncate onyx-sidebar-title">OnyxAgent</span>
-                    <span class="text-xs onyx-sidebar-subtitle" data-i18n="console">Console</span>
+                    <span class="text-white font-semibold text-sm truncate">OnyxAgent</span>
+                    <span class="text-neutral-500 text-xs" data-i18n="console">Console</span>
                 </div>
             </div>
 
             <!-- Navigation -->
-            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1 onyx-sidebar-nav">
+            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
                 <!-- Chat Group -->
                 <div class="menu-group open" data-group="chat">
-                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer transition-colors duration-150 onyx-sidebar-group-label">
+                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors duration-150">
                         <i class="fas fa-chevron-right text-[10px] chevron"></i>
                         <span data-i18n="nav_chat">Chat</span>
                     </button>
                     <div class="menu-group-items pl-2">
-                        <a class="sidebar-item active flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item active flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="chat">
                             <i class="fas fa-message item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_chat">Chat</span>
@@ -250,57 +193,57 @@
 
                 <!-- Management Group -->
                 <div class="menu-group open" data-group="manage">
-                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer transition-colors duration-150 onyx-sidebar-group-label">
+                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors duration-150">
                         <i class="fas fa-chevron-right text-[10px] chevron"></i>
                         <span data-i18n="nav_manage">Management</span>
                     </button>
                     <div class="menu-group-items pl-2">
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="config">
                             <i class="fas fa-sliders item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_config">Config</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="models">
                             <i class="fas fa-microchip item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_models">Model</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="skills">
                             <i class="fas fa-bolt item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_skills">Skills</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="workflows">
                             <i class="fas fa-diagram-project item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_workflows">Workflows</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="security">
                             <i class="fas fa-shield-halved item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_security">Security</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="memory">
                             <i class="fas fa-brain item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_memory">Memory</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="knowledge">
                             <i class="fas fa-book item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_knowledge">Knowledge</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="files">
                             <i class="fas fa-folder-tree item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_files">Files</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="tasks">
                             <i class="fas fa-clock item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_tasks">Tasks</span>
                         </a>
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="fonts">
                             <i class="fas fa-font item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_fonts">Fonts</span>
@@ -310,12 +253,12 @@
 
                 <!-- Monitor Group -->
                 <div class="menu-group open" data-group="monitor">
-                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer transition-colors duration-150 onyx-sidebar-group-label">
+                    <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors duration-150">
                         <i class="fas fa-chevron-right text-[10px] chevron"></i>
                         <span data-i18n="nav_monitor">Monitor</span>
                     </button>
                     <div class="menu-group-items pl-2">
-                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 text-[14px] onyx-sidebar-item"
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="logs">
                             <i class="fas fa-terminal item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_logs">Logs</span>
@@ -325,8 +268,8 @@
             </nav>
 
             <!-- Sidebar Footer -->
-            <div class="px-4 py-3 border-t flex-shrink-0 onyx-sidebar-footer">
-                <div class="flex items-center gap-2 text-xs onyx-sidebar-version">
+            <div class="px-4 py-3 border-t border-white/10 flex-shrink-0">
+                <div class="flex items-center gap-2 text-xs text-neutral-600">
                     <i class="fas fa-circle text-[6px] text-primary-400"></i>
                     <a id="sidebar-version"
                        href="https://github.com/AkshayCoder48/OnyxAgent/releases"
@@ -391,7 +334,7 @@
         <!-- ================================================================ -->
         <div id="main-content" class="flex-1 flex flex-col min-w-0 h-dvh">
             <!-- Top Header -->
-            <header class="h-14 sm:h-14 flex items-center gap-2 sm:gap-3 px-2 sm:px-4 border-b border-border bg-card flex-shrink-0 z-10">
+            <header class="h-14 sm:h-14 flex items-center gap-2 sm:gap-3 px-2 sm:px-4 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] flex-shrink-0 z-10">
                 <!-- Mobile menu toggle (opens sidebar) -->
                 <button id="menu-toggle" class="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer transition-colors duration-150"
                         onclick="toggleSidebar()" title="Open sidebar">
@@ -415,7 +358,7 @@
                 <div class="hidden lg:flex items-center gap-2 text-sm min-w-0">
                     <span id="breadcrumb-group" class="text-slate-400 dark:text-slate-500 truncate" data-i18n="nav_chat">Chat</span>
                     <i class="fas fa-chevron-right text-[10px] text-slate-300 dark:text-slate-600"></i>
-                    <span id="breadcrumb-page" class="font-medium text-card-fg truncate" data-i18n="menu_chat">Chat</span>
+                    <span id="breadcrumb-page" class="font-medium text-slate-800 dark:text-slate-200 truncate" data-i18n="menu_chat">Chat</span>
                 </div>
 
                 <div class="flex-1"></div>
@@ -449,69 +392,69 @@
                         <!-- Welcome Screen -->
                         <div id="welcome-screen" class="flex flex-col items-center justify-center h-full px-4 sm:px-6 pb-8 sm:pb-16" style="padding-top: 2vh">
                             <img src="assets/logo.svg" alt="OnyxAgent" class="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl mb-3 sm:mb-6 shadow-lg shadow-primary-500/20">
-                            <h1 id="welcome-title" class="text-xl sm:text-2xl font-bold text-card-fg mb-2 sm:mb-3">OnyxAgent</h1>
+                            <h1 id="welcome-title" class="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-200 mb-2 sm:mb-3">OnyxAgent</h1>
                             <p id="welcome-subtitle" class="text-slate-500 dark:text-slate-400 text-center max-w-lg mb-4 sm:mb-10 leading-relaxed text-sm sm:text-base"
                                data-i18n-html="welcome_subtitle">I can help answer questions, manage your computer, create and run skills, and<br>keep growing through long-term memory and a knowledge base</p>
 
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 w-full max-w-2xl">
-                                <div class="example-card group bg-card border border-border rounded-xl p-3 sm:p-4
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-3 sm:p-4
                                             cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
                                     <div class="flex items-center gap-2 mb-2">
                                         <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
                                             <i class="fas fa-folder-open text-blue-500 text-xs"></i>
                                         </div>
-                                        <span class="font-medium text-sm text-card-fg" data-i18n="example_sys_title">System Management</span>
+                                        <span class="font-medium text-sm text-slate-800 dark:text-slate-200" data-i18n="example_sys_title">System Management</span>
                                     </div>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_sys_text">See what files are in the workspace</p>
                                 </div>
-                                <div class="example-card group bg-card border border-border rounded-xl p-4
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
                                             cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
                                     <div class="flex items-center gap-2 mb-2">
                                         <div class="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
                                             <i class="fas fa-clock text-amber-500 text-xs"></i>
                                         </div>
-                                        <span class="font-medium text-sm text-card-fg" data-i18n="example_task_title">Scheduled Tasks</span>
+                                        <span class="font-medium text-sm text-slate-800 dark:text-slate-200" data-i18n="example_task_title">Scheduled Tasks</span>
                                     </div>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_task_text">1Remind me to check the server in 1 minute</p>
                                 </div>
-                                <div class="example-card group bg-card border border-border rounded-xl p-4
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
                                             cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
                                     <div class="flex items-center gap-2 mb-2">
                                         <div class="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
                                             <i class="fas fa-code text-rose-500 text-xs"></i>
                                         </div>
-                                        <span class="font-medium text-sm text-card-fg" data-i18n="example_code_title">Coding Assistant</span>
+                                        <span class="font-medium text-sm text-slate-800 dark:text-slate-200" data-i18n="example_code_title">Coding Assistant</span>
                                     </div>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_code_text">SearchAInews and generate a visual web report</p>
                                 </div>
-                                <div class="example-card group bg-card border border-border rounded-xl p-4
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
                                             cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
                                     <div class="flex items-center gap-2 mb-2">
                                         <div class="w-7 h-7 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
                                             <i class="fas fa-book text-violet-500 text-xs"></i>
                                         </div>
-                                        <span class="font-medium text-sm text-card-fg" data-i18n="example_knowledge_title">Knowledge Base</span>
+                                        <span class="font-medium text-sm text-slate-800 dark:text-slate-200" data-i18n="example_knowledge_title">Knowledge Base</span>
                                     </div>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_knowledge_text">Check the current documents in the knowledge base</p>
                                 </div>
-                                <div class="example-card group bg-card border border-border rounded-xl p-4
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
                                             cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
                                     <div class="flex items-center gap-2 mb-2">
                                         <div class="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
                                             <i class="fas fa-puzzle-piece text-rose-500 text-xs"></i>
                                         </div>
-                                        <span class="font-medium text-sm text-card-fg" data-i18n="example_skill_title">Skill System</span>
+                                        <span class="font-medium text-sm text-slate-800 dark:text-slate-200" data-i18n="example_skill_title">Skill System</span>
                                     </div>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_skill_text">View all supported tools and skills</p>
                                 </div>
-                                <div class="example-card group bg-card border border-border rounded-xl p-4
+                                <div class="example-card group bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl p-4
                                             cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200"
                                      data-send="/help">
                                     <div class="flex items-center gap-2 mb-2">
                                         <div class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                             <i class="fas fa-terminal text-slate-500 text-xs"></i>
                                         </div>
-                                        <span class="font-medium text-sm text-card-fg" data-i18n="example_web_title">Command Center</span>
+                                        <span class="font-medium text-sm text-slate-800 dark:text-slate-200" data-i18n="example_web_title">Command Center</span>
                                     </div>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="example_web_text">View all commands</p>
                                 </div>
@@ -523,7 +466,7 @@
                     <button id="scroll-to-bottom-btn"
                             class="hidden absolute right-5 bottom-[80px] z-10
                                    w-9 h-9 rounded-full shadow-lg
-                                   bg-card border border-slate-200 dark:border-white/15
+                                   bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/15
                                    text-slate-500 dark:text-slate-400 hover:text-primary-500 dark:hover:text-primary-400
                                    flex items-center justify-center cursor-pointer transition-all duration-200
                                    hover:shadow-xl hover:scale-105"
@@ -532,7 +475,7 @@
                     </button>
 
                     <!-- Chat Input -->
-                    <div class="flex-shrink-0 border-t border-border bg-card px-2 sm:px-4 py-2 sm:py-3">
+                    <div class="flex-shrink-0 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] px-2 sm:px-4 py-2 sm:py-3">
                         <div class="max-w-3xl mx-auto">
                             <!-- Attachment preview bar -->
                             <div id="attachment-preview" class="attachment-preview hidden"></div>
@@ -575,7 +518,7 @@
                                 <div class="flex-1 min-w-0 relative flex items-center">
                                     <textarea id="chat-input"
                                               class="w-full pl-3 sm:pl-4 pr-10 sm:pr-11 py-2 sm:py-[10px] rounded-xl border border-slate-200 dark:border-slate-600
-                                                     bg-slate-50 dark:bg-white/5 text-card-fg
+                                                     bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200
                                                      placeholder:text-slate-400 dark:placeholder:text-slate-500
                                                      focus:outline-none focus:ring-0 focus:border-primary-600
                                                      text-sm leading-relaxed"
@@ -602,7 +545,7 @@
                         </div>
                     </div>
                     <!-- Uncensored Mode Toggle (bottom of chat view) -->
-                    <div class="flex-shrink-0 border-t border-border bg-card px-2 sm:px-4 py-1.5 flex items-center justify-between">
+                    <div class="flex-shrink-0 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] px-2 sm:px-4 py-1.5 flex items-center justify-between">
                         <label class="flex items-center gap-2 cursor-pointer select-none">
                             <div class="relative">
                                 <input type="checkbox" id="uncensored-toggle" class="sr-only peer" onchange="toggleUncensoredMode(this.checked)">
@@ -621,9 +564,9 @@
                 <div id="view-files" class="view">
                     <div class="flex-1 overflow-hidden flex flex-col">
                         <!-- Files Header -->
-                        <div class="flex items-center justify-between p-4 sm:p-6 border-b border border-border">
+                        <div class="flex items-center justify-between p-4 sm:p-6 border-b border border-slate-200 dark:border-white/10">
                             <div>
-                                <h2 class="text-xl font-bold text-card-fg" data-i18n="files_title">File Browser</h2>
+                                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200" data-i18n="files_title">File Browser</h2>
                                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="files_desc">Browse and manage workspace files</p>
                             </div>
                             <div class="flex items-center gap-2">
@@ -631,11 +574,11 @@
                                         onclick="showFileUploadDialog()">
                                     <i class="fas fa-upload mr-1"></i> <span data-i18n="files_upload">Upload</span>
                                 </button>
-                                <button id="files-mkdir-btn" class="px-3 py-1.5 rounded-lg border border-border text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors duration-150"
+                                <button id="files-mkdir-btn" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors duration-150"
                                         onclick="showMkdirDialog()">
                                     <i class="fas fa-folder-plus mr-1"></i> <span data-i18n="files_new_folder">New Folder</span>
                                 </button>
-                                <button id="files-new-file-btn" class="px-3 py-1.5 rounded-lg border border-border text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors duration-150"
+                                <button id="files-new-file-btn" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors duration-150"
                                         onclick="showNewFileDialog()">
                                     <i class="fas fa-file-plus mr-1"></i> <span data-i18n="files_new_file">New File</span>
                                 </button>
@@ -643,7 +586,7 @@
                         </div>
 
                         <!-- Breadcrumb -->
-                        <div id="files-breadcrumb" class="flex items-center gap-1 px-4 sm:px-6 py-2 text-sm border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-card">
+                        <div id="files-breadcrumb" class="flex items-center gap-1 px-4 sm:px-6 py-2 text-sm border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white dark:bg-[#1A1A1A]">
                             <span class="cursor-pointer text-primary-500 hover:text-primary-600 font-medium" onclick="filesNavigateTo('.')">~</span>
                         </div>
 
@@ -659,11 +602,11 @@
 
                     <!-- File Editor Modal -->
                     <div id="file-editor-modal" class="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center hidden">
-                        <div class="bg-card rounded-2xl border border-border w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col shadow-2xl">
-                            <div class="flex items-center justify-between p-4 border-b border border-border">
+                        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col shadow-2xl">
+                            <div class="flex items-center justify-between p-4 border-b border border-slate-200 dark:border-white/10">
                                 <div class="flex items-center gap-3 min-w-0">
                                     <i class="fas fa-file-code text-primary-500"></i>
-                                    <span id="file-editor-title" class="font-semibold text-card-fg truncate">Edit File</span>
+                                    <span id="file-editor-title" class="font-semibold text-slate-800 dark:text-slate-200 truncate">Edit File</span>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <button class="px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium cursor-pointer transition-colors duration-150"
@@ -677,20 +620,20 @@
                                 </div>
                             </div>
                             <div class="flex-1 overflow-hidden p-4">
-                                <textarea id="file-editor-content" class="w-full h-full min-h-[400px] p-4 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-card-fg font-mono text-sm leading-relaxed resize-none focus:outline-none focus:border-primary-500 transition-colors" spellcheck="false"></textarea>
+                                <textarea id="file-editor-content" class="w-full h-full min-h-[400px] p-4 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200 font-mono text-sm leading-relaxed resize-none focus:outline-none focus:border-primary-500 transition-colors" spellcheck="false"></textarea>
                             </div>
                         </div>
                     </div>
 
                     <!-- Context Menu -->
-                    <div id="file-context-menu" class="fixed z-[150] bg-card border border-border rounded-xl shadow-xl py-1 hidden" style="min-width: 180px;">
-                        <button class="w-full flex items-center gap-3 px-4 py-2 text-sm text-card-fg hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors" onclick="fileAction('download')">
+                    <div id="file-context-menu" class="fixed z-[150] bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-xl shadow-xl py-1 hidden" style="min-width: 180px;">
+                        <button class="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors" onclick="fileAction('download')">
                             <i class="fas fa-download text-xs w-4 text-center"></i> <span data-i18n="files_ctx_download">Download</span>
                         </button>
-                        <button class="w-full flex items-center gap-3 px-4 py-2 text-sm text-card-fg hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors" onclick="fileAction('edit')">
+                        <button class="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors" onclick="fileAction('edit')">
                             <i class="fas fa-pen text-xs w-4 text-center"></i> <span data-i18n="files_ctx_edit">Edit</span>
                         </button>
-                        <button class="w-full flex items-center gap-3 px-4 py-2 text-sm text-card-fg hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors" onclick="fileAction('rename')">
+                        <button class="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors" onclick="fileAction('rename')">
                             <i class="fas fa-i-cursor text-xs w-4 text-center"></i> <span data-i18n="files_ctx_rename">Rename</span>
                         </button>
                         <div class="border-t border-slate-100 dark:border-white/5 my-1"></div>
@@ -701,11 +644,11 @@
 
                     <!-- Rename Dialog -->
                     <div id="file-rename-dialog" class="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center hidden">
-                        <div class="bg-card rounded-2xl border border-border w-full max-w-md mx-4 p-6 shadow-2xl">
-                            <h3 class="text-lg font-semibold text-card-fg mb-4" data-i18n="files_rename_title">Rename</h3>
-                            <input id="file-rename-input" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-sm text-card-fg focus:outline-none focus:border-primary-500 transition-colors" placeholder="New name">
+                        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 w-full max-w-md mx-4 p-6 shadow-2xl">
+                            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4" data-i18n="files_rename_title">Rename</h3>
+                            <input id="file-rename-input" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-primary-500 transition-colors" placeholder="New name">
                             <div class="flex justify-end gap-2 mt-4">
-                                <button class="px-4 py-2 rounded-lg border border-border text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer" onclick="closeRenameDialog()">Cancel</button>
+                                <button class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer" onclick="closeRenameDialog()">Cancel</button>
                                 <button class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium cursor-pointer" onclick="confirmRename()">Rename</button>
                             </div>
                         </div>
@@ -713,11 +656,11 @@
 
                     <!-- Mkdir Dialog -->
                     <div id="file-mkdir-dialog" class="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center hidden">
-                        <div class="bg-card rounded-2xl border border-border w-full max-w-md mx-4 p-6 shadow-2xl">
-                            <h3 class="text-lg font-semibold text-card-fg mb-4" data-i18n="files_mkdir_title">New Folder</h3>
-                            <input id="file-mkdir-input" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-sm text-card-fg focus:outline-none focus:border-primary-500 transition-colors" placeholder="Folder name">
+                        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 w-full max-w-md mx-4 p-6 shadow-2xl">
+                            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4" data-i18n="files_mkdir_title">New Folder</h3>
+                            <input id="file-mkdir-input" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-primary-500 transition-colors" placeholder="Folder name">
                             <div class="flex justify-end gap-2 mt-4">
-                                <button class="px-4 py-2 rounded-lg border border-border text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer" onclick="closeMkdirDialog()">Cancel</button>
+                                <button class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer" onclick="closeMkdirDialog()">Cancel</button>
                                 <button class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium cursor-pointer" onclick="confirmMkdir()">Create</button>
                             </div>
                         </div>
@@ -725,11 +668,11 @@
 
                     <!-- New File Dialog -->
                     <div id="file-newfile-dialog" class="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center hidden">
-                        <div class="bg-card rounded-2xl border border-border w-full max-w-md mx-4 p-6 shadow-2xl">
-                            <h3 class="text-lg font-semibold text-card-fg mb-4" data-i18n="files_newfile_title">New File</h3>
-                            <input id="file-newfile-input" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-sm text-card-fg focus:outline-none focus:border-primary-500 transition-colors" placeholder="File name (e.g. notes.txt)">
+                        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 w-full max-w-md mx-4 p-6 shadow-2xl">
+                            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4" data-i18n="files_newfile_title">New File</h3>
+                            <input id="file-newfile-input" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-primary-500 transition-colors" placeholder="File name (e.g. notes.txt)">
                             <div class="flex justify-end gap-2 mt-4">
-                                <button class="px-4 py-2 rounded-lg border border-border text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer" onclick="closeNewFileDialog()">Cancel</button>
+                                <button class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer" onclick="closeNewFileDialog()">Cancel</button>
                                 <button class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium cursor-pointer" onclick="confirmNewFile()">Create</button>
                             </div>
                         </div>
@@ -746,7 +689,7 @@
                         <div class="max-w-4xl mx-auto">
                             <div class="flex items-center justify-between mb-6">
                                 <div>
-                                    <h2 class="text-xl font-bold text-card-fg" data-i18n="config_title">Configuration</h2>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200" data-i18n="config_title">Configuration</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="config_desc">Manage model and Agent Config</p>
                                 </div>
                             </div>
@@ -755,13 +698,13 @@
                                 <!-- ================================================== -->
                                 <!-- Appearance Card (PRD §31, §32, §33)               -->
                                 <!-- ================================================== -->
-                                <div class="bg-card rounded-xl border border-border p-4 sm:p-6">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-4 sm:p-6">
                                     <div class="flex items-center gap-3 mb-5">
                                         <div class="w-9 h-9 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
                                             <i class="fas fa-palette text-violet-500"></i>
                                         </div>
                                         <div class="min-w-0">
-                                            <h3 class="text-base font-semibold text-card-fg">Appearance</h3>
+                                            <h3 class="text-base font-semibold text-slate-800 dark:text-slate-200">Appearance</h3>
                                             <p class="text-xs text-slate-400 dark:text-slate-500">Customize how OnyxAgent looks. Changes apply instantly across the entire app.</p>
                                         </div>
                                     </div>
@@ -839,13 +782,13 @@
                                 </div>
 
                                 <!-- Export / Import Card -->
-                                <div class="bg-card rounded-xl border border-border p-4 sm:p-6">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-4 sm:p-6">
                                     <div class="flex items-center gap-3 mb-5">
                                         <div class="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
                                             <i class="fas fa-cloud-arrow-down text-emerald-500"></i>
                                         </div>
                                         <div class="min-w-0">
-                                            <h3 class="text-base font-semibold text-card-fg">Backup & Restore</h3>
+                                            <h3 class="text-base font-semibold text-slate-800 dark:text-slate-200">Backup & Restore</h3>
                                             <p class="text-xs text-slate-400 dark:text-slate-500">Export all data or import from a backup ZIP</p>
                                         </div>
                                     </div>
@@ -868,12 +811,12 @@
                                 </div>
 
                                 <!-- Model Config Card -->
-                                <div class="bg-card rounded-xl border border-border p-6">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
                                     <div class="flex items-center gap-3 mb-5">
                                         <div class="w-9 h-9 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center">
                                             <i class="fas fa-microchip text-primary-500 text-sm"></i>
                                         </div>
-                                        <h3 class="font-semibold text-card-fg" data-i18n="config_model">Model Configuration</h3>
+                                        <h3 class="font-semibold text-slate-800 dark:text-slate-200" data-i18n="config_model">Model Configuration</h3>
                                         <a class="ml-auto text-xs text-slate-500 dark:text-slate-400 hover:text-primary-500 dark:hover:text-primary-400 cursor-pointer transition-colors flex items-center gap-1"
                                            onclick="navigateTo('models')">
                                             <span data-i18n="config_model_advanced">Advanced</span>
@@ -908,7 +851,7 @@
                                             <div id="cfg-model-custom-wrap" class="mt-2 hidden">
                                                 <input id="cfg-model-custom" type="text"
                                                        class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                                              bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                              bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                               focus:outline-none focus:border-primary-500 font-mono transition-colors"
                                                        data-i18n-placeholder="config_custom_model_hint" placeholder="Enter a custom model name">
                                             </div>
@@ -919,7 +862,7 @@
                                             <div class="relative">
                                                 <input id="cfg-api-key" type="text" autocomplete="off" data-1p-ignore data-lpignore="true"
                                                        class="w-full px-3 py-2 pr-10 rounded-lg border border-slate-200 dark:border-slate-600
-                                                              bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                              bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                               focus:outline-none focus:border-primary-500 font-mono transition-colors cfg-key-masked"
                                                        placeholder="sk-...">
                                                 <button type="button" id="cfg-api-key-toggle"
@@ -935,7 +878,7 @@
                                             <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Base</label>
                                             <input id="cfg-api-base" type="text"
                                                    class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                                          bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                           focus:outline-none focus:border-primary-500 font-mono transition-colors"
                                                    placeholder="https://...">
                                         </div>
@@ -951,12 +894,12 @@
                                 </div>
 
                                 <!-- Agent Config Card -->
-                                <div class="bg-card rounded-xl border border-border p-6">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
                                     <div class="flex items-center gap-3 mb-5">
                                         <div class="w-9 h-9 rounded-lg bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
                                             <i class="fas fa-robot text-rose-500 text-sm"></i>
                                         </div>
-                                        <h3 class="font-semibold text-card-fg" data-i18n="config_agent">Agent Config</h3>
+                                        <h3 class="font-semibold text-slate-800 dark:text-slate-200" data-i18n="config_agent">Agent Config</h3>
                                     </div>
                                     <div class="space-y-4">
                                         <div>
@@ -966,7 +909,7 @@
                                             </label>
                                             <input id="cfg-max-tokens" type="number" min="1000" max="200000" step="1000"
                                                    class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                                          bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                           focus:outline-none focus:border-primary-500 font-mono transition-colors">
                                         </div>
                                         <div>
@@ -976,7 +919,7 @@
                                             </label>
                                             <input id="cfg-max-turns" type="number" min="1" max="100" step="1"
                                                    class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                                          bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                           focus:outline-none focus:border-primary-500 font-mono transition-colors">
                                         </div>
                                         <div>
@@ -986,7 +929,7 @@
                                             </label>
                                             <input id="cfg-max-steps" type="number" min="1" max="50" step="1"
                                                    class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                                          bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                           focus:outline-none focus:border-primary-500 font-mono transition-colors">
                                         </div>
                                         <div class="flex items-center justify-between">
@@ -1024,19 +967,19 @@
                                 </div>
 
                                 <!-- Security Config Card -->
-                                <div class="bg-card rounded-xl border border-border p-6">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
                                     <div class="flex items-center gap-3 mb-5">
                                         <div class="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
                                             <i class="fas fa-lock text-amber-500 text-sm"></i>
                                         </div>
-                                        <h3 class="font-semibold text-card-fg" data-i18n="config_security">Security Settings</h3>
+                                        <h3 class="font-semibold text-slate-800 dark:text-slate-200" data-i18n="config_security">Security Settings</h3>
                                     </div>
                                     <div class="space-y-4">
                                         <div>
                                             <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5" data-i18n="config_password">Access Password</label>
                                             <input id="cfg-password" type="password" autocomplete="new-password"
                                                    class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                                          bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                           focus:outline-none focus:border-primary-500 font-mono transition-colors
                                                           cfg-key-masked"
                                                    data-masked="1">
@@ -1057,13 +1000,13 @@
                                 <!-- ================================================== -->
                                 <!-- Timezone Card                                       -->
                                 <!-- ================================================== -->
-                                <div class="bg-card rounded-xl border border-border p-6">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
                                     <div class="flex items-center gap-3 mb-5">
                                         <div class="w-9 h-9 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
                                             <i class="fas fa-globe text-violet-500 text-sm"></i>
                                         </div>
                                         <div class="flex-1">
-                                            <h3 class="font-semibold text-card-fg">Timezone</h3>
+                                            <h3 class="font-semibold text-slate-800 dark:text-slate-200">Timezone</h3>
                                             <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                                                 All scheduled task times are interpreted in this timezone. Auto-detected from your IP — override if needed.
                                             </p>
@@ -1071,10 +1014,10 @@
                                     </div>
                                     <div class="space-y-4">
                                         <!-- Detected timezone -->
-                                        <div id="cfg-tz-detected-row" class="rounded-lg bg-slate-50 dark:bg-white/5 border border-border p-3 text-xs">
+                                        <div id="cfg-tz-detected-row" class="rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-3 text-xs">
                                             <div class="flex items-center justify-between mb-1">
                                                 <span class="text-slate-500 dark:text-slate-400 font-medium">Auto-detected</span>
-                                                <span id="cfg-tz-detected" class="font-mono text-card-fg">—</span>
+                                                <span id="cfg-tz-detected" class="font-mono text-slate-800 dark:text-slate-200">—</span>
                                             </div>
                                             <div class="flex items-center justify-between">
                                                 <span class="text-slate-500 dark:text-slate-400 font-medium">Effective</span>
@@ -1086,7 +1029,7 @@
                                             <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Manual override (IANA name)</label>
                                             <input id="cfg-timezone" type="text" autocomplete="off"
                                                    class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                                          bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                           focus:outline-none focus:border-primary-500 font-mono transition-colors"
                                                    placeholder="e.g., Asia/Kolkata, America/New_York, Europe/London">
                                             <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
@@ -1108,13 +1051,13 @@
                                 <!-- ================================================== -->
                                 <!-- Telegram Channel Card                              -->
                                 <!-- ================================================== -->
-                                <div class="bg-card rounded-xl border border-border p-6">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
                                     <div class="flex items-center gap-3 mb-5">
                                         <div class="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-900/30 flex items-center justify-center">
                                             <i class="fab fa-telegram text-sky-500 text-base"></i>
                                         </div>
                                         <div class="flex-1">
-                                            <h3 class="font-semibold text-card-fg">Telegram Channel</h3>
+                                            <h3 class="font-semibold text-slate-800 dark:text-slate-200">Telegram Channel</h3>
                                             <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                                                 Connect a Telegram bot to trigger and monitor tasks from your phone.
                                                 Save the token, test it, then start the bot — no app restart needed.
@@ -1129,7 +1072,7 @@
                                             <div class="relative">
                                                 <input id="cfg-telegram-token" type="text" autocomplete="off" data-1p-ignore data-lpignore="true"
                                                        class="w-full px-3 py-2 pr-10 rounded-lg border border-slate-200 dark:border-slate-600
-                                                              bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                              bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                               focus:outline-none focus:border-primary-500 font-mono transition-colors cfg-key-masked"
                                                        placeholder="1234567890:ABCdefGhI..."
                                                        data-masked="1">
@@ -1149,7 +1092,7 @@
                                             <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Proxy (optional)</label>
                                             <input id="cfg-telegram-proxy" type="text" autocomplete="off"
                                                    class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                                          bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                           focus:outline-none focus:border-primary-500 font-mono transition-colors"
                                                    placeholder="socks5://user:pass@host:port">
                                             <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
@@ -1161,7 +1104,7 @@
                                             <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Admin User IDs (optional)</label>
                                             <input id="cfg-telegram-admin-ids" type="text" autocomplete="off"
                                                    class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                                          bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                                           focus:outline-none focus:border-primary-500 font-mono transition-colors"
                                                    placeholder="123456789, 987654321">
                                             <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
@@ -1196,7 +1139,7 @@
                                         <div id="cfg-telegram-botinfo" class="hidden rounded-lg border border-sky-200 dark:border-sky-900/50 bg-sky-50/50 dark:bg-sky-900/10 p-3 text-xs">
                                             <div class="flex items-center gap-2 mb-1">
                                                 <i class="fas fa-circle-check text-emerald-500"></i>
-                                                <span class="font-medium text-card-fg">Bot verified</span>
+                                                <span class="font-medium text-slate-800 dark:text-slate-200">Bot verified</span>
                                             </div>
                                             <div class="text-slate-600 dark:text-slate-300 space-y-0.5 font-mono">
                                                 <div><span class="text-slate-400">username:</span> @<span id="cfg-telegram-bot-username">—</span></div>
@@ -1211,7 +1154,7 @@
                                                            cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     onclick="saveTelegramConfig()">Save</button>
                                             <button id="cfg-telegram-test"
-                                                    class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-card-fg text-sm font-medium
+                                                    class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 text-sm font-medium
                                                            hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     onclick="testTelegramToken()">Test Connection</button>
                                             <button id="cfg-telegram-start"
@@ -1240,7 +1183,7 @@
                         <div class="max-w-4xl mx-auto">
                             <div class="flex items-center justify-between mb-6">
                                 <div>
-                                    <h2 class="text-xl font-bold text-card-fg" data-i18n="skills_title">Skills Management</h2>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200" data-i18n="skills_title">Skills Management</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="skills_desc">View, enable, or disable Agent Skills</p>
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -1320,7 +1263,7 @@
                                     </button>
                                     <button onclick="switchAddSkillMethod('upload')"
                                             id="add-method-upload"
-                                            class="add-method-btn group flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-border bg-card text-slate-600 dark:text-slate-400 hover:border-primary-300 dark:hover:border-primary-700 transition-all cursor-pointer">
+                                            class="add-method-btn group flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] text-slate-600 dark:text-slate-400 hover:border-primary-300 dark:hover:border-primary-700 transition-all cursor-pointer">
                                         <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
                                             <i class="fas fa-file-zipper text-emerald-500 text-lg"></i>
                                         </div>
@@ -1329,7 +1272,7 @@
                                     </button>
                                     <button onclick="switchAddSkillMethod('url')"
                                             id="add-method-url"
-                                            class="add-method-btn group flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-border bg-card text-slate-600 dark:text-slate-400 hover:border-primary-300 dark:hover:border-primary-700 transition-all cursor-pointer">
+                                            class="add-method-btn group flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] text-slate-600 dark:text-slate-400 hover:border-primary-300 dark:hover:border-primary-700 transition-all cursor-pointer">
                                         <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
                                             <i class="fas fa-link text-blue-500 text-lg"></i>
                                         </div>
@@ -1339,18 +1282,18 @@
                                 </div>
 
                                 <!-- Create Skill Form -->
-                                <div id="add-skill-create" class="bg-card rounded-xl border border-border p-6">
-                                    <h3 class="text-base font-semibold text-card-fg mb-4" data-i18n="skills_create_title">Create Custom Skill</h3>
+                                <div id="add-skill-create" class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <h3 class="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4" data-i18n="skills_create_title">Create Custom Skill</h3>
                                     <div class="space-y-4">
                                         <div>
                                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5" data-i18n="skills_create_name_label">Skill Name</label>
                                             <input id="skill-create-name" type="text" placeholder="my-custom-skill"
-                                                   class="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm text-card-fg placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5" data-i18n="skills_create_desc_label">Description (optional)</label>
                                             <input id="skill-create-desc" type="text" placeholder="Brief description of the skill"
-                                                   class="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm text-card-fg placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
@@ -1359,7 +1302,7 @@
                                             </label>
                                             <textarea id="skill-create-content" rows="12"
                                                       placeholder="# My Custom Skill&#10;&#10;---&#10;name: my-custom-skill&#10;description: A custom skill for OnyxAgent&#10;---&#10;&#10;## Instructions&#10;&#10;Write your skill instructions here..."
-                                                      class="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm text-card-fg placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors font-mono text-xs resize-y"></textarea>
+                                                      class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors font-mono text-xs resize-y"></textarea>
                                         </div>
                                         <div class="flex items-center gap-3">
                                             <button onclick="createSkillFromContent()"
@@ -1374,8 +1317,8 @@
                                 </div>
 
                                 <!-- Upload Skill Form -->
-                                <div id="add-skill-upload" class="hidden bg-card rounded-xl border border-border p-6">
-                                    <h3 class="text-base font-semibold text-card-fg mb-4" data-i18n="skills_upload_title">Upload Skill Package</h3>
+                                <div id="add-skill-upload" class="hidden bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <h3 class="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4" data-i18n="skills_upload_title">Upload Skill Package</h3>
                                     <div class="space-y-4">
                                         <div id="skill-upload-dropzone"
                                              class="border-2 border-dashed border-slate-300 dark:border-white/20 rounded-xl p-8 text-center hover:border-primary-400 dark:hover:border-primary-600 transition-colors cursor-pointer"
@@ -1394,7 +1337,7 @@
                                         <div>
                                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5" data-i18n="skills_upload_name_label">Skill Name (optional, auto-detected from zip)</label>
                                             <input id="skill-upload-name" type="text" placeholder="auto-detected"
-                                                   class="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm text-card-fg placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
                                         </div>
                                         <div class="bg-slate-50 dark:bg-white/5 rounded-lg p-3">
                                             <p class="text-xs text-slate-500 dark:text-slate-400" data-i18n="skills_upload_hint">The zip should contain a folder with a SKILL.md file, or directly contain SKILL.md at the root.</p>
@@ -1412,19 +1355,19 @@
                                 </div>
 
                                 <!-- URL Install Form -->
-                                <div id="add-skill-url" class="hidden bg-card rounded-xl border border-border p-6">
-                                    <h3 class="text-base font-semibold text-card-fg mb-4" data-i18n="skills_url_title">Install from URL</h3>
+                                <div id="add-skill-url" class="hidden bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                    <h3 class="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4" data-i18n="skills_url_title">Install from URL</h3>
                                     <div class="space-y-4">
                                         <div>
                                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5" data-i18n="skills_url_label">Package URL</label>
                                             <input id="skill-url-input" type="url" placeholder="https://github.com/user/skill/archive/refs/heads/main.zip"
-                                                   class="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm text-card-fg placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
                                             <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5" data-i18n="skills_url_hint">Supports direct .zip links from GitHub, GitLab, or any URL</p>
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5" data-i18n="skills_url_name_label">Skill Name (optional, auto-detected from URL)</label>
                                             <input id="skill-url-name" type="text" placeholder="auto-detected"
-                                                   class="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm text-card-fg placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
+                                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A] text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors">
                                         </div>
                                         <div class="flex items-center gap-3">
                                             <button onclick="installSkillFromUrl()"
@@ -1472,8 +1415,8 @@
                 <!-- Skill Delete Confirm Dialog -->
                 <div id="skill-delete-dialog" class="fixed inset-0 z-50 flex items-center justify-center hidden">
                     <div class="absolute inset-0 bg-black/50" onclick="closeSkillDeleteDialog()"></div>
-                    <div class="relative bg-card rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-border">
-                        <h3 class="text-base font-semibold text-card-fg mb-2" data-i18n="skills_delete_title">Delete Skill</h3>
+                    <div class="relative bg-white dark:bg-[#1A1A1A] rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-200 dark:border-white/10">
+                        <h3 class="text-base font-semibold text-slate-800 dark:text-slate-200 mb-2" data-i18n="skills_delete_title">Delete Skill</h3>
                         <p class="text-sm text-slate-500 dark:text-slate-400 mb-5" data-i18n="skills_delete_msg">Are you sure you want to delete this skill? This action cannot be undone.</p>
                         <div class="flex items-center justify-end gap-3">
                             <button onclick="closeSkillDeleteDialog()"
@@ -1492,13 +1435,13 @@
                         <div class="max-w-4xl mx-auto">
                             <div class="flex items-center justify-between mb-6">
                                 <div>
-                                    <h2 class="text-xl font-bold text-card-fg">AI Workflows</h2>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">AI Workflows</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
                                         Multi-step pipelines created by the AI. Ask the agent to create a workflow in chat.
                                     </p>
                                 </div>
                                 <button onclick="loadWorkflowsView()"
-                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
                                     <i class="fas fa-rotate-right text-[10px]"></i>
                                     <span>Refresh</span>
                                 </button>
@@ -1530,10 +1473,10 @@
                 <!-- Workflow detail dialog (modal) -->
                 <div id="workflow-detail-dialog" class="fixed inset-0 z-50 flex items-center justify-center hidden">
                     <div class="absolute inset-0 bg-black/50" onclick="closeWorkflowDetail()"></div>
-                    <div class="relative bg-card rounded-2xl shadow-2xl p-6 w-full max-w-2xl mx-4 border border-border max-h-[85vh] overflow-y-auto">
+                    <div class="relative bg-white dark:bg-[#1A1A1A] rounded-2xl shadow-2xl p-6 w-full max-w-2xl mx-4 border border-slate-200 dark:border-white/10 max-h-[85vh] overflow-y-auto">
                         <div class="flex items-start justify-between mb-4">
                             <div class="flex-1 min-w-0">
-                                <h3 id="workflow-detail-title" class="text-lg font-bold text-card-fg"></h3>
+                                <h3 id="workflow-detail-title" class="text-lg font-bold text-slate-800 dark:text-slate-200"></h3>
                                 <p id="workflow-detail-desc" class="text-sm text-slate-500 dark:text-slate-400 mt-1"></p>
                             </div>
                             <button onclick="closeWorkflowDetail()" class="ml-3 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer flex-shrink-0">
@@ -1541,7 +1484,7 @@
                             </button>
                         </div>
                         <div id="workflow-detail-steps" class="space-y-3"></div>
-                        <div class="mt-4 pt-4 border-t border-border text-xs text-slate-400 dark:text-slate-500">
+                        <div class="mt-4 pt-4 border-t border-slate-200 dark:border-white/10 text-xs text-slate-400 dark:text-slate-500">
                             <span id="workflow-detail-meta"></span>
                         </div>
                     </div>
@@ -1555,7 +1498,7 @@
                         <div class="max-w-4xl mx-auto">
                             <div class="flex items-center justify-between mb-6">
                                 <div>
-                                    <h2 class="text-xl font-bold text-card-fg">Security Audit</h2>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">Security Audit</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
                                         Scans your codebase for the top 10 security issues before launch.
                                     </p>
@@ -1623,7 +1566,7 @@
                             <div id="memory-panel-list">
                                 <div class="flex items-center justify-between mb-6">
                                     <div>
-                                        <h2 class="text-xl font-bold text-card-fg" data-i18n="memory_title">Memory Management</h2>
+                                        <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200" data-i18n="memory_title">Memory Management</h2>
                                         <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="memory_desc">View Agent memory files and content</p>
                                     </div>
                                     <div class="flex items-center bg-slate-100 dark:bg-white/10 rounded-lg p-0.5">
@@ -1645,10 +1588,10 @@
                                     <p class="text-sm text-slate-400 dark:text-slate-500 mt-1" data-i18n="memory_loading_desc">Memory files will appear here</p>
                                 </div>
                                 <div id="memory-list" class="hidden">
-                                    <div class="bg-card rounded-xl border border-border overflow-hidden">
+                                    <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
                                         <table class="w-full">
                                             <thead>
-                                                <tr class="border-b border border-border">
+                                                <tr class="border-b border border-slate-200 dark:border-white/10">
                                                     <th class="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" data-i18n="memory_col_name">Filename</th>
                                                     <th class="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" data-i18n="memory_col_type">Type</th>
                                                     <th class="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" data-i18n="memory_col_size">Size</th>
@@ -1668,16 +1611,16 @@
                                     <button onclick="closeMemoryViewer()"
                                             class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm
                                                    text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10
-                                                   border border-border transition-colors cursor-pointer">
+                                                   border border-slate-200 dark:border-white/10 transition-colors cursor-pointer">
                                         <i class="fas fa-arrow-left text-xs"></i>
                                         <span data-i18n="memory_back">Back to list</span>
                                     </button>
                                     <h2 id="memory-viewer-title"
-                                        class="text-base font-semibold text-card-fg font-mono truncate"></h2>
+                                        class="text-base font-semibold text-slate-800 dark:text-slate-200 font-mono truncate"></h2>
                                 </div>
-                                <div class="bg-card rounded-xl border border-border overflow-hidden">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
                                     <div id="memory-viewer-content"
-                                         class="p-5 overflow-y-auto text-sm msg-content text-card-fg"
+                                         class="p-5 overflow-y-auto text-sm msg-content text-slate-800 dark:text-slate-200"
                                          style="max-height: calc(100vh - 220px)"></div>
                                 </div>
                             </div>
@@ -1696,7 +1639,7 @@
                             <!-- Header -->
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
                                 <div>
-                                    <h2 class="text-xl font-bold text-card-fg" data-i18n="knowledge_title">Knowledge Base</h2>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200" data-i18n="knowledge_title">Knowledge Base</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="knowledge_desc">Browse and explore your knowledge base</p>
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -1737,12 +1680,12 @@
                                 <div class="flex flex-col md:flex-row gap-4 md:gap-6" style="min-height: calc(100vh - 220px)">
                                     <!-- File tree -->
                                     <div id="knowledge-sidebar" class="w-full md:w-72 lg:w-80 flex-shrink-0">
-                                        <div class="bg-card rounded-xl border border-border overflow-hidden">
-                                            <div class="px-4 py-3 border-b border border-border">
+                                        <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                                            <div class="px-4 py-3 border-b border border-slate-200 dark:border-white/10">
                                                 <div class="relative">
                                                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                                                     <input id="knowledge-search" type="text" placeholder="Search..."
-                                                           class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-white/5 border border-border rounded-lg text-card-fg placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-400/50"
+                                                           class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-400/50"
                                                            oninput="filterKnowledgeTree(this.value)">
                                                 </div>
                                             </div>
@@ -1757,17 +1700,17 @@
                                             <p class="text-sm" data-i18n="knowledge_select_hint">Select a document to view</p>
                                         </div>
                                         <div id="knowledge-content-viewer" class="hidden">
-                                            <div class="bg-card rounded-xl border border-border overflow-hidden">
-                                                <div class="flex items-center gap-3 px-4 md:px-5 py-3 border-b border border-border">
+                                            <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                                                <div class="flex items-center gap-3 px-4 md:px-5 py-3 border-b border border-slate-200 dark:border-white/10">
                                                     <button onclick="knowledgeMobileBack()" class="md:hidden p-1 -ml-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">
                                                         <i class="fas fa-arrow-left text-xs"></i>
                                                     </button>
                                                     <i class="fas fa-file-lines text-slate-400 text-sm hidden md:inline"></i>
-                                                    <span id="knowledge-viewer-title" class="text-sm font-medium text-card-fg truncate"></span>
+                                                    <span id="knowledge-viewer-title" class="text-sm font-medium text-slate-800 dark:text-slate-200 truncate"></span>
                                                     <span id="knowledge-viewer-path" class="text-xs text-slate-400 dark:text-slate-500 ml-auto font-mono truncate hidden md:inline"></span>
                                                 </div>
                                                 <div id="knowledge-viewer-body"
-                                                     class="p-4 md:p-5 overflow-y-auto text-sm msg-content text-card-fg"
+                                                     class="p-4 md:p-5 overflow-y-auto text-sm msg-content text-slate-800 dark:text-slate-200"
                                                      style="max-height: calc(100vh - 280px)"></div>
                                             </div>
                                         </div>
@@ -1777,7 +1720,7 @@
 
                             <!-- Graph panel -->
                             <div id="knowledge-panel-graph" class="hidden">
-                                <div class="bg-card rounded-xl border border-border overflow-hidden">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
                                     <div id="knowledge-graph-container" class="w-full h-[60vh] md:h-[calc(100vh-220px)]"></div>
                                 </div>
                             </div>
@@ -1803,7 +1746,7 @@
                         <div class="max-w-4xl mx-auto">
                             <div class="flex items-center justify-between mb-6">
                                 <div>
-                                    <h2 class="text-xl font-bold text-card-fg" data-i18n="models_title">Models Management</h2>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200" data-i18n="models_title">Models Management</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="models_desc">Unified management of chat, vision, voice, vector, image, and search capabilities</p>
                                 </div>
                                 <button id="models-add-vendor-btn" onclick="openVendorModal('')"
@@ -1829,7 +1772,7 @@
                         <div class="max-w-4xl mx-auto">
                             <div class="flex items-center justify-between mb-6">
                                 <div>
-                                    <h2 class="text-xl font-bold text-card-fg" data-i18n="tasks_title">Scheduled Tasks</h2>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200" data-i18n="tasks_title">Scheduled Tasks</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="tasks_desc">View and manage scheduled tasks</p>
                                 </div>
                                 <button onclick="purgeAllTasks()"
@@ -1859,18 +1802,18 @@
                         <div class="max-w-4xl mx-auto">
                             <div class="flex items-center justify-between mb-6">
                                 <div>
-                                    <h2 class="text-xl font-bold text-card-fg">✦ Fonts</h2>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">✦ Fonts</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Customize fonts across your chat interface</p>
                                 </div>
-                                <button onclick="resetFonts()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                                <button onclick="resetFonts()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                                     <i class="fas fa-rotate-left mr-1"></i> Reset
                                 </button>
                             </div>
 
                             <div class="space-y-6">
                                 <!-- Server Fonts -->
-                                <div class="bg-card rounded-xl border border-border p-5">
-                                    <h3 class="text-sm font-semibold text-card-fg mb-4 flex items-center gap-2">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-5">
+                                    <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
                                         <i class="fas fa-server text-primary-400 text-xs"></i> Server Fonts
                                     </h3>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Select from pre-loaded fonts on the server</p>
@@ -1880,13 +1823,13 @@
                                 </div>
 
                                 <!-- Import from URL -->
-                                <div class="bg-card rounded-xl border border-border p-5">
-                                    <h3 class="text-sm font-semibold text-card-fg mb-4 flex items-center gap-2">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-5">
+                                    <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
                                         <i class="fas fa-link text-primary-400 text-xs"></i> Import from URL
                                     </h3>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Paste a Google Fonts URL or any CSS @import URL</p>
                                     <div class="flex gap-2">
-                                        <input type="text" id="font-url-input" placeholder="https://fonts.googleapis.com/css2?family=..." class="flex-1 px-3 py-2 rounded-lg border border-border bg-slate-50 dark:bg-white/5 text-sm text-card-fg placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-400">
+                                        <input type="text" id="font-url-input" placeholder="https://fonts.googleapis.com/css2?family=..." class="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-400">
                                         <button onclick="importFontFromUrl()" class="px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors">
                                             Import
                                         </button>
@@ -1897,12 +1840,12 @@
                                 </div>
 
                                 <!-- Upload Font -->
-                                <div class="bg-card rounded-xl border border-border p-5">
-                                    <h3 class="text-sm font-semibold text-card-fg mb-4 flex items-center gap-2">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-5">
+                                    <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
                                         <i class="fas fa-upload text-primary-400 text-xs"></i> Upload Font
                                     </h3>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Upload TTF, OTF, or WOFF2 font files</p>
-                                    <div id="font-upload-zone" class="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary-400 dark:hover:border-primary-500 transition-colors" onclick="document.getElementById('font-file-input').click()">
+                                    <div id="font-upload-zone" class="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl p-6 text-center cursor-pointer hover:border-primary-400 dark:hover:border-primary-500 transition-colors" onclick="document.getElementById('font-file-input').click()">
                                         <i class="fas fa-cloud-arrow-up text-2xl text-slate-400 mb-2"></i>
                                         <p class="text-sm text-slate-500 dark:text-slate-400">Click or drag & drop font files here</p>
                                         <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">.ttf, .otf, .woff2</p>
@@ -1914,29 +1857,29 @@
                                 </div>
 
                                 <!-- Font Assignments -->
-                                <div class="bg-card rounded-xl border border-border p-5">
-                                    <h3 class="text-sm font-semibold text-card-fg mb-4 flex items-center gap-2">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-5">
+                                    <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
                                         <i class="fas fa-text-height text-primary-400 text-xs"></i> Font Assignments
                                     </h3>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Choose which font to use for each part of the interface</p>
                                     <div class="space-y-4">
                                         <div>
                                             <label class="text-xs text-slate-500 dark:text-slate-400 mb-1.5 block font-medium">Body / Chat Text</label>
-                                            <select id="font-assign-body" onchange="applyFontAssignment('body', this.value)" class="w-full px-3 py-2 rounded-lg border border-border bg-slate-50 dark:bg-white/5 text-sm text-card-fg focus:outline-none focus:ring-2 focus:ring-primary-400">
+                                            <select id="font-assign-body" onchange="applyFontAssignment('body', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-400">
                                                 <option value="Inter">Inter (Default)</option>
                                             </select>
                                             <p class="text-xs text-slate-400 mt-1 font-preview" style="font-family: var(--font-body)">Preview: The quick brown fox jumps over the lazy dog</p>
                                         </div>
                                         <div>
                                             <label class="text-xs text-slate-500 dark:text-slate-400 mb-1.5 block font-medium">Display / Headings</label>
-                                            <select id="font-assign-display" onchange="applyFontAssignment('display', this.value)" class="w-full px-3 py-2 rounded-lg border border-border bg-slate-50 dark:bg-white/5 text-sm text-card-fg focus:outline-none focus:ring-2 focus:ring-primary-400">
+                                            <select id="font-assign-display" onchange="applyFontAssignment('display', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-400">
                                                 <option value="Space Grotesk">Space Grotesk (Default)</option>
                                             </select>
                                             <p class="text-xs text-slate-400 mt-1 font-preview" style="font-family: var(--font-display)">Preview: The Quick Brown Fox</p>
                                         </div>
                                         <div>
                                             <label class="text-xs text-slate-500 dark:text-slate-400 mb-1.5 block font-medium">Code / Monospace</label>
-                                            <select id="font-assign-mono" onchange="applyFontAssignment('mono', this.value)" class="w-full px-3 py-2 rounded-lg border border-border bg-slate-50 dark:bg-white/5 text-sm text-card-fg focus:outline-none focus:ring-2 focus:ring-primary-400">
+                                            <select id="font-assign-mono" onchange="applyFontAssignment('mono', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-400">
                                                 <option value="JetBrains Mono">JetBrains Mono (Default)</option>
                                             </select>
                                             <p class="text-xs text-slate-400 mt-1 font-preview" style="font-family: var(--font-mono)">Preview: const x = 42;</p>
@@ -1945,8 +1888,8 @@
                                 </div>
 
                                 <!-- Font Size -->
-                                <div class="bg-card rounded-xl border border-border p-5">
-                                    <h3 class="text-sm font-semibold text-card-fg mb-4 flex items-center gap-2">
+                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-5">
+                                    <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
                                         <i class="fas fa-text-width text-primary-400 text-xs"></i> Font Size
                                     </h3>
                                     <div class="space-y-4">
@@ -1979,7 +1922,7 @@
                         <div class="max-w-5xl mx-auto">
                             <div class="flex items-center justify-between mb-6">
                                 <div>
-                                    <h2 class="text-xl font-bold text-card-fg" data-i18n="logs_title">Logs</h2>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200" data-i18n="logs_title">Logs</h2>
                                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="logs_desc">Real-time log output (run.log)</p>
                                 </div>
                             </div>
@@ -2034,20 +1977,20 @@
 
     <!-- Confirm Dialog -->
     <div id="confirm-dialog-overlay" class="fixed inset-0 bg-black/50 z-[200] hidden flex items-center justify-center">
-        <div class="bg-card rounded-2xl border border-border shadow-xl
+        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl
                     w-full max-w-sm mx-4 overflow-hidden">
             <div class="p-6">
                 <div class="flex items-center gap-3 mb-3">
                     <div class="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
                         <i class="fas fa-triangle-exclamation text-red-500"></i>
                     </div>
-                    <h3 id="confirm-dialog-title" class="font-semibold text-card-fg text-base"></h3>
+                    <h3 id="confirm-dialog-title" class="font-semibold text-slate-800 dark:text-slate-200 text-base"></h3>
                 </div>
                 <p id="confirm-dialog-message" class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed ml-[52px]"></p>
             </div>
             <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 dark:border-white/5">
                 <button id="confirm-dialog-cancel"
-                        class="px-4 py-2 rounded-lg border border-border
+                        class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10
                                text-slate-600 dark:text-slate-300 text-sm font-medium
                                hover:bg-slate-50 dark:hover:bg-white/5
                                cursor-pointer transition-colors duration-150"></button>
@@ -2061,14 +2004,14 @@
     <!-- HTML Artifact Preview Overlay -->
     <div id="artifact-overlay" class="fixed inset-0 z-[150] hidden">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="dismissArtifactOverlay()"></div>
-        <div id="artifact-card" class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-4xl h-[75vh] bg-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col" style="perspective: 1200px; transform-style: preserve-3d;">
+        <div id="artifact-card" class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-4xl h-[75vh] bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col" style="perspective: 1200px; transform-style: preserve-3d;">
             <!-- Header -->
-            <div class="flex items-center justify-between px-4 py-3 border-b border-border bg-slate-50 dark:bg-white/5">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
                 <div class="flex items-center gap-2">
                     <div class="w-7 h-7 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center">
                         <i class="fas fa-eye text-primary-500 text-xs"></i>
                     </div>
-                    <span id="artifact-title" class="text-sm font-medium text-card-fg">Preview</span>
+                    <span id="artifact-title" class="text-sm font-medium text-slate-800 dark:text-slate-200">Preview</span>
                     <span id="artifact-lang-badge" class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400"></span>
                 </div>
                 <div class="flex items-center gap-2">
@@ -2090,7 +2033,7 @@
                 <div class="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></div>
             </div>
             <!-- Preview iframe -->
-            <div class="flex-1 overflow-hidden bg-card">
+            <div class="flex-1 overflow-hidden bg-white dark:bg-[#1A1A1A]">
                 <iframe id="artifact-iframe" class="w-full h-full border-0" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-same-origin"></iframe>
             </div>
         </div>
@@ -2098,7 +2041,7 @@
 
     <!-- Vendor Credentials Modal -->
     <div id="vendor-modal-overlay" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-center justify-center">
-        <div class="bg-card rounded-2xl border border-border shadow-xl
+        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl
                     w-full max-w-md mx-4">
             <div class="p-6">
                 <div class="flex items-center gap-3 mb-5">
@@ -2106,7 +2049,7 @@
                         <i class="fas fa-key text-primary-500"></i>
                     </div>
                     <div class="min-w-0 flex-1">
-                        <h3 id="vendor-modal-title" class="font-semibold text-card-fg text-base"></h3>
+                        <h3 id="vendor-modal-title" class="font-semibold text-slate-800 dark:text-slate-200 text-base"></h3>
                         <p id="vendor-modal-subtitle" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono"></p>
                     </div>
                 </div>
@@ -2128,7 +2071,7 @@
                         <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Key</label>
                         <input id="vendor-modal-key" type="text" autocomplete="off" data-1p-ignore data-lpignore="true"
                                class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                      bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                      bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                       focus:outline-none focus:border-primary-500 font-mono transition-colors"
                                placeholder="sk-...">
                     </div>
@@ -2136,7 +2079,7 @@
                         <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Base</label>
                         <input id="vendor-modal-base" type="text"
                                class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                      bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                      bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                       focus:outline-none focus:border-primary-500 font-mono transition-colors"
                                placeholder="https://...../v1">
                         <p id="vendor-modal-base-hint" class="mt-1.5 text-xs text-slate-400 dark:text-slate-500 hidden">
@@ -2154,7 +2097,7 @@
                 <span id="vendor-modal-status"
                       class="flex-1 text-xs text-primary-500 opacity-0 transition-opacity duration-300 text-center"></span>
                 <button id="vendor-modal-cancel"
-                        class="px-4 py-2 rounded-lg border border-border
+                        class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10
                                text-slate-600 dark:text-slate-300 text-sm font-medium
                                hover:bg-slate-50 dark:hover:bg-white/5
                                cursor-pointer transition-colors duration-150"
@@ -2169,7 +2112,7 @@
 
     <!-- Custom Provider Modal (multiple OpenAI-compatible providers) -->
     <div id="custom-provider-modal-overlay" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-center justify-center">
-        <div class="bg-card rounded-2xl border border-border shadow-xl
+        <div class="bg-white dark:bg-[#1A1A1A] rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl
                     w-full max-w-md mx-4">
             <div class="p-6">
                 <div class="flex items-center gap-3 mb-5">
@@ -2177,7 +2120,7 @@
                         <i class="fas fa-sliders text-primary-500"></i>
                     </div>
                     <div class="min-w-0 flex-1">
-                        <h3 id="custom-provider-modal-title" class="font-semibold text-card-fg text-base"></h3>
+                        <h3 id="custom-provider-modal-title" class="font-semibold text-slate-800 dark:text-slate-200 text-base"></h3>
                     </div>
                 </div>
 
@@ -2186,14 +2129,14 @@
                         <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5" data-i18n="models_custom_name">Name</label>
                         <input id="custom-provider-name" type="text" autocomplete="off" data-1p-ignore data-lpignore="true"
                                class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                      bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                      bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                       focus:outline-none focus:border-primary-500 transition-colors">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Base</label>
                         <input id="custom-provider-base" type="text"
                                class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                      bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                      bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                       focus:outline-none focus:border-primary-500 font-mono transition-colors"
                                placeholder="https://...../v1">
                     </div>
@@ -2201,7 +2144,7 @@
                         <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">API Key</label>
                         <input id="custom-provider-key" type="text" autocomplete="off" data-1p-ignore data-lpignore="true"
                                class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
-                                      bg-slate-50 dark:bg-white/5 text-sm text-card-fg
+                                      bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-200
                                       focus:outline-none focus:border-primary-500 font-mono transition-colors">
                     </div>
                     <!-- Custom Request Headers (optional) -->
@@ -2231,7 +2174,7 @@
                 <span id="custom-provider-modal-status"
                       class="flex-1 text-xs text-primary-500 opacity-0 transition-opacity duration-300 text-left"></span>
                 <button id="custom-provider-modal-cancel"
-                        class="px-4 py-2 rounded-lg border border-border
+                        class="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10
                                text-slate-600 dark:text-slate-300 text-sm font-medium
                                hover:bg-slate-50 dark:hover:bg-white/5
                                cursor-pointer transition-colors duration-150"

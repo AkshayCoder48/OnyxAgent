@@ -2631,7 +2631,7 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
         botEl.innerHTML = `
             <img src="assets/ai-avatar.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-0.5 shadow-sm ring-1 ring-slate-200/60 dark:ring-white/10">
             <div class="min-w-0 flex-1 max-w-[85%]">
-                <div class="onyx-bot-bubble rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content">
+                <div class="bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content text-slate-700 dark:text-slate-200">
                     <div class="agent-steps"></div>
                     <div class="answer-content sse-streaming"></div>
                     <div class="media-content"></div>
@@ -3223,7 +3223,7 @@ function createUserMessageEl(content, timestamp, attachments) {
     const textHtml = content ? renderMarkdown(content) : '';
     el.innerHTML = `
         <div class="max-w-[75%] sm:max-w-[60%]">
-            <div class="onyx-user-bubble rounded-2xl px-4 py-2.5 text-sm leading-relaxed msg-content user-bubble">
+            <div class="bg-primary-400 text-white rounded-2xl px-4 py-2.5 text-sm leading-relaxed msg-content user-bubble">
                 ${attachHtml}${textHtml}
             </div>
             <div class="flex items-center justify-end gap-2 mt-1.5">
@@ -3627,7 +3627,7 @@ function createBotMessageEl(content, timestamp, requestId, msg) {
     el.innerHTML = `
         <img src="assets/ai-avatar.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-0.5 shadow-sm ring-1 ring-slate-200/60 dark:ring-white/10">
         <div class="min-w-0 flex-1 max-w-[85%]">
-            <div class="onyx-bot-bubble rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content">
+            <div class="bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm leading-relaxed msg-content text-slate-700 dark:text-slate-200">
                 ${evolutionBadge}
                 ${stepsHtml ? `<div class="agent-steps">${stepsHtml}</div>` : ''}
                 <div class="answer-content">${renderMarkdown(displayContent)}</div>
@@ -3924,7 +3924,7 @@ function addLoadingIndicator() {
     el.className = 'flex gap-3 px-4 sm:px-6 py-3';
     el.innerHTML = `
         <img src="assets/ai-avatar.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-0.5 shadow-sm ring-1 ring-slate-200/60 dark:ring-white/10">
-        <div class="onyx-bot-bubble rounded-2xl px-4 py-3">
+        <div class="bg-white dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3">
             <div class="flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-primary-400 animate-pulse-dot" style="animation-delay: 0s"></span>
                 <span class="w-2 h-2 rounded-full bg-primary-400 animate-pulse-dot" style="animation-delay: 0.2s"></span>

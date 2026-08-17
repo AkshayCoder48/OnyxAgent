@@ -26,20 +26,52 @@ try:
 except ImportError:
     _HAS_PLAYWRIGHT = False
 
+# Stealth mode: try to import playwright-extra + stealth plugin for
+# Cloudflare bypass. These are optional — if not installed, we fall back
+# to vanilla playwright (which works for most sites but can be detected
+# by Cloudflare's bot-protection).
+_HAS_STEALTH = False
+_stealth_chromium = None
+try:
+    from playwright_extra.sync_api import sync_playwright as _stealth_sync_playwright
+    import playwright_extra_stealth
+    _stealth_chromium = playwright_extra_stealth.stealth_sync()
+    _HAS_STEALTH = True
+except ImportError:
+    pass
+except Exception as _e:
+    pass
+
 
 def _ensure_playwright_installed():
     """Auto-install Playwright browser on first use.
-    
+
     Called lazily when the browser tool is first invoked. Downloads Chromium
     to a shared location so all subsequent chats reuse the same binary.
+
+    Also attempts to install playwright-extra + stealth plugin for Cloudflare
+    bypass. These are optional and don't block browser operation if they
+    fail to install.
     """
-    global _HAS_PLAYWRIGHT
+    global _HAS_PLAYWRIGHT, _HAS_STEALTH, _stealth_chromium
     if _HAS_PLAYWRIGHT:
+        # Even if playwright is installed, try to load stealth if not yet loaded
+        if not _HAS_STEALTH:
+            try:
+                from playwright_extra.sync_api import sync_playwright as _sp
+                import playwright_extra_stealth
+                _stealth_chromium = playwright_extra_stealth.stealth_sync()
+                _HAS_STEALTH = True
+                logger.info("[Browser] Stealth plugin loaded successfully")
+            except ImportError:
+                pass
+            except Exception:
+                pass
         return True
-    
+
     import subprocess
     import shutil
-    
+
     logger.info("[Browser] Playwright not found, auto-installing...")
     try:
         # Install playwright package if not present
@@ -48,21 +80,37 @@ def _ensure_playwright_installed():
             f"{pip_path} install playwright -q",
             shell=True, capture_output=True, timeout=120
         )
-        
+
         # Install Chromium browser
         subprocess.run(
             f"{sys.executable} -m playwright install chromium",
             shell=True, capture_output=True, timeout=180
         )
-        
+
         # Try importing again
         from playwright.sync_api import sync_playwright
         _HAS_PLAYWRIGHT = True
         logger.info("[Browser] Playwright auto-installed successfully")
-        return True
     except Exception as e:
         logger.warning(f"[Browser] Auto-install failed: {e}. Manual install: pip install playwright && playwright install chromium")
         return False
+
+    # Try to install stealth plugin (optional, non-blocking)
+    try:
+        subprocess.run(
+            f"{pip_path} install playwright-extra playwright-extra-plugin-stealth -q",
+            shell=True, capture_output=True, timeout=60
+        )
+        from playwright_extra.sync_api import sync_playwright as _sp
+        import playwright_extra_stealth
+        _stealth_chromium = playwright_extra_stealth.stealth_sync()
+        _HAS_STEALTH = True
+        logger.info("[Browser] Stealth plugin installed and loaded successfully")
+    except ImportError:
+        logger.info("[Browser] Stealth plugin not available — Cloudflare-protected sites may block the browser. Install with: pip install playwright-extra playwright-extra-plugin-stealth")
+    except Exception as e:
+        logger.info(f"[Browser] Stealth plugin install skipped: {e}")
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -466,10 +514,9 @@ class BrowserService:
 
     def _launch_browser(self):
         """Launch / connect Chromium on the background thread."""
-        # Auto-install Playwright if not available
-        if not _HAS_PLAYWRIGHT:
-            if not _ensure_playwright_installed():
-                raise RuntimeError("Playwright is not installed and auto-install failed. Run: pip install playwright && playwright install chromium")
+        # Auto-install Playwright if not available (also tries stealth plugin)
+        if not _ensure_playwright_installed():
+            raise RuntimeError("Playwright is not installed and auto-install failed. Run: pip install playwright && playwright install chromium")
         if self._headless is None:
             headless_cfg = self._config.get("headless")
             self._headless = headless_cfg if headless_cfg is not None else _should_use_headless()
@@ -497,6 +544,14 @@ class BrowserService:
                 "--memory-pressure-off",
             ])
 
+        # Stealth-specific args: when stealth plugin is active, add args that
+        # make Chromium look more like a real browser (helps with Cloudflare).
+        if _HAS_STEALTH:
+            launch_args.extend([
+                "--disable-blink-features=AutomationControlled",
+                "--disable-features=IsAutomationControlled",
+            ])
+
         extra_args = self._config.get("launch_args", [])
         if extra_args:
             launch_args.extend(extra_args)
@@ -504,13 +559,19 @@ class BrowserService:
         viewport_w = self._config.get("viewport_width", 1280)
         viewport_h = self._config.get("viewport_height", 720)
         viewport = {"width": viewport_w, "height": viewport_h}
+        # Realistic user agent — Windows Chrome 122 (matches the stealth example)
         user_agent = (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 Safari/537.36"
+            "Chrome/122.0.0.0 Safari/537.36"
         )
 
-        self._playwright = sync_playwright().start()
+        # Use stealth playwright if available, otherwise vanilla playwright
+        if _HAS_STEALTH:
+            self._playwright = _stealth_sync_playwright().start()
+            logger.info("[Browser] Using stealth-enabled Playwright (Cloudflare bypass active)")
+        else:
+            self._playwright = sync_playwright().start()
 
         if self._launch_mode == "cdp":
             self._connect_cdp(viewport)
@@ -762,6 +823,46 @@ class BrowserService:
                 cf_detected = True
         except Exception:
             pass
+
+        # If Cloudflare challenge detected AND stealth is active, wait for
+        # the challenge to resolve naturally. Stealth mode handles the
+        # JavaScript fingerprinting that Cloudflare checks, so the challenge
+        # should auto-pass within 5-10 seconds.
+        if cf_detected and _HAS_STEALTH:
+            logger.info("[Browser] Cloudflare challenge detected — stealth active, waiting up to 15s for auto-resolve...")
+            try:
+                # Wait for the challenge to complete. Cloudflare typically
+                # resolves within 5-10s when stealth is active.
+                for _ in range(30):  # 30 x 500ms = 15s max
+                    page.wait_for_timeout(500)
+                    try:
+                        title = page.title()
+                        current_url = page.url
+                        # If the title changed away from "Just a moment..."
+                        # or the URL changed (redirect after challenge), we're through.
+                        new_content = page.content().lower()
+                        if not any(ind in new_content for ind in [
+                            'just a moment', 'checking your browser', 'cf-challenge'
+                        ]):
+                            logger.info("[Browser] Cloudflare challenge resolved!")
+                            cf_detected = False
+                            break
+                    except Exception:
+                        pass
+                if cf_detected:
+                    logger.warning("[Browser] Cloudflare challenge did not auto-resolve after 15s")
+            except Exception as e:
+                logger.warning(f"[Browser] Cloudflare wait error: {e}")
+
+            # Re-read title + URL after challenge
+            try:
+                title = page.title()
+            except Exception:
+                title = ""
+            try:
+                current_url = page.url
+            except Exception:
+                current_url = url
 
         result = {"url": current_url, "title": title, "status": status}
         if cf_detected:
