@@ -75,6 +75,12 @@ def init_scheduler(agent_bridge) -> bool:
                         )
                         return False
 
+                    # Best-effort Telegram "task started" notification so the
+                    # user knows the scheduler fired (useful when the web UI
+                    # isn't open). Silently skipped if Telegram isn't the
+                    # target channel or isn't configured.
+                    _notify_telegram_task_started(task)
+
                     if action_type == "agent_task":
                         return _execute_agent_task(task, agent_bridge)
                     elif action_type == "send_message":
@@ -114,7 +120,7 @@ def _is_channel_ready(channel_type: str, receiver: str) -> bool:
     scheduled task fires. Previously this check returned False whenever
     `session_queues[receiver]` was missing, which caused every scheduled
     task to be deferred indefinitely and eventually skipped after the
-    10-minute catch-up window. That made the scheduler useless for
+    catch-up window. That made the scheduler useless for
     "send me a daily report at 9:27pm" use cases.
 
     Now we ALWAYS return True for the web channel: the scheduler will
@@ -128,6 +134,10 @@ def _is_channel_ready(channel_type: str, receiver: str) -> bool:
          the scheduled message to the conversation store, so it shows
          up in `/api/history` even if the polling queue was lost
          (e.g. process restart between fire and reconnect).
+
+    Telegram channel: returns True if the polling loop is alive and
+    the bot knows its own username. Otherwise False so the scheduler
+    defers until the user clicks "Start Bot" in the web UI.
     """
     if not channel_type or channel_type == "unknown":
         return True
@@ -142,6 +152,24 @@ def _is_channel_ready(channel_type: str, receiver: str) -> bool:
             if not tokens or receiver not in tokens:
                 return False
             return True
+
+        if channel_type == "telegram":
+            # Telegram is "ready" only if the polling loop is alive AND
+            # the bot has resolved its own username (which happens during
+            # the `get_me` call in `_async_main`). If the user hasn't
+            # started the bot yet (no token saved, or they saved the
+            # token but didn't click "Start Bot"), defer the task so it
+            # fires as soon as the bot comes online.
+            loop_thread = getattr(channel, "_loop_thread", None)
+            bot_username = getattr(channel, "bot_username", "") or ""
+            if loop_thread and loop_thread.is_alive() and bot_username:
+                return True
+            logger.info(
+                f"[Scheduler] Telegram channel not yet ready "
+                f"(loop_alive={bool(loop_thread and loop_thread.is_alive())}, "
+                f"bot_username={bot_username!r}); deferring task"
+            )
+            return False
 
         if channel_type == "web":
             # Auto-create the polling queue if missing so the message can
@@ -164,6 +192,66 @@ def _is_channel_ready(channel_type: str, receiver: str) -> bool:
     except Exception as e:
         logger.warning(f"[Scheduler] Channel readiness check failed for {channel_type}: {e}")
         return True
+
+
+def _notify_telegram_task_started(task: dict) -> None:
+    """Send a "scheduled task started" notification to the user's Telegram.
+
+    This is a UX nicesulty so that when a scheduled task fires, the user
+    gets a heads-up on Telegram ("⏰ Scheduled task 'X' is now running…")
+    even before the actual task output arrives. Without this, the user
+    might not realise the scheduler is alive — especially on a VPS where
+    the web UI isn't open.
+
+    Best-effort: silently skips if Telegram isn't configured, or if the
+    target receiver doesn't map to a Telegram chat. Never raises.
+    """
+    try:
+        from config import conf
+        tg_token = str(conf().get("telegram_token", "") or "").strip()
+        if not tg_token:
+            return  # Telegram not configured — skip silently.
+
+        action = task.get("action", {}) or {}
+        channel_type = action.get("channel_type", "")
+        if channel_type != "telegram":
+            return  # Task wasn't created from Telegram — skip.
+
+        receiver = action.get("receiver", "")
+        if not receiver:
+            return
+
+        # Only notify for tasks that take more than a few seconds
+        # (i.e. agent_task / tool_call / skill_call). For send_message
+        # the actual message arrives within milliseconds anyway, so a
+        # "started" notification would just be noise.
+        action_type = action.get("type", "")
+        if action_type == "send_message":
+            return
+
+        task_name = task.get("name", "scheduled task")
+        text = (
+            f"⏰ Scheduled task started: *{task_name}*\n"
+            f"I'll send you the result as soon as it's ready."
+        )
+
+        import requests
+        url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+        proxy_url = str(conf().get("telegram_proxy", "") or "").strip()
+        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+        resp = requests.post(url, json={
+            "chat_id": receiver,
+            "text": text,
+            "parse_mode": "Markdown",
+        }, proxies=proxies, timeout=10)
+        if resp.status_code != 200:
+            logger.debug(
+                f"[Scheduler] Telegram start-notification non-200: "
+                f"{resp.status_code} {resp.text[:200]}"
+            )
+    except Exception as e:
+        # Never let the notification break the actual task execution.
+        logger.debug(f"[Scheduler] Telegram start-notification failed (non-fatal): {e}")
 
 
 def get_task_store():

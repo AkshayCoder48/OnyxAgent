@@ -4285,8 +4285,8 @@ function initConfigView(data) {
 
     // ── Telegram channel config ──
     initTelegramConfig(data);
-    // ── External cron-trigger (/run-task) config ──
-    initRunTaskConfig(data);
+    // Refresh the running/not-running badge from the server's perspective.
+    refreshTelegramStatus();
 }
 
 // =====================================================================
@@ -4396,92 +4396,225 @@ function saveTelegramConfig() {
 }
 
 // =====================================================================
-// External Cron Trigger (/run-task) config
+// External Cron Trigger (/run-task) config — REMOVED
+// (The /run-task endpoint and its UI card were deleted; scheduled tasks
+// now fire purely via the in-process scheduler which runs independently
+// of any web tab being open. See agent/tools/scheduler/.)
 // =====================================================================
 
-function initRunTaskConfig(data) {
-    const keyInput = document.getElementById('cfg-run-task-key');
-    if (!keyInput) return;
-    const maskedKey = data.run_task_api_key_masked || '';
-    keyInput.value = maskedKey;
-    keyInput.dataset.masked = maskedKey ? '1' : '';
-    keyInput.dataset.maskedVal = maskedKey;
-    keyInput.classList.toggle('cfg-key-masked', !!maskedKey);
-    const keyIcon = document.querySelector('#cfg-run-task-key-toggle i');
-    if (keyIcon) keyIcon.className = 'fas fa-eye text-xs';
 
-    if (!keyInput._cfgBound) {
-        keyInput.addEventListener('focus', function() {
-            if (this.dataset.masked === '1') {
-                this.value = '';
-                this.dataset.masked = '';
-                this.classList.remove('cfg-key-masked');
-            }
-        });
-        keyInput.addEventListener('blur', function() {
-            if (!this.value.trim() && this.dataset.maskedVal) {
-                this.value = this.dataset.maskedVal;
-                this.dataset.masked = '1';
-                this.classList.add('cfg-key-masked');
-            }
-        });
-        keyInput.addEventListener('input', function() {
-            this.dataset.masked = '';
-        });
-        keyInput._cfgBound = true;
+// =====================================================================
+// Telegram: test connection + start bot + status polling
+// =====================================================================
+
+/**
+ * Get the current (possibly masked) Telegram bot token from the input.
+ * If the user has typed a new value (mask was cleared), use that;
+ * otherwise fall back to the masked display value (which we can't send
+ * back to Telegram, so the test will fail with a clear error).
+ */
+function _getTelegramTokenForRequest() {
+    const input = document.getElementById('cfg-telegram-token');
+    if (!input) return '';
+    if (input.dataset.masked === '1') {
+        // Masked — the user hasn't typed a new token. We can still try
+        // the test by sending an empty token and asking the backend to
+        // use the saved one from config. But /api/telegram/test requires
+        // the token in the body, so we have to ask the user to re-enter.
+        return '';
     }
+    return input.value.trim();
 }
 
-function toggleRunTaskKeyVisibility() {
-    const input = document.getElementById('cfg-run-task-key');
-    if (!input) return;
-    const icon = document.querySelector('#cfg-run-task-key-toggle i');
-    if (input.classList.contains('cfg-key-masked')) {
-        input.classList.remove('cfg-key-masked');
-        if (icon) icon.className = 'fas fa-eye-slash text-xs';
-    } else {
-        input.classList.add('cfg-key-masked');
-        if (icon) icon.className = 'fas fa-eye text-xs';
-    }
-}
+async function testTelegramToken() {
+    const statusEl = document.getElementById('cfg-telegram-status');
+    const btn = document.getElementById('cfg-telegram-test');
+    const token = _getTelegramTokenForRequest();
 
-function saveRunTaskConfig() {
-    const keyInput = document.getElementById('cfg-run-task-key');
-    if (!keyInput || keyInput.dataset.masked === '1') {
-        showStatus('cfg-run-task-status', 'config_saved', false);
+    if (!token) {
+        // Try to fetch it from the backend by saving first.
+        const ok = await saveTelegramConfigAsync();
+        if (!ok) {
+            showStatus('cfg-telegram-status', 'config_save_error', true);
+            return;
+        }
+        // After save the input is masked again — ask user to re-type to test.
+        showStatus('cfg-telegram-status', 'config_save_error', true);
+        const status = document.getElementById('cfg-telegram-status');
+        status.textContent = 'Re-enter token to test (masked values cannot be sent to Telegram)';
+        status.classList.remove('opacity-0', 'text-red-500');
+        status.classList.add('text-amber-500');
+        setTimeout(() => status.classList.add('opacity-0'), 3500);
         return;
     }
-    const updates = { run_task_api_key: keyInput.value.trim() };
 
-    const btn = document.getElementById('cfg-run-task-save');
     btn.disabled = true;
-    fetch('/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates })
-    })
-    .then(r => r.json())
-    .then(data => {
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs mr-1"></i>Testing…';
+    try {
+        const res = await fetch('/api/telegram/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.bot) {
+            const bot = data.bot;
+            document.getElementById('cfg-telegram-bot-username').textContent = bot.username || '—';
+            document.getElementById('cfg-telegram-bot-id').textContent = bot.id || '—';
+            document.getElementById('cfg-telegram-bot-name').textContent = bot.first_name || '—';
+            document.getElementById('cfg-telegram-botinfo').classList.remove('hidden');
+            showStatus('cfg-telegram-status', 'config_saved', false);
+            const s = document.getElementById('cfg-telegram-status');
+            s.textContent = `✓ Bot @${bot.username} verified`;
+            s.classList.remove('opacity-0', 'text-red-500');
+            s.classList.add('text-emerald-500');
+            setTimeout(() => s.classList.add('opacity-0'), 3500);
+        } else {
+            showStatus('cfg-telegram-status', 'config_save_error', true);
+            const s = document.getElementById('cfg-telegram-status');
+            s.textContent = `✗ ${data.message || 'Test failed'}`;
+            s.classList.remove('opacity-0');
+            s.classList.add('text-red-500');
+            setTimeout(() => s.classList.add('opacity-0'), 4000);
+        }
+    } catch (err) {
+        const s = document.getElementById('cfg-telegram-status');
+        s.textContent = `✗ ${err.message || 'Network error'}`;
+        s.classList.remove('opacity-0');
+        s.classList.add('text-red-500');
+        setTimeout(() => s.classList.add('opacity-0'), 4000);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Test Connection';
+    }
+}
+
+async function saveTelegramConfigAsync() {
+    const updates = {};
+    const tokenInput = document.getElementById('cfg-telegram-token');
+    if (tokenInput && tokenInput.dataset.masked !== '1') {
+        const v = tokenInput.value.trim();
+        if (v) updates.telegram_token = v;
+    }
+    const proxyInput = document.getElementById('cfg-telegram-proxy');
+    if (proxyInput) updates.telegram_proxy = proxyInput.value.trim();
+    const adminInput = document.getElementById('cfg-telegram-admin-ids');
+    if (adminInput) updates.telegram_admin_ids = adminInput.value.trim();
+
+    if (Object.keys(updates).length === 0) return true;
+
+    try {
+        const res = await fetch('/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ updates }),
+        });
+        const data = await res.json();
         if (data.status === 'success') {
-            showStatus('cfg-run-task-status', 'config_saved', false);
-            if (data.applied && data.applied.run_task_api_key) {
-                const v = data.applied.run_task_api_key;
+            // Re-mask the token if it was updated.
+            if (data.applied && data.applied.telegram_token && tokenInput) {
+                const v = data.applied.telegram_token;
                 const masked = v.length > 8
                     ? v.substring(0, 4) + '*'.repeat(v.length - 8) + v.substring(v.length - 4)
                     : v;
-                keyInput.value = masked;
-                keyInput.dataset.masked = '1';
-                keyInput.dataset.maskedVal = masked;
-                keyInput.classList.add('cfg-key-masked');
-                const icon = document.querySelector('#cfg-run-task-key-toggle i');
+                tokenInput.value = masked;
+                tokenInput.dataset.masked = '1';
+                tokenInput.dataset.maskedVal = masked;
+                tokenInput.classList.add('cfg-key-masked');
+                const icon = document.querySelector('#cfg-telegram-token-toggle i');
                 if (icon) icon.className = 'fas fa-eye text-xs';
             }
-        } else {
-            showStatus('cfg-run-task-status', 'config_save_error', true);
+            return true;
         }
-    })
-    .catch(() => showStatus('cfg-run-task-status', 'config_save_error', true))
-    .finally(() => { btn.disabled = false; });
+        return false;
+    } catch {
+        return false;
+    }
+}
+
+async function startTelegramBot() {
+    const btn = document.getElementById('cfg-telegram-start');
+    const statusEl = document.getElementById('cfg-telegram-status');
+
+    // Save any pending changes first so the channel picks them up.
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs mr-1"></i>Starting…';
+
+    try {
+        const tokenInput = document.getElementById('cfg-telegram-token');
+        const proxyInput = document.getElementById('cfg-telegram-proxy');
+        const adminInput = document.getElementById('cfg-telegram-admin-ids');
+
+        const body = {};
+        if (tokenInput && tokenInput.dataset.masked !== '1' && tokenInput.value.trim()) {
+            body.token = tokenInput.value.trim();
+        }
+        if (proxyInput) body.proxy = proxyInput.value.trim();
+        if (adminInput) body.admin_ids = adminInput.value.trim();
+
+        const res = await fetch('/api/telegram/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (data.status === 'started') {
+            const s = statusEl;
+            s.textContent = `✓ Bot @${data.bot_username} is now polling`;
+            s.classList.remove('opacity-0', 'text-red-500');
+            s.classList.add('text-emerald-500');
+            setTimeout(() => s.classList.add('opacity-0'), 4000);
+            updateTelegramConnBadge(true, data.bot_username);
+        } else if (data.status === 'starting') {
+            const s = statusEl;
+            s.textContent = '⏳ Starting in background…';
+            s.classList.remove('opacity-0', 'text-red-500');
+            s.classList.add('text-amber-500');
+            setTimeout(() => s.classList.add('opacity-0'), 4000);
+            // Poll status after a delay.
+            setTimeout(refreshTelegramStatus, 3000);
+        } else {
+            const s = statusEl;
+            s.textContent = `✗ ${data.message || 'Start failed'}`;
+            s.classList.remove('opacity-0');
+            s.classList.add('text-red-500');
+            setTimeout(() => s.classList.add('opacity-0'), 5000);
+        }
+    } catch (err) {
+        const s = statusEl;
+        s.textContent = `✗ ${err.message || 'Network error'}`;
+        s.classList.remove('opacity-0');
+        s.classList.add('text-red-500');
+        setTimeout(() => s.classList.add('opacity-0'), 5000);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Start Bot';
+    }
+}
+
+async function refreshTelegramStatus() {
+    try {
+        const res = await fetch('/api/telegram/status');
+        const data = await res.json();
+        if (data.status === 'success') {
+            updateTelegramConnBadge(data.channel_running && data.loop_alive, data.bot_username);
+        }
+    } catch {
+        // ignore — badge stays in last known state
+    }
+}
+
+function updateTelegramConnBadge(running, botUsername) {
+    const badge = document.getElementById('cfg-telegram-conn-badge');
+    if (!badge) return;
+    if (running) {
+        badge.textContent = `● Running @${botUsername || 'bot'}`;
+        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300';
+    } else {
+        badge.textContent = 'Not running';
+        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400';
+    }
 }
 
 function detectProvider(model) {

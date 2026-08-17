@@ -1196,12 +1196,12 @@ class WebChannel(ChatChannel):
             '/api/import', 'ImportHandler',
             '/v1/chat/completions', 'OpenAIChatCompletionsHandler',
             '/v1/models', 'OpenAIModelsHandler',
-            # External cron-trigger endpoint — accepts an HTTP POST with a
-            # prompt and runs it through the agent in the background. Used by
-            # services like Cron-Job.org to fire scheduled tasks without
-            # keeping a browser tab open. Authentication is via X-API-Key
-            # header (falls back to web_password, then to no-auth).
-            '/run-task', 'RunTaskHandler',
+            # Telegram channel management — test token validity, fetch bot
+            # metadata, and start the channel in the background without
+            # requiring an app restart.
+            '/api/telegram/test', 'TelegramTestHandler',
+            '/api/telegram/start', 'TelegramStartHandler',
+            '/api/telegram/status', 'TelegramStatusHandler',
             '/health', 'HealthHandler',
             '/assets/(.*)', 'AssetsHandler',
         )
@@ -1273,160 +1273,230 @@ class HealthHandler:
         return json.dumps({"status": "ok"})
 
 
-class RunTaskHandler:
-    """External cron-trigger endpoint — `POST /run-task`.
-
-    Lets external schedulers (Cron-Job.org, GitHub Actions, Render Cron, etc.)
-    fire an AI task without keeping a browser tab open. The request runs the
-    prompt through the agent in the background and returns immediately.
-
-    Authentication (any one of):
-      1. `X-API-Key: <run_task_api_key>` header — when `run_task_api_key` is set
-         in config (recommended for production).
-      2. `Authorization: Bearer <web_password>` header — when `web_password` is
-         set but `run_task_api_key` is not.
-      3. No auth — when neither is set (open mode, fine for local testing but
-         DO NOT expose publicly like this).
+class TelegramTestHandler:
+    """`POST /api/telegram/test` — validate bot token + fetch bot metadata.
 
     Request body (JSON):
-      {
-        "prompt":   "Check server logs and send me a summary",   # required
-        "receiver": "user-123"                                    # optional, defaults to "cron-trigger"
-      }
-
-    The `receiver` identifies which conversation history to append the
-    resulting message to. Use a stable string (e.g. your user id) so the
-    output shows up in your chat history when you next open the web UI.
+      { "token": "1234567890:ABCdefGhI..." }
 
     Response (200):
-      { "status": "triggered", "request_id": "..." }
+      {
+        "status": "success",
+        "bot": {
+          "id": 1234567890,
+          "username": "MyOnyxBot",
+          "first_name": "My Onyx Bot",
+          "can_join_groups": true,
+          "can_read_all_group_messages": false,
+          "supports_inline_queries": false
+        }
+      }
 
-    The agent runs asynchronously; the response returns before the task
-    finishes. Polling `/poll?session_id=<receiver>` will return the result
-    once the agent completes, or it will simply appear in your chat history
-    next time you open the web UI.
+    Response (400):
+      { "status": "error", "message": "Invalid token or Telegram unreachable" }
     """
 
     def POST(self):
+        _require_auth()
         web.header('Content-Type', 'application/json; charset=utf-8')
-
-        # ── Auth ──
-        cfg = conf()
-        run_task_key = str(cfg.get("run_task_api_key", "") or "")
-        web_pwd = str(cfg.get("web_password", "") or "")
-
-        # Determine the expected key: prefer run_task_api_key, fall back to web_password.
-        expected_key = run_task_key or web_pwd
-        if expected_key:
-            provided = (
-                web.ctx.env.get("HTTP_X_API_KEY", "")
-                or web.ctx.env.get("HTTP_AUTHORIZATION", "").replace("Bearer ", "").strip()
-            )
-            if provided != expected_key:
-                web.ctx.status = "401 Unauthorized"
-                return json.dumps({"status": "error", "message": "Invalid or missing API key"})
-
-        # ── Parse body ──
         try:
-            raw = web.data()
-            body = json.loads(raw) if raw else {}
-        except (ValueError, json.JSONDecodeError) as e:
-            web.ctx.status = "400 Bad Request"
-            return json.dumps({"status": "error", "message": f"Invalid JSON: {e}"})
+            body = json.loads(web.data() or "{}")
+            token = str(body.get("token", "")).strip()
+            if not token:
+                return json.dumps({"status": "error", "message": "token is required"})
 
-        prompt = str(body.get("prompt", "") or "").strip()
-        if not prompt:
-            web.ctx.status = "400 Bad Request"
-            return json.dumps({"status": "error", "message": "prompt is required"})
+            # Optional proxy — pull from config so the user doesn't have to
+            # re-enter it just for the test.
+            proxy_url = str(conf().get("telegram_proxy", "") or "").strip()
 
-        receiver = str(body.get("receiver", "") or "").strip() or "cron-trigger"
+            import requests
+            url = f"https://api.telegram.org/bot{token}/getMe"
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+            resp = requests.get(url, proxies=proxies, timeout=15)
 
-        # ── Dispatch into the web channel's polling pipeline ──
-        try:
-            # `@singleton` decorator makes WebChannel() return the shared instance.
-            wc = WebChannel()
-        except Exception as e:
-            web.ctx.status = "503 Service Unavailable"
-            return json.dumps({"status": "error", "message": f"Web channel not ready: {e}"})
-
-        import uuid as _uuid
-        request_id = f"cron_{_uuid.uuid4().hex[:12]}"
-        session_id = receiver
-
-        # Pre-create the polling queue so the response can land somewhere even
-        # if no browser is currently polling for this session.
-        if session_id not in wc.session_queues:
-            wc.session_queues[session_id] = Queue()
-        wc.request_to_session[request_id] = session_id
-
-        from bridge.context import Context, ContextType
-        from channel.chat_message import ChatMessage
-
-        msg = WebMessage(wc._generate_msg_id(), prompt)
-        msg.from_user_id = session_id
-        context = wc._compose_context(ContextType.TEXT, prompt, msg=msg, isgroup=False)
-        if context is None:
-            web.ctx.status = "500 Internal Server Error"
-            return json.dumps({"status": "error", "message": "Failed to compose context"})
-        context["session_id"] = session_id
-        context["receiver"] = session_id
-        context["request_id"] = request_id
-        context["is_scheduled_task"] = True  # prevent recursive task creation
-
-        # Run the agent in a background thread so this handler can return
-        # immediately. The result will be enqueued to session_queues[session_id]
-        # and also persisted to conversation history via the agent bridge.
-        import threading as _threading
-
-        def _run_in_background():
-            try:
-                from bridge.agent_bridge import Bridge
-                bridge = Bridge()
-                reply = bridge.agent_reply(prompt, context=context, on_event=None, clear_history=False)
-                if reply and reply.content:
-                    # Drop into the polling queue so the web UI picks it up
-                    # when the user reconnects. Also makes it visible via
-                    # /poll?session_id=<receiver> for external integrations.
-                    wc.session_queues[session_id].put({
-                        "type": str(reply.type),
-                        "content": reply.content,
-                        "timestamp": time.time(),
-                        "request_id": request_id,
-                    })
-                    logger.info(
-                        f"[RunTaskHandler] cron-trigger completed for "
-                        f"receiver={session_id}, request={request_id}"
-                    )
-                else:
-                    logger.warning(
-                        f"[RunTaskHandler] cron-trigger produced no reply for "
-                        f"receiver={session_id}, request={request_id}"
-                    )
-            except Exception as e:
-                logger.error(
-                    f"[RunTaskHandler] cron-trigger failed for "
-                    f"receiver={session_id}, request={request_id}: {e}",
-                    exc_info=True,
-                )
+            if resp.status_code != 200:
                 try:
-                    wc.session_queues[session_id].put({
-                        "type": "error",
-                        "content": f"❌ {e}",
-                        "timestamp": time.time(),
-                        "request_id": request_id,
-                    })
+                    err_body = resp.json()
+                    err_msg = err_body.get("description", resp.text[:200])
                 except Exception:
-                    pass
+                    err_msg = resp.text[:200]
+                return json.dumps({
+                    "status": "error",
+                    "message": f"Telegram rejected token: {err_msg}",
+                    "http_status": resp.status_code,
+                })
 
-        thread = _threading.Thread(target=_run_in_background, daemon=True, name="run-task")
-        thread.start()
+            data = resp.json()
+            if not data.get("ok"):
+                return json.dumps({
+                    "status": "error",
+                    "message": f"Telegram returned ok=false: {data.get('description', 'unknown')}",
+                })
 
-        return json.dumps({
-            "status": "triggered",
-            "request_id": request_id,
-            "session_id": session_id,
-            "message": "Task started. Result will be available in the chat history or via /poll?session_id=" + session_id,
-        })
+            bot_info = data.get("result", {})
+            return json.dumps({
+                "status": "success",
+                "bot": {
+                    "id": bot_info.get("id"),
+                    "username": bot_info.get("username", ""),
+                    "first_name": bot_info.get("first_name", ""),
+                    "can_join_groups": bot_info.get("can_join_groups", False),
+                    "can_read_all_group_messages": bot_info.get("can_read_all_group_messages", False),
+                    "supports_inline_queries": bot_info.get("supports_inline_queries", False),
+                },
+            }, ensure_ascii=False)
+        except Exception as e:
+            logger.warning(f"[TelegramTestHandler] test failed: {e}")
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class TelegramStartHandler:
+    """`POST /api/telegram/start` — start the Telegram channel in the
+    background without requiring an app restart.
+
+    Saves the token to config.json (if a token is provided in the body),
+    then lazily boots the TelegramChannel in a daemon thread. The channel
+    will keep polling until the process exits or `stop()` is called.
+
+    Request body (JSON):
+      {
+        "token":       "1234567890:ABC...",   # optional — uses saved token if empty
+        "proxy":       "socks5://...",         # optional
+        "admin_ids":   "123, 456"              # optional, comma-separated
+      }
+
+    Response (200):
+      { "status": "started", "bot_username": "MyOnyxBot" }
+    """
+
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or "{}")
+            cfg = conf()
+
+            # Update config with any provided fields.
+            updates = {}
+            if body.get("token"):
+                updates["telegram_token"] = str(body["token"]).strip()
+            if "proxy" in body:
+                updates["telegram_proxy"] = str(body.get("proxy", "")).strip()
+            if "admin_ids" in body:
+                updates["telegram_admin_ids"] = str(body.get("admin_ids", "")).strip()
+
+            if updates:
+                cfg.update(updates)
+                # Persist to config.json so it survives restart.
+                try:
+                    config_path = os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.dirname(
+                            os.path.abspath(__file__)))),
+                        "config.json"
+                    )
+                    if os.path.exists(config_path):
+                        with open(config_path, "r", encoding="utf-8") as f:
+                            file_cfg = json.load(f)
+                    else:
+                        file_cfg = {}
+                    file_cfg.update(updates)
+                    with open(config_path, "w", encoding="utf-8") as f:
+                        json.dump(file_cfg, f, indent=4, ensure_ascii=False)
+                except Exception as pers_err:
+                    logger.warning(f"[TelegramStartHandler] failed to persist config: {pers_err}")
+
+            token = str(cfg.get("telegram_token", "")).strip()
+            if not token:
+                return json.dumps({
+                    "status": "error",
+                    "message": "No telegram_token configured. Save a token first.",
+                })
+
+            # Boot the channel in a background thread so this handler can
+            # return immediately. The channel's startup() blocks (it runs
+            # the polling loop), so we MUST run it off the request thread.
+            import threading as _threading
+
+            # Track startup outcome so we can return it to the caller.
+            startup_outcome = {"status": "pending", "bot_username": "", "error": ""}
+
+            def _boot_telegram():
+                try:
+                    from channel.telegram.telegram_channel import TelegramChannel
+                    tg = TelegramChannel()
+                    # Pre-set the bot_token from config before startup so the
+                    # channel doesn't have to re-read it.
+                    tg.bot_token = token
+                    # startup() blocks until stop() is called — that's fine
+                    # because we're in a daemon thread.
+                    tg.startup()
+                    if tg.bot_username:
+                        startup_outcome["status"] = "running"
+                        startup_outcome["bot_username"] = tg.bot_username
+                    else:
+                        startup_outcome["status"] = "running_no_username"
+                except Exception as e:
+                    startup_outcome["status"] = "error"
+                    startup_outcome["error"] = str(e)
+                    logger.error(f"[TelegramStartHandler] channel boot failed: {e}", exc_info=True)
+
+            thread = _threading.Thread(target=_boot_telegram, daemon=True, name="telegram-channel")
+            thread.start()
+
+            # Wait briefly for the channel to either succeed or fail.
+            # If it takes longer than 10s, return "starting" and let the
+            # client poll the status endpoint.
+            import time as _time
+            deadline = _time.time() + 10
+            while _time.time() < deadline:
+                if startup_outcome["status"] != "pending":
+                    break
+                _time.sleep(0.3)
+
+            if startup_outcome["status"] == "error":
+                return json.dumps({
+                    "status": "error",
+                    "message": startup_outcome["error"] or "Telegram channel failed to start",
+                })
+            elif startup_outcome["status"] == "running":
+                return json.dumps({
+                    "status": "started",
+                    "bot_username": startup_outcome["bot_username"],
+                    "message": f"Telegram bot @{startup_outcome['bot_username']} is now polling for messages.",
+                })
+            else:
+                return json.dumps({
+                    "status": "starting",
+                    "message": "Telegram channel is starting in the background. Check logs for confirmation.",
+                })
+        except Exception as e:
+            logger.error(f"[TelegramStartHandler] start failed: {e}", exc_info=True)
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class TelegramStatusHandler:
+    """`GET /api/telegram/status` — check whether the Telegram channel is
+    currently running and what bot username it's polling as.
+    """
+    def GET(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            from channel.telegram.telegram_channel import TelegramChannel
+            tg = TelegramChannel()
+            # The singleton decorator makes this return the same instance
+            # every time, so the bot_username set during startup() is
+            # accessible here.
+            token_configured = bool(str(conf().get("telegram_token", "") or "").strip())
+            return json.dumps({
+                "status": "success",
+                "token_configured": token_configured,
+                "channel_running": bool(getattr(tg, "_application", None) is not None),
+                "bot_username": getattr(tg, "bot_username", "") or "",
+                "loop_alive": bool(getattr(tg, "_loop_thread", None) and tg._loop_thread.is_alive()),
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
 
 
 class ConnectionStatusHandler:
@@ -2341,10 +2411,6 @@ class ConfigHandler:
         # admin_ids is a comma-separated Telegram user ID list to restrict who
         # can issue commands to the bot (empty = anyone who can DM the bot).
         "telegram_token", "telegram_proxy", "telegram_admin_ids",
-        # External cron-trigger endpoint (/run-task) authentication. When set,
-        # callers must send `X-API-Key: <run_task_api_key>` to authorise. When
-        # empty, falls back to web_password (or no auth if web_password is empty).
-        "run_task_api_key",
     }
 
     @staticmethod
@@ -2416,9 +2482,6 @@ class ConfigHandler:
             raw_tg_token = str(local_config.get("telegram_token", "") or "")
             masked_tg_token = self._mask_key(raw_tg_token) if raw_tg_token else ""
 
-            raw_run_key = str(local_config.get("run_task_api_key", "") or "")
-            masked_run_key = self._mask_key(raw_run_key) if raw_run_key else ""
-
             return json.dumps({
                 "status": "success",
                 "use_agent": use_agent,
@@ -2442,8 +2505,6 @@ class ConfigHandler:
                 "telegram_token_masked": masked_tg_token,
                 "telegram_proxy": local_config.get("telegram_proxy", ""),
                 "telegram_admin_ids": local_config.get("telegram_admin_ids", ""),
-                # External cron-trigger (/run-task) endpoint API key.
-                "run_task_api_key_masked": masked_run_key,
             }, ensure_ascii=False)
         except Exception as e:
             logger.error(f"Error getting config: {e}")

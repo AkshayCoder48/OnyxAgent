@@ -894,9 +894,10 @@
                                             <h3 class="font-semibold text-slate-800 dark:text-slate-100">Telegram Channel</h3>
                                             <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                                                 Connect a Telegram bot to trigger and monitor tasks from your phone.
-                                                Set <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-[10px]">channel_type = "telegram"</code> in <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-[10px]">config.json</code> to switch the active channel.
+                                                Save the token, test it, then start the bot — no app restart needed.
                                             </p>
                                         </div>
+                                        <span id="cfg-telegram-conn-badge" class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400">Not running</span>
                                     </div>
                                     <div class="space-y-4">
                                         <!-- Bot Token -->
@@ -944,73 +945,38 @@
                                                 Comma-separated Telegram user IDs allowed to issue commands. Empty = anyone who DMs the bot. Find your ID via <a href="https://t.me/userinfobot" target="_blank" class="text-primary-500 hover:underline">@userinfobot</a>.
                                             </p>
                                         </div>
-                                        <!-- Save -->
-                                        <div class="flex items-center justify-end gap-3 pt-1">
-                                            <span id="cfg-telegram-status" class="text-xs text-primary-500 opacity-0 transition-opacity duration-300"></span>
+                                        <!-- Bot metadata display -->
+                                        <div id="cfg-telegram-botinfo" class="hidden rounded-lg border border-sky-200 dark:border-sky-900/50 bg-sky-50/50 dark:bg-sky-900/10 p-3 text-xs">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <i class="fas fa-circle-check text-emerald-500"></i>
+                                                <span class="font-medium text-slate-700 dark:text-slate-200">Bot verified</span>
+                                            </div>
+                                            <div class="text-slate-600 dark:text-slate-300 space-y-0.5 font-mono">
+                                                <div><span class="text-slate-400">username:</span> @<span id="cfg-telegram-bot-username">—</span></div>
+                                                <div><span class="text-slate-400">id:</span> <span id="cfg-telegram-bot-id">—</span></div>
+                                                <div><span class="text-slate-400">name:</span> <span id="cfg-telegram-bot-name">—</span></div>
+                                            </div>
+                                        </div>
+                                        <!-- Action buttons -->
+                                        <div class="flex flex-wrap items-center gap-2 pt-1">
                                             <button id="cfg-telegram-save"
                                                     class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium
                                                            cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     onclick="saveTelegramConfig()">Save</button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- ================================================== -->
-                                <!-- External Cron Trigger Card                          -->
-                                <!-- ================================================== -->
-                                <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
-                                    <div class="flex items-center gap-3 mb-5">
-                                        <div class="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
-                                            <i class="fas fa-clock text-emerald-500 text-sm"></i>
-                                        </div>
-                                        <div class="flex-1">
-                                            <h3 class="font-semibold text-slate-800 dark:text-slate-100">External Cron Trigger</h3>
-                                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                                                Fire AI tasks from external schedulers (Cron-Job.org, GitHub Actions, Render Cron) without opening a browser tab.
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div class="space-y-4">
-                                        <div class="rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4">
-                                            <div class="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Endpoint</div>
-                                            <code class="text-xs font-mono text-slate-800 dark:text-slate-200 break-all">POST /run-task</code>
-                                            <div class="text-xs font-medium text-slate-500 dark:text-slate-400 mt-3 mb-2">Headers</div>
-                                            <code class="text-xs font-mono text-slate-800 dark:text-slate-200 break-all">X-API-Key: &lt;your key&gt;</code>
-                                            <div class="text-xs font-medium text-slate-500 dark:text-slate-400 mt-3 mb-2">Body (JSON)</div>
-                                            <pre class="text-xs font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{
-  "prompt":   "Check server logs and send me a summary",
-  "receiver": "my-user-id"
-}</pre>
-                                        </div>
-                                        <!-- Run-Task API Key -->
-                                        <div>
-                                            <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Run-Task API Key</label>
-                                            <div class="relative">
-                                                <input id="cfg-run-task-key" type="text" autocomplete="off" data-1p-ignore data-lpignore="true"
-                                                       class="w-full px-3 py-2 pr-10 rounded-lg border border-slate-200 dark:border-slate-600
-                                                              bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
-                                                              focus:outline-none focus:border-primary-500 font-mono transition-colors cfg-key-masked"
-                                                       placeholder="Leave empty to use web password"
-                                                       data-masked="1">
-                                                <button type="button" id="cfg-run-task-key-toggle"
-                                                        class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600
-                                                               dark:hover:text-slate-300 cursor-pointer transition-colors p-1"
-                                                        onclick="toggleRunTaskKeyVisibility()">
-                                                    <i class="fas fa-eye text-xs"></i>
-                                                </button>
-                                            </div>
-                                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-                                                When set, external callers must send <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-[10px]">X-API-Key</code> header. Falls back to web password when empty.
-                                            </p>
-                                        </div>
-                                        <!-- Save -->
-                                        <div class="flex items-center justify-end gap-3 pt-1">
-                                            <span id="cfg-run-task-status" class="text-xs text-primary-500 opacity-0 transition-opacity duration-300"></span>
-                                            <button id="cfg-run-task-save"
-                                                    class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium
+                                            <button id="cfg-telegram-test"
+                                                    class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium
+                                                           hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onclick="testTelegramToken()">Test Connection</button>
+                                            <button id="cfg-telegram-start"
+                                                    class="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium
                                                            cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    onclick="saveRunTaskConfig()">Save</button>
+                                                    onclick="startTelegramBot()">Start Bot</button>
+                                            <span id="cfg-telegram-status" class="text-xs text-primary-500 opacity-0 transition-opacity duration-300 ml-auto"></span>
                                         </div>
+                                        <p class="text-xs text-slate-400 dark:text-slate-500">
+                                            <strong>Test Connection</strong> validates the token with Telegram and fetches bot metadata.
+                                            <strong>Start Bot</strong> boots the polling loop in the background — no app restart required.
+                                        </p>
                                     </div>
                                 </div>
 

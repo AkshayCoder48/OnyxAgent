@@ -66,15 +66,18 @@ class SchedulerService:
     
     def _run_loop(self):
         """Main scheduler loop"""
-        logger.info("[Scheduler] Scheduler loop started")
-        
+        logger.info("[Scheduler] Scheduler loop started (10s tick)")
+
         while self.running:
             try:
                 self._check_and_execute_tasks()
             except Exception as e:
                 logger.error(f"[Scheduler] Error in scheduler loop: {e}")
 
-            time.sleep(30)
+            # 10-second tick so scheduled tasks fire within ~10s of their
+            # target time. The loop body is cheap (one file read + a few
+            # datetime comparisons), so this is fine even on slow VPSes.
+            time.sleep(10)
     
     def _check_and_execute_tasks(self):
         """Check for due tasks and execute them"""
@@ -110,11 +113,11 @@ class SchedulerService:
     def _is_task_due(self, task: dict, now: datetime) -> bool:
         """
         Check if a task is due to run
-        
+
         Args:
             task: Task dictionary
             now: Current datetime
-            
+
         Returns:
             True if task should run now
         """
@@ -128,7 +131,7 @@ class SchedulerService:
                 })
                 return False
             return False
-        
+
         try:
             next_run = _parse_naive_local(next_run_str)
 
@@ -137,10 +140,20 @@ class SchedulerService:
                 schedule = task.get("schedule", {})
                 schedule_type = schedule.get("type")
 
-                # Catch-up window: fire if we're within 10 minutes of the
-                # scheduled tick. Beyond that we'd rather skip than push a
-                # stale daily report to the user.
-                if time_diff <= 600:
+                # Catch-up window: fire if we're within 1 HOUR of the
+                # scheduled tick. Previously this was 10 minutes, which was
+                # too aggressive — if the process was busy or restarting
+                # when the tick fired, the task would be silently skipped.
+                #
+                # For one-time tasks we fire even if we're very late — the
+                # user explicitly wanted this task to run at this time and
+                # would rather get a late notification than none at all.
+                # For recurring tasks we still skip after 1 hour to avoid
+                # spamming the user with a backlog of missed ticks.
+                if schedule_type == "once":
+                    return True
+
+                if time_diff <= 3600:
                     return True
 
                 logger.warning(
