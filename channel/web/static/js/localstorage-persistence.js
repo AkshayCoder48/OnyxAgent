@@ -1,48 +1,122 @@
 /**
- * Local Storage Persistence System
+ * IndexedDB Persistence System — UNLIMITED storage
  *
- * Saves all critical app data to the browser's localStorage so it survives
- * VPS restarts, data wipes, or container rebuilds. On first app open,
- * the saved data is auto-loaded. A manual "Load from Local Storage" button
- * is also available in the Config page.
+ * Uses IndexedDB instead of localStorage (which is limited to ~5-10MB).
+ * IndexedDB can store hundreds of MB to GB depending on the browser, and
+ * with navigator.storage.persist() the data won't be evicted even under
+ * storage pressure.
  *
  * What's persisted:
- *   - Chat history (all sessions + messages)
+ *   - Chat history (all sessions + messages — NO LIMIT)
  *   - Config (appearance, accent color, telegram settings, model config)
  *   - Skills list (installed + enabled state)
  *   - Scheduled tasks list
  *
  * Save strategy:
- *   - After each AI response completes, wait 2s then save to localStorage.
- *     This debounce prevents saving on every token (which would be too slow).
- *   - Before page unload (onbeforeunload), save immediately.
+ *   - After each AI response completes, wait 2s then save to IndexedDB.
+ *   - Before page unload, save immediately.
  *   - Config changes save immediately.
  *
  * Load strategy:
- *   - On DOMContentLoaded, check if localStorage has saved data.
+ *   - On DOMContentLoaded, check if IndexedDB has saved data.
  *   - If yes AND the server's DB is empty (first open after wipe), auto-load.
- *   - If the server's DB has data, prefer the server data (newer).
- *   - Manual load button always available in Config → Backup & Restore.
+ *   - Manual "Load from Storage" button in Config → Backup & Restore.
  */
 
-const STORAGE_KEY = 'onyx_backup_v1';
-const STORAGE_VERSION = 1;
+const DB_NAME = 'onyx_backup_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'backups';
+const BACKUP_KEY = 'latest';
 const SAVE_DEBOUNCE_MS = 2000;
+
+// ─── IndexedDB helpers ────────────────────────────────────────────────
+
+function _openDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function _idbGet(key) {
+    const db = await _openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get(key);
+        req.onsuccess = (e) => resolve(e.target.result ? e.target.result.data : null);
+        req.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function _idbPut(key, data) {
+    const db = await _openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.put({ id: key, data: data });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function _idbDelete(key) {
+    const db = await _openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.delete(key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = (e) => reject(e.target.error);
+    });
+}
+
+// ─── Request persistent storage ───────────────────────────────────────
+// navigator.storage.persist() asks the browser to grant persistent
+// storage permission, meaning the data won't be evicted even under
+// storage pressure. The user may see a prompt in some browsers.
+
+async function _requestPersistentStorage() {
+    if (navigator.storage && navigator.storage.persist) {
+        try {
+            const isPersisted = await navigator.storage.persisted();
+            if (isPersisted) {
+                console.log('[IndexedDB] Storage already persistent');
+                return true;
+            }
+            const granted = await navigator.storage.persist();
+            if (granted) {
+                console.log('[IndexedDB] Persistent storage granted — data will not be evicted');
+            } else {
+                console.log('[IndexedDB] Persistent storage not granted — data may be evicted under pressure');
+            }
+            return granted;
+        } catch (e) {
+            console.warn('[IndexedDB] persist() failed:', e);
+            return false;
+        }
+    }
+    return false;
+}
 
 // ─── Save ─────────────────────────────────────────────────────────────
 
 let _saveTimer = null;
 
 /**
- * Save all app state to localStorage. Debounced by default to avoid
- * hammering localStorage on every token — call with {immediate: true}
- * to skip the debounce (used before page unload).
+ * Save all app state to IndexedDB. Debounced by default.
  */
 async function saveToLocalStorage(opts = {}) {
     const { immediate = false } = opts;
 
     if (!immediate) {
-        // Debounce: wait SAVE_DEBOUNCE_MS after the last call before saving.
         if (_saveTimer) clearTimeout(_saveTimer);
         _saveTimer = setTimeout(() => _doSave(), SAVE_DEBOUNCE_MS);
         return;
@@ -53,7 +127,7 @@ async function saveToLocalStorage(opts = {}) {
 async function _doSave() {
     try {
         const backup = {
-            version: STORAGE_VERSION,
+            version: 1,
             saved_at: new Date().toISOString(),
             sessions: await _fetchSessions(),
             config: _getConfigState(),
@@ -61,24 +135,12 @@ async function _doSave() {
             tasks: await _fetchTasks(),
         };
 
-        // Try to save. localStorage has a ~5-10MB limit; if it exceeds,
-        // try saving without messages (just session metadata) as a fallback.
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(backup));
-            console.log(`[localStorage] Saved backup (${(JSON.stringify(backup).length / 1024).toFixed(1)} KB) at ${backup.saved_at}`);
-        } catch (quotaErr) {
-            // Quota exceeded — try saving without session messages (just metadata)
-            console.warn('[localStorage] Quota exceeded, saving without messages...');
-            try {
-                const lite = { ...backup, sessions: backup.sessions.map(s => ({ ...s, messages: [] })) };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(lite));
-                console.log(`[localStorage] Saved lite backup (no messages) (${(JSON.stringify(lite).length / 1024).toFixed(1)} KB)`);
-            } catch (e2) {
-                console.error('[localStorage] Even lite save failed:', e2);
-            }
-        }
+        // IndexedDB has no practical size limit — save everything.
+        await _idbPut(BACKUP_KEY, backup);
+        const sizeKB = (JSON.stringify(backup).length / 1024).toFixed(1);
+        console.log(`[IndexedDB] Saved backup (${sizeKB} KB) at ${backup.saved_at}`);
     } catch (err) {
-        console.error('[localStorage] Save failed:', err);
+        console.error('[IndexedDB] Save failed:', err);
     }
 }
 
@@ -86,16 +148,17 @@ async function _doSave() {
 
 async function _fetchSessions() {
     try {
-        const res = await fetch('/api/sessions?channel_type=all&page=1&page_size=100');
+        const res = await fetch('/api/sessions?channel_type=all&page=1&page_size=200');
         const data = await res.json();
         if (data.status !== 'success') return [];
 
         const sessions = data.sessions || [];
-        // Fetch messages for each session (limit to 50 per session to keep localStorage manageable)
+        // No cap on sessions — IndexedDB can handle it.
+        // Fetch up to 100 messages per session for full history.
         const sessionsWithMessages = [];
-        for (const s of sessions.slice(0, 50)) { // cap at 50 sessions
+        for (const s of sessions) {
             try {
-                const msgRes = await fetch(`/api/history?session_id=${encodeURIComponent(s.session_id)}&page=1&page_size=50`);
+                const msgRes = await fetch(`/api/history?session_id=${encodeURIComponent(s.session_id)}&page=1&page_size=100`);
                 const msgData = await msgRes.json();
                 if (msgData.status === 'success') {
                     sessionsWithMessages.push({
@@ -121,7 +184,7 @@ async function _fetchSessions() {
         }
         return sessionsWithMessages;
     } catch (e) {
-        console.warn('[localStorage] Failed to fetch sessions:', e);
+        console.warn('[IndexedDB] Failed to fetch sessions:', e);
         return [];
     }
 }
@@ -181,28 +244,25 @@ async function _fetchTasks() {
 // ─── Load ─────────────────────────────────────────────────────────────
 
 /**
- * Load saved data from localStorage. Returns null if no backup exists.
+ * Load saved data from IndexedDB. Returns null if no backup exists.
  */
-function loadFromLocalStorage() {
+async function loadFromLocalStorage() {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return null;
-        const backup = JSON.parse(raw);
-        if (!backup || backup.version !== STORAGE_VERSION) {
-            console.warn('[localStorage] Backup version mismatch, ignoring');
+        const backup = await _idbGet(BACKUP_KEY);
+        if (!backup || backup.version !== 1) {
+            console.log('[IndexedDB] No valid backup found');
             return null;
         }
-        console.log(`[localStorage] Found backup from ${backup.saved_at} (${(raw.length / 1024).toFixed(1)} KB)`);
+        console.log(`[IndexedDB] Found backup from ${backup.saved_at}`);
         return backup;
     } catch (e) {
-        console.error('[localStorage] Load failed:', e);
+        console.error('[IndexedDB] Load failed:', e);
         return null;
     }
 }
 
 /**
- * Check if the server has any data. Used to decide whether to auto-load
- * from localStorage (only auto-load if the server DB is empty).
+ * Check if the server has any data.
  */
 async function _isServerEmpty() {
     try {
@@ -210,49 +270,45 @@ async function _isServerEmpty() {
         const data = await res.json();
         if (data.status !== 'success') return true;
         const sessions = data.sessions || [];
-        // If the server has < 1 session, consider it empty (fresh after wipe)
         return sessions.length === 0;
     } catch (e) {
-        // If the server is unreachable, definitely try to load from localStorage
         return true;
     }
 }
 
 /**
- * Auto-load from localStorage on first app open.
+ * Auto-load from IndexedDB on first app open.
  * Only triggers if the server appears empty (no sessions).
  */
 async function autoLoadFromLocalStorage() {
-    const backup = loadFromLocalStorage();
+    const backup = await loadFromLocalStorage();
     if (!backup) {
-        console.log('[localStorage] No backup found, skipping auto-load');
+        console.log('[IndexedDB] No backup found, skipping auto-load');
         return false;
     }
 
     const serverEmpty = await _isServerEmpty();
     if (!serverEmpty) {
-        console.log('[localStorage] Server has data, skipping auto-load (server is newer)');
+        console.log('[IndexedDB] Server has data, skipping auto-load (server is newer)');
         return false;
     }
 
-    console.log('[localStorage] Server appears empty, auto-loading from localStorage backup...');
+    console.log('[IndexedDB] Server appears empty, auto-loading from IndexedDB backup...');
     return await restoreFromLocalStorage(backup);
 }
 
 /**
- * Restore all data from a localStorage backup.
- * This pushes sessions, config, skills, and tasks back to the server
- * so they persist in the DB as well.
+ * Restore all data from an IndexedDB backup.
  */
 async function restoreFromLocalStorage(backup) {
     if (!backup) {
-        toastError('No backup found in local storage');
+        if (typeof toastError === 'function') toastError('No backup found in storage');
         return false;
     }
 
     let restored = 0;
 
-    // 1. Restore config (appearance, accent, etc.)
+    // 1. Restore config
     if (backup.config) {
         const cfg = backup.config;
         if (cfg.theme) setAppearance(cfg.theme);
@@ -261,13 +317,12 @@ async function restoreFromLocalStorage(backup) {
             const tzInput = document.getElementById('cfg-timezone');
             if (tzInput) tzInput.value = cfg.timezone;
         }
-        // Restore agent config to server
         const updates = {};
         if (cfg.timezone) updates.timezone = cfg.timezone;
         if (cfg.agent_max_context_tokens) updates.agent_max_context_tokens = cfg.agent_max_context_tokens;
         if (cfg.agent_max_context_turns) updates.agent_max_context_turns = cfg.agent_max_context_turns;
         if (cfg.agent_max_steps) updates.agent_max_steps = cfg.agent_max_steps;
-        if (updates && Object.keys(updates).length > 0) {
+        if (Object.keys(updates).length > 0) {
             try {
                 await fetch('/config', {
                     method: 'POST',
@@ -283,7 +338,6 @@ async function restoreFromLocalStorage(backup) {
     if (backup.sessions && backup.sessions.length > 0) {
         for (const session of backup.sessions) {
             try {
-                // Re-create the session
                 const storeRes = await fetch('/api/import', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -296,7 +350,7 @@ async function restoreFromLocalStorage(backup) {
                 });
                 if (storeRes.ok) restored++;
             } catch (e) {
-                console.warn(`[localStorage] Failed to restore session ${session.session_id}:`, e);
+                console.warn(`[IndexedDB] Failed to restore session ${session.session_id}:`, e);
             }
         }
     }
@@ -324,29 +378,26 @@ async function restoreFromLocalStorage(backup) {
     }
 
     if (restored > 0) {
-        toastSuccess(`Restored ${restored} item(s) from local storage`);
-        // Reload the page to reflect restored data
+        if (typeof toastSuccess === 'function') {
+            toastSuccess(`Restored ${restored} item(s) from IndexedDB storage`);
+        }
         setTimeout(() => window.location.reload(), 2000);
     } else {
-        toastInfo('No items needed restoration');
+        if (typeof toastInfo === 'function') toastInfo('No items needed restoration');
     }
     return restored > 0;
 }
 
 // ─── Auto-save hooks ─────────────────────────────────────────────────
 
-// Save before page unload (immediate, no debounce)
 window.addEventListener('beforeunload', () => {
-    _doSave(); // synchronous attempt
+    _doSave();
 });
 
-// Save after each AI response completes (debounced)
-// This is called from the SSE 'done' handler in console.js
 function _onAiResponseComplete() {
     saveToLocalStorage();
 }
 
-// Save after config changes
 function _onConfigChanged() {
     saveToLocalStorage({ immediate: false });
 }
@@ -354,29 +405,31 @@ function _onConfigChanged() {
 // ─── Init ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Auto-load from localStorage on first open (if server is empty)
-    // Delayed slightly to let the app initialise first
+    // Request persistent storage so data won't be evicted
+    _requestPersistentStorage();
+
+    // Auto-load from IndexedDB on first open (if server is empty)
     setTimeout(() => {
         autoLoadFromLocalStorage().then((loaded) => {
             if (!loaded) {
-                console.log('[localStorage] Auto-load skipped (server has data or no backup)');
+                console.log('[IndexedDB] Auto-load skipped (server has data or no backup)');
             }
         });
     }, 3000);
 });
 
-// Manual load button handler (called from Config → Backup & Restore)
+// Manual load button handler
 async function manualLoadFromLocalStorage() {
-    const backup = loadFromLocalStorage();
+    const backup = await loadFromLocalStorage();
     if (!backup) {
         if (typeof toastWarning === 'function') {
-            toastWarning('No backup found in local storage');
+            toastWarning('No backup found in storage');
         } else {
-            alert('No backup found in local storage');
+            alert('No backup found in storage');
         }
         return;
     }
-    if (!confirm(`Restore from local storage backup saved at ${backup.saved_at}? This will re-create sessions, config, and tasks on the server.`)) {
+    if (!confirm(`Restore from storage backup saved at ${backup.saved_at}? This will re-create sessions, config, and tasks on the server.`)) {
         return;
     }
     await restoreFromLocalStorage(backup);
