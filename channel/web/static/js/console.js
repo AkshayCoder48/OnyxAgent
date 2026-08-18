@@ -2992,6 +2992,13 @@ function startSSE(requestId, loadingEl, timestamp, titleInfo, replayItems) {
                             console.warn('[card final-pass] failed:', e);
                         }
                     }, 200);
+
+                    // Trigger localStorage save (debounced 2s) after AI response completes.
+                    // This ensures all chats are persisted to the browser's local storage
+                    // so they survive VPS restarts/wipes.
+                    if (typeof _onAiResponseComplete === 'function') {
+                        _onAiResponseComplete();
+                    }
                 }
 
                 // Backfill seq metadata so edit/regenerate buttons can call
@@ -4737,7 +4744,7 @@ function saveTimezoneConfig() {
     .then(r => r.json())
     .then(data => {
         if (data.status === 'success') {
-            showStatus('cfg-tz-status', 'config_saved', false);
+            showStatus('cfg-tz-status', 'config_saved', false); if (typeof _onConfigChanged === "function") _onConfigChanged();
             // Refresh the displayed effective timezone.
             fetch('/config').then(r => r.json()).then(cfg => {
                 const detectedEl = document.getElementById('cfg-tz-detected');
@@ -4828,7 +4835,7 @@ function saveTelegramConfig() {
 
     // If nothing changed (token still masked + others unchanged), just ack.
     if (Object.keys(updates).length === 0) {
-        showStatus('cfg-telegram-status', 'config_saved', false);
+        showStatus('cfg-telegram-status', 'config_saved', false); if (typeof _onConfigChanged === "function") _onConfigChanged();
         return;
     }
 
@@ -4842,7 +4849,7 @@ function saveTelegramConfig() {
     .then(r => r.json())
     .then(data => {
         if (data.status === 'success') {
-            showStatus('cfg-telegram-status', 'config_saved', false);
+            showStatus('cfg-telegram-status', 'config_saved', false); if (typeof _onConfigChanged === "function") _onConfigChanged();
             // Re-fetch masked token for display
             if (data.applied && data.applied.telegram_token) {
                 const v = data.applied.telegram_token;
@@ -4932,7 +4939,7 @@ async function testTelegramToken() {
             document.getElementById('cfg-telegram-bot-id').textContent = bot.id || '—';
             document.getElementById('cfg-telegram-bot-name').textContent = bot.first_name || '—';
             document.getElementById('cfg-telegram-botinfo').classList.remove('hidden');
-            showStatus('cfg-telegram-status', 'config_saved', false);
+            showStatus('cfg-telegram-status', 'config_saved', false); if (typeof _onConfigChanged === "function") _onConfigChanged();
             const s = document.getElementById('cfg-telegram-status');
             s.textContent = `✓ Bot @${bot.username} verified`;
             s.classList.remove('opacity-0', 'text-red-500');
@@ -5397,7 +5404,7 @@ function saveModelConfig() {
                     }
                 });
             }
-            showStatus('cfg-model-status', 'config_saved', false);
+            showStatus('cfg-model-status', 'config_saved', false); if (typeof _onConfigChanged === "function") _onConfigChanged();
         } else {
             showStatus('cfg-model-status', 'config_save_error', true);
         }
@@ -5425,7 +5432,7 @@ function saveAgentConfig() {
     .then(r => r.json())
     .then(data => {
         if (data.status === 'success') {
-            showStatus('cfg-agent-status', 'config_saved', false);
+            showStatus('cfg-agent-status', 'config_saved', false); if (typeof _onConfigChanged === "function") _onConfigChanged();
         } else {
             showStatus('cfg-agent-status', 'config_save_error', true);
         }
@@ -5437,7 +5444,7 @@ function saveAgentConfig() {
 function savePasswordConfig() {
     const input = document.getElementById('cfg-password');
     if (input.dataset.masked === '1') {
-        showStatus('cfg-password-status', 'config_saved', false);
+        showStatus('cfg-password-status', 'config_saved', false); if (typeof _onConfigChanged === "function") _onConfigChanged();
         return;
     }
     const newPwd = input.value.trim();

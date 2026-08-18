@@ -803,10 +803,16 @@
                                             <span>Import Backup</span>
                                             <input type="file" accept=".zip" class="hidden" onchange="importAllData(event)">
                                         </label>
+                                        <button onclick="manualLoadFromLocalStorage()"
+                                                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-violet-500 hover:bg-violet-600 transition-colors cursor-pointer flex-shrink-0">
+                                            <i class="fas fa-database text-xs"></i>
+                                            <span>Load from Local Storage</span>
+                                        </button>
                                     </div>
                                     <div id="import-status" class="hidden mt-3 text-sm"></div>
                                     <p class="text-xs text-slate-400 dark:text-slate-500 mt-3">
                                         Exports: chats, config (models + API keys), memory, knowledge, skills, workflows, todos, scheduled tasks, MCP config.
+                                        <br><strong>Local Storage:</strong> All chats, config, skills, and tasks are automatically saved to your browser's local storage after each AI response. If the VPS is wiped, they auto-restore on next open.
                                     </p>
                                 </div>
 
@@ -2214,6 +2220,7 @@
     </script>
     <script defer src="assets/js/onyx-icons.js"></script>
     <script defer src="assets/js/console.js"></script>
+    <script defer src="assets/js/localstorage-persistence.js"></script>
 
     <!-- PWA Service Worker Registration -->
     <script>

@@ -11,6 +11,7 @@ const STATIC_ASSETS = [
   '/assets/vendor/fontawesome/css/all.min.css',
   '/assets/vendor/fonts/inter/inter.css',
   '/assets/js/console.js',
+  '/assets/js/localstorage-persistence.js',
   '/assets/manifest.json',
   '/assets/favicon.svg',
   '/assets/favicon.ico',
