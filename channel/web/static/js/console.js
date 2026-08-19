@@ -5192,7 +5192,6 @@ async function purgeAllTasks() {
             if (typeof toastSuccess === 'function') {
                 toastSuccess(data.message || `Purged ${data.purged} task(s)`);
             }
-            // Reload the tasks list
             if (typeof loadTasksView === 'function') loadTasksView();
             else setTimeout(() => window.location.reload(), 1500);
         } else {
@@ -5200,6 +5199,192 @@ async function purgeAllTasks() {
                 toastError(data.message || 'Failed to purge tasks');
             }
         }
+    } catch (err) {
+        if (typeof toastError === 'function') toastError(err.message);
+    }
+}
+
+// =====================================================================
+// Scheduled Tasks — Export / Import (JSON file + IndexedDB storage)
+// =====================================================================
+
+/**
+ * Export all scheduled tasks to a JSON file (download).
+ * The file can be imported on another VPS or after a wipe.
+ */
+async function exportScheduledTasks() {
+    try {
+        const res = await fetch('/api/scheduler');
+        const data = await res.json();
+        if (data.status !== 'success') {
+            if (typeof toastError === 'function') toastError('Failed to fetch tasks');
+            return;
+        }
+        const tasks = data.tasks || [];
+        if (tasks.length === 0) {
+            if (typeof toastWarning === 'function') toastWarning('No tasks to export');
+            return;
+        }
+        const exportData = {
+            type: 'onyx_scheduled_tasks',
+            version: 1,
+            exported_at: new Date().toISOString(),
+            task_count: tasks.length,
+            tasks: tasks,
+        };
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `onyx-tasks-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        if (typeof toastSuccess === 'function') {
+            toastSuccess(`Exported ${tasks.length} task(s) to JSON file`);
+        }
+    } catch (err) {
+        if (typeof toastError === 'function') toastError(err.message);
+    }
+}
+
+/**
+ * Import scheduled tasks from a JSON file (upload).
+ * Creates each task on the VPS via /api/scheduler/create.
+ */
+async function importScheduledTasks(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    event.target.value = ''; // reset input so same file can be re-selected
+
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!data || data.type !== 'onyx_scheduled_tasks' || !Array.isArray(data.tasks)) {
+            if (typeof toastError === 'function') toastError('Invalid file: not an Onyx tasks export');
+            return;
+        }
+        if (!confirm(`Import ${data.tasks.length} task(s) from "${file.name}"?\nExported at: ${data.exported_at || 'unknown'}`)) {
+            return;
+        }
+        let imported = 0;
+        for (const task of data.tasks) {
+            try {
+                const action = task.action || {};
+                const schedule = task.schedule || {};
+                await fetch('/api/scheduler/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: task.name || 'Imported task',
+                        type: action.type === 'agent_task' ? 'ai_task' : 'message',
+                        content: action.content || action.task_description || '',
+                        schedule_type: schedule.type || 'once',
+                        schedule_value: schedule.expression || schedule.run_at || String(schedule.seconds || 3600),
+                        receiver: action.receiver || 'imported',
+                        channel_type: action.channel_type || 'web',
+                    }),
+                });
+                imported++;
+            } catch (e) { /* skip failed */ }
+        }
+        if (typeof toastSuccess === 'function') {
+            toastSuccess(`Imported ${imported}/${data.tasks.length} task(s)`);
+        }
+        if (typeof loadTasksView === 'function') loadTasksView();
+        else setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+        if (typeof toastError === 'function') toastError('Failed to read file: ' + err.message);
+    }
+}
+
+/**
+ * Save all scheduled tasks to browser's IndexedDB storage.
+ * This is separate from the auto-save — it saves ONLY tasks, immediately.
+ */
+async function exportTasksToLocalStorage() {
+    try {
+        const res = await fetch('/api/scheduler');
+        const data = await res.json();
+        if (data.status !== 'success') {
+            if (typeof toastError === 'function') toastError('Failed to fetch tasks');
+            return;
+        }
+        const tasks = data.tasks || [];
+        if (tasks.length === 0) {
+            if (typeof toastWarning === 'function') toastWarning('No tasks to save');
+            return;
+        }
+        // Save to IndexedDB under a dedicated key
+        const tasksBackup = {
+            type: 'onyx_tasks_only',
+            version: 1,
+            saved_at: new Date().toISOString(),
+            tasks: tasks,
+        };
+        // Use the same IndexedDB from localstorage-persistence.js
+        if (typeof _idbPut === 'function') {
+            await _idbPut('tasks_export', tasksBackup);
+        } else {
+            // Fallback: use localStorage if IndexedDB helpers aren't loaded yet
+            localStorage.setItem('onyx_tasks_export', JSON.stringify(tasksBackup));
+        }
+        if (typeof toastSuccess === 'function') {
+            toastSuccess(`Saved ${tasks.length} task(s) to browser storage (survives VPS wipe)`);
+        }
+    } catch (err) {
+        if (typeof toastError === 'function') toastError(err.message);
+    }
+}
+
+/**
+ * Load scheduled tasks from browser's IndexedDB storage back to the VPS.
+ */
+async function importTasksFromLocalStorage() {
+    try {
+        let tasksBackup = null;
+        if (typeof _idbGet === 'function') {
+            tasksBackup = await _idbGet('tasks_export');
+        }
+        if (!tasksBackup) {
+            // Fallback: check localStorage
+            const raw = localStorage.getItem('onyx_tasks_export');
+            if (raw) tasksBackup = JSON.parse(raw);
+        }
+        if (!tasksBackup || !tasksBackup.tasks) {
+            if (typeof toastWarning === 'function') toastWarning('No tasks found in browser storage');
+            return;
+        }
+        if (!confirm(`Load ${tasksBackup.tasks.length} task(s) from browser storage back to VPS?\nSaved at: ${tasksBackup.saved_at || 'unknown'}`)) {
+            return;
+        }
+        let imported = 0;
+        for (const task of tasksBackup.tasks) {
+            try {
+                const action = task.action || {};
+                const schedule = task.schedule || {};
+                await fetch('/api/scheduler/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: task.name || 'Restored task',
+                        type: action.type === 'agent_task' ? 'ai_task' : 'message',
+                        content: action.content || action.task_description || '',
+                        schedule_type: schedule.type || 'once',
+                        schedule_value: schedule.expression || schedule.run_at || String(schedule.seconds || 3600),
+                        receiver: action.receiver || 'restored',
+                        channel_type: action.channel_type || 'web',
+                    }),
+                });
+                imported++;
+            } catch (e) { /* skip failed */ }
+        }
+        if (typeof toastSuccess === 'function') {
+            toastSuccess(`Loaded ${imported}/${tasksBackup.tasks.length} task(s) from browser storage`);
+        }
+        if (typeof loadTasksView === 'function') loadTasksView();
+        else setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
         if (typeof toastError === 'function') toastError(err.message);
     }
