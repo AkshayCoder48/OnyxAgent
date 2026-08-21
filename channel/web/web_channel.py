@@ -5449,13 +5449,8 @@ class SchedulerToggleHandler:
 class SchedulerPurgeHandler:
     """POST /api/scheduler/purge — delete ALL scheduled tasks.
 
-    Used when the VPS was rebuilt/wiped and orphaned tasks from the old
-    instance are still firing (e.g. email reminders keep sending because
-    tasks.json survived on persistent storage). This endpoint wipes the
-    entire tasks.json so the scheduler has nothing to fire.
-
-    Body (optional):
-      { "confirm": true }   — required to actually purge (safety net)
+    Deletes the tasks.json file AND clears the in-memory scheduler store
+    so the scheduler loop stops firing immediately.
     """
     def POST(self):
         _require_auth()
@@ -5472,13 +5467,32 @@ class SchedulerPurgeHandler:
             tasks = store.list_tasks()
             count = len(tasks)
 
-            # Delete the tasks.json file entirely so the scheduler starts fresh.
+            # Delete the tasks.json file entirely.
             import os
             if os.path.exists(store.store_path):
                 os.remove(store.store_path)
                 logger.info(f"[SchedulerUI] Purged {count} task(s) — deleted {store.store_path}")
-            else:
-                logger.info("[SchedulerUI] No tasks.json to purge")
+
+            # ALSO clear the in-memory scheduler store from integration.py.
+            # Without this, the scheduler loop still has the old tasks cached
+            # in the singleton _task_store and will keep firing them.
+            try:
+                from agent.tools.scheduler import integration
+                if integration._task_store:
+                    integration._task_store._tasks_cache = {}
+                    integration._task_store = None
+                    logger.info("[SchedulerUI] Cleared in-memory scheduler store")
+            except Exception as clear_err:
+                logger.warning(f"[SchedulerUI] Could not clear in-memory store: {clear_err}")
+
+            # Also stop and restart the scheduler service so it picks up the empty store.
+            try:
+                from agent.tools.scheduler import integration
+                if integration._scheduler_service and integration._scheduler_service.running:
+                    integration._scheduler_service.stop()
+                    logger.info("[SchedulerUI] Stopped scheduler service")
+            except Exception as stop_err:
+                logger.warning(f"[SchedulerUI] Could not stop scheduler service: {stop_err}")
 
             return json.dumps({
                 "status": "success",

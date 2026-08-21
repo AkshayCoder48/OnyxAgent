@@ -5221,8 +5221,8 @@ async function purgeAllTasks() {
             if (typeof toastSuccess === 'function') {
                 toastSuccess(data.message || `Purged ${data.purged} task(s)`);
             }
-            if (typeof loadTasksView === 'function') loadTasksView();
-            else setTimeout(() => window.location.reload(), 1500);
+            // Always reload — the task cards need to be cleared from the DOM.
+            setTimeout(() => window.location.reload(), 1500);
         } else {
             if (typeof toastError === 'function') {
                 toastError(data.message || 'Failed to purge tasks');
@@ -5334,7 +5334,7 @@ async function importScheduledTasks(event) {
 
 /**
  * Save all scheduled tasks to browser's IndexedDB storage.
- * This is separate from the auto-save — it saves ONLY tasks, immediately.
+ * Self-contained — doesn't depend on functions from localstorage-persistence.js.
  */
 async function exportTasksToLocalStorage() {
     try {
@@ -5349,42 +5349,30 @@ async function exportTasksToLocalStorage() {
             if (typeof toastWarning === 'function') toastWarning('No tasks to save');
             return;
         }
-        // Save to IndexedDB under a dedicated key
         const tasksBackup = {
             type: 'onyx_tasks_only',
             version: 1,
             saved_at: new Date().toISOString(),
             tasks: tasks,
         };
-        // Use the same IndexedDB from localstorage-persistence.js
-        if (typeof _idbPut === 'function') {
-            await _idbPut('tasks_export', tasksBackup);
-        } else {
-            // Fallback: use localStorage if IndexedDB helpers aren't loaded yet
-            localStorage.setItem('onyx_tasks_export', JSON.stringify(tasksBackup));
-        }
+        // Self-contained IndexedDB access — don't depend on _idbPut
+        await _tasksIdbPut(tasksBackup);
         if (typeof toastSuccess === 'function') {
             toastSuccess(`Saved ${tasks.length} task(s) to browser storage (survives VPS wipe)`);
         }
     } catch (err) {
-        if (typeof toastError === 'function') toastError(err.message);
+        console.error('[Tasks] exportTasksToLocalStorage error:', err);
+        if (typeof toastError === 'function') toastError(err.message || 'Failed to save');
     }
 }
 
 /**
  * Load scheduled tasks from browser's IndexedDB storage back to the VPS.
+ * Self-contained — doesn't depend on functions from localstorage-persistence.js.
  */
 async function importTasksFromLocalStorage() {
     try {
-        let tasksBackup = null;
-        if (typeof _idbGet === 'function') {
-            tasksBackup = await _idbGet('tasks_export');
-        }
-        if (!tasksBackup) {
-            // Fallback: check localStorage
-            const raw = localStorage.getItem('onyx_tasks_export');
-            if (raw) tasksBackup = JSON.parse(raw);
-        }
+        const tasksBackup = await _tasksIdbGet();
         if (!tasksBackup || !tasksBackup.tasks) {
             if (typeof toastWarning === 'function') toastWarning('No tasks found in browser storage');
             return;
@@ -5397,7 +5385,7 @@ async function importTasksFromLocalStorage() {
             try {
                 const action = task.action || {};
                 const schedule = task.schedule || {};
-                await fetch('/api/scheduler/create', {
+                const res = await fetch('/api/scheduler/create', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -5410,7 +5398,7 @@ async function importTasksFromLocalStorage() {
                         channel_type: action.channel_type || 'web',
                     }),
                 });
-                imported++;
+                if (res.ok) imported++;
             } catch (e) { /* skip failed */ }
         }
         if (typeof toastSuccess === 'function') {
@@ -5419,8 +5407,48 @@ async function importTasksFromLocalStorage() {
         if (typeof loadTasksView === 'function') loadTasksView();
         else setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
-        if (typeof toastError === 'function') toastError(err.message);
+        console.error('[Tasks] importTasksFromLocalStorage error:', err);
+        if (typeof toastError === 'function') toastError(err.message || 'Failed to load');
     }
+}
+
+// ── Self-contained IndexedDB helpers for tasks ──
+// Don't depend on localstorage-persistence.js — those functions might
+// not be loaded yet when the user clicks a button.
+function _tasksOpenDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open('onyx_backup_db', 1);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('backups')) {
+                db.createObjectStore('backups', { keyPath: 'id' });
+            }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function _tasksIdbPut(data) {
+    const db = await _tasksOpenDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('backups', 'readwrite');
+        const store = tx.objectStore('backups');
+        store.put({ id: 'tasks_export', data: data });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function _tasksIdbGet() {
+    const db = await _tasksOpenDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('backups', 'readonly');
+        const store = tx.objectStore('backups');
+        const req = store.get('tasks_export');
+        req.onsuccess = (e) => resolve(e.target.result ? e.target.result.data : null);
+        req.onerror = (e) => reject(e.target.error);
+    });
 }
 
 function detectProvider(model) {
