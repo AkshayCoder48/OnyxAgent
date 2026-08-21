@@ -20,6 +20,8 @@
  * Load strategy:
  *   - On DOMContentLoaded, check if IndexedDB has saved data.
  *   - If yes AND the server's DB is empty (first open after wipe), auto-load.
+ *   - IMPORTANT: Only auto-loads ONCE per browser session (tracked via
+ *     sessionStorage flag). Prevents infinite reload loops.
  *   - Manual "Load from Storage" button in Config → Backup & Restore.
  */
 
@@ -28,6 +30,13 @@ const DB_VERSION = 1;
 const STORE_NAME = 'backups';
 const BACKUP_KEY = 'latest';
 const SAVE_DEBOUNCE_MS = 2000;
+
+// sessionStorage key — set after first auto-load attempt so we don't
+// retry on every page navigation within the same browser session.
+// sessionStorage is cleared when the tab closes, so a new tab/session
+// will re-check. But the server won't be empty anymore (data was restored),
+// so the auto-load will skip naturally.
+const AUTO_LOAD_FLAG = 'onyx_autoload_done';
 
 // ─── IndexedDB helpers ────────────────────────────────────────────────
 
@@ -79,9 +88,6 @@ async function _idbDelete(key) {
 }
 
 // ─── Request persistent storage ───────────────────────────────────────
-// navigator.storage.persist() asks the browser to grant persistent
-// storage permission, meaning the data won't be evicted even under
-// storage pressure. The user may see a prompt in some browsers.
 
 async function _requestPersistentStorage() {
     if (navigator.storage && navigator.storage.persist) {
@@ -109,6 +115,7 @@ async function _requestPersistentStorage() {
 // ─── Save ─────────────────────────────────────────────────────────────
 
 let _saveTimer = null;
+let _isSaving = false;  // prevent concurrent saves
 
 /**
  * Save all app state to IndexedDB. Debounced by default.
@@ -125,6 +132,11 @@ async function saveToLocalStorage(opts = {}) {
 }
 
 async function _doSave() {
+    if (_isSaving) {
+        console.log('[IndexedDB] Save already in progress, skipping');
+        return;
+    }
+    _isSaving = true;
     try {
         const backup = {
             version: 1,
@@ -135,12 +147,13 @@ async function _doSave() {
             tasks: await _fetchTasks(),
         };
 
-        // IndexedDB has no practical size limit — save everything.
         await _idbPut(BACKUP_KEY, backup);
         const sizeKB = (JSON.stringify(backup).length / 1024).toFixed(1);
         console.log(`[IndexedDB] Saved backup (${sizeKB} KB) at ${backup.saved_at}`);
     } catch (err) {
         console.error('[IndexedDB] Save failed:', err);
+    } finally {
+        _isSaving = false;
     }
 }
 
@@ -153,12 +166,13 @@ async function _fetchSessions() {
         if (data.status !== 'success') return [];
 
         const sessions = data.sessions || [];
-        // No cap on sessions — IndexedDB can handle it.
-        // Fetch up to 100 messages per session for full history.
+        // Cap at 50 sessions to avoid overwhelming the VPS during save.
+        // IndexedDB can store more, but fetching 100+ sessions × 100 msgs
+        // each from the VPS during save was crashing it.
         const sessionsWithMessages = [];
-        for (const s of sessions) {
+        for (const s of sessions.slice(0, 50)) {
             try {
-                const msgRes = await fetch(`/api/history?session_id=${encodeURIComponent(s.session_id)}&page=1&page_size=100`);
+                const msgRes = await fetch(`/api/history?session_id=${encodeURIComponent(s.session_id)}&page=1&page_size=50`);
                 const msgData = await msgRes.json();
                 if (msgData.status === 'success') {
                     sessionsWithMessages.push({
@@ -278,9 +292,27 @@ async function _isServerEmpty() {
 
 /**
  * Auto-load from IndexedDB on first app open.
- * Only triggers if the server appears empty (no sessions).
+ *
+ * CRITICAL: This only runs ONCE per browser session (tracked via
+ * sessionStorage). Without this guard, the page would reload after
+ * restoring data, which would trigger auto-load again, which would
+ * find the server non-empty and skip — but if the restore was slow
+ * or incomplete, it could loop forever.
+ *
+ * The sessionStorage flag is cleared when the browser tab closes, so
+ * the next time you open the app in a new tab, it will check again.
+ * But by then the server should have data (from the previous restore),
+ * so it will skip naturally.
  */
 async function autoLoadFromLocalStorage() {
+    // Guard 1: Only auto-load once per browser tab session.
+    if (sessionStorage.getItem(AUTO_LOAD_FLAG)) {
+        console.log('[IndexedDB] Auto-load already attempted this session, skipping');
+        return false;
+    }
+    // Mark immediately — even if the load fails, don't retry in this session.
+    sessionStorage.setItem(AUTO_LOAD_FLAG, '1');
+
     const backup = await loadFromLocalStorage();
     if (!backup) {
         console.log('[IndexedDB] No backup found, skipping auto-load');
@@ -299,6 +331,9 @@ async function autoLoadFromLocalStorage() {
 
 /**
  * Restore all data from an IndexedDB backup.
+ *
+ * IMPORTANT: Only reloads the page ONCE (after all restores complete).
+ * The auto-load guard (sessionStorage flag) prevents re-triggering.
  */
 async function restoreFromLocalStorage(backup) {
     if (!backup) {
@@ -381,6 +416,8 @@ async function restoreFromLocalStorage(backup) {
         if (typeof toastSuccess === 'function') {
             toastSuccess(`Restored ${restored} item(s) from IndexedDB storage`);
         }
+        // Reload ONCE. The sessionStorage flag prevents auto-load from
+        // re-triggering after this reload.
         setTimeout(() => window.location.reload(), 2000);
     } else {
         if (typeof toastInfo === 'function') toastInfo('No items needed restoration');
@@ -409,16 +446,19 @@ document.addEventListener('DOMContentLoaded', () => {
     _requestPersistentStorage();
 
     // Auto-load from IndexedDB on first open (if server is empty)
+    // Delayed slightly to let the app initialise first.
+    // The sessionStorage guard ensures this only runs once per tab.
     setTimeout(() => {
         autoLoadFromLocalStorage().then((loaded) => {
             if (!loaded) {
-                console.log('[IndexedDB] Auto-load skipped (server has data or no backup)');
+                console.log('[IndexedDB] Auto-load skipped (already done, server has data, or no backup)');
             }
         });
     }, 3000);
 });
 
-// Manual load button handler
+// Manual load button handler — this ALWAYS works regardless of
+// sessionStorage flag, because the user explicitly clicked the button.
 async function manualLoadFromLocalStorage() {
     const backup = await loadFromLocalStorage();
     if (!backup) {
@@ -432,5 +472,8 @@ async function manualLoadFromLocalStorage() {
     if (!confirm(`Restore from storage backup saved at ${backup.saved_at}? This will re-create sessions, config, and tasks on the server.`)) {
         return;
     }
+    // Clear the auto-load flag so the restore can proceed even if it
+    // was already set (user is manually forcing a reload).
+    sessionStorage.removeItem(AUTO_LOAD_FLAG);
     await restoreFromLocalStorage(backup);
 }

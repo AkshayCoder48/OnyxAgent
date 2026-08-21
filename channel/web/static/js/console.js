@@ -662,7 +662,26 @@ function navigateTo(viewId) {
 // =====================================================================
 
 function exportAllData() {
-    window.location.href = '/api/export';
+    // Show a loading indicator so the user knows something is happening.
+    // The server-side /api/export builds a ZIP which can take a while
+    // if the data is large. We open it in a new window so the main
+    // UI stays responsive.
+    if (typeof toastInfo === 'function') {
+        toastInfo('Preparing export... This may take a moment for large datasets.', { durationMs: 5000 });
+    }
+    // Use a hidden iframe instead of window.location.href so the page
+    // doesn't navigate away — if the export fails, the user stays on
+    // the current page instead of getting a blank screen.
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = '/api/export';
+    document.body.appendChild(iframe);
+    // Clean up the iframe after 5 minutes (max export time).
+    setTimeout(() => {
+        if (iframe.parentNode) {
+            document.body.removeChild(iframe);
+        }
+    }, 300000);
 }
 
 function importAllData(event) {
@@ -695,7 +714,17 @@ function importAllData(event) {
                 statusEl.className = 'mt-3 text-sm text-emerald-500';
                 statusEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i> Import successful! Restored: ' + parts.join(', ') + '.' +
                     (data.error_count > 0 ? ' (' + data.error_count + ' errors)' : '') +
-                    '<br><span class="text-xs opacity-60">Refresh the page to see imported data.</span>';
+                    '<br><span class="text-xs opacity-60">Saving to IndexedDB and refreshing…</span>';
+                // Trigger IndexedDB save so the newly imported data is
+                // persisted to browser storage immediately.
+                if (typeof saveToLocalStorage === 'function') {
+                    setTimeout(() => saveToLocalStorage({ immediate: true }), 1000);
+                }
+                if (typeof toastSuccess === 'function') {
+                    toastSuccess('Import successful — saving to IndexedDB...');
+                }
+                // Reload after save completes (3s delay for save + reload)
+                setTimeout(() => window.location.reload(), 3000);
             } else {
                 statusEl.className = 'mt-3 text-sm text-red-500';
                 statusEl.innerHTML = '<i class="fas fa-times-circle mr-1"></i> Import failed: ' + (data.message || 'unknown error');
@@ -5291,6 +5320,10 @@ async function importScheduledTasks(event) {
         }
         if (typeof toastSuccess === 'function') {
             toastSuccess(`Imported ${imported}/${data.tasks.length} task(s)`);
+        }
+        // Trigger IndexedDB save so imported tasks are persisted to browser storage.
+        if (typeof saveToLocalStorage === 'function') {
+            setTimeout(() => saveToLocalStorage({ immediate: true }), 500);
         }
         if (typeof loadTasksView === 'function') loadTasksView();
         else setTimeout(() => window.location.reload(), 1500);
