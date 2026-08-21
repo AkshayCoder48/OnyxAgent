@@ -1,5 +1,5 @@
 // OnyxAgent Service Worker - PWA Support
-const CACHE_NAME = 'onyxagent-v2.1.1';
+const CACHE_NAME = 'onyxagent-v2.2.0';
 const STATIC_ASSETS = [
   '/chat',
   '/assets/css/console.css',
