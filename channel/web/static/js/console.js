@@ -5285,49 +5285,86 @@ async function exportScheduledTasks() {
 async function importScheduledTasks(event) {
     const file = event.target.files[0];
     if (!file) return;
-    event.target.value = ''; // reset input so same file can be re-selected
+    event.target.value = '';
 
     try {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (!data || data.type !== 'onyx_scheduled_tasks' || !Array.isArray(data.tasks)) {
-            if (typeof toastError === 'function') toastError('Invalid file: not an Onyx tasks export');
+
+        // Accept both 'onyx_scheduled_tasks' format and raw array of tasks
+        let tasks = [];
+        if (Array.isArray(data)) {
+            tasks = data;
+        } else if (data && Array.isArray(data.tasks)) {
+            tasks = data.tasks;
+        } else if (data && data.type === 'onyx_scheduled_tasks' && Array.isArray(data.tasks)) {
+            tasks = data.tasks;
+        } else {
+            if (typeof toastError === 'function') toastError('Invalid file: expected JSON with tasks array');
             return;
         }
-        if (!confirm(`Import ${data.tasks.length} task(s) from "${file.name}"?\nExported at: ${data.exported_at || 'unknown'}`)) {
+
+        if (tasks.length === 0) {
+            if (typeof toastWarning === 'function') toastWarning('No tasks found in file');
             return;
         }
+
+        if (!confirm(`Import ${tasks.length} task(s) from "${file.name}"?`)) return;
+
         let imported = 0;
-        for (const task of data.tasks) {
+        let failed = 0;
+        for (const task of tasks) {
             try {
                 const action = task.action || {};
                 const schedule = task.schedule || {};
-                await fetch('/api/scheduler/create', {
+
+                // Build the request body with fallbacks for missing fields
+                const reqBody = {
+                    name: task.name || 'Imported task',
+                    type: (action.type === 'agent_task' || action.type === 'ai_task') ? 'ai_task' : 'message',
+                    content: action.content || action.task_description || action.task_description || task.prompt || task.description || 'Imported task content',
+                    schedule_type: schedule.type || task.type || 'once',
+                    schedule_value: schedule.expression || schedule.run_at || String(schedule.seconds || task.seconds || 3600),
+                    receiver: action.receiver || task.receiver || 'imported',
+                    channel_type: action.channel_type || task.channel_type || 'web',
+                };
+
+                const res = await fetch('/api/scheduler/create', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: task.name || 'Imported task',
-                        type: action.type === 'agent_task' ? 'ai_task' : 'message',
-                        content: action.content || action.task_description || '',
-                        schedule_type: schedule.type || 'once',
-                        schedule_value: schedule.expression || schedule.run_at || String(schedule.seconds || 3600),
-                        receiver: action.receiver || 'imported',
-                        channel_type: action.channel_type || 'web',
-                    }),
+                    body: JSON.stringify(reqBody),
                 });
-                imported++;
-            } catch (e) { /* skip failed */ }
+
+                if (res.ok) {
+                    imported++;
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    console.error('[Tasks] Import failed for task:', task.name, errData.message);
+                    failed++;
+                }
+            } catch (e) {
+                console.error('[Tasks] Import error:', e);
+                failed++;
+            }
         }
-        if (typeof toastSuccess === 'function') {
-            toastSuccess(`Imported ${imported}/${data.tasks.length} task(s)`);
+
+        if (imported > 0) {
+            if (typeof toastSuccess === 'function') {
+                toastSuccess(`Imported ${imported} task(s)` + (failed > 0 ? ` (${failed} failed)` : ''));
+            }
+            // Save to IndexedDB
+            if (typeof saveToLocalStorage === 'function') {
+                setTimeout(() => saveToLocalStorage({ immediate: true }), 500);
+            }
+            // Reload to show the new tasks
+            setTimeout(() => window.location.reload(), 1500);
+        } else if (failed > 0) {
+            if (typeof toastError === 'function') {
+                toastError(`All ${failed} task(s) failed to import. Check console for details.`);
+            }
         }
-        // Trigger IndexedDB save so imported tasks are persisted to browser storage.
-        if (typeof saveToLocalStorage === 'function') {
-            setTimeout(() => saveToLocalStorage({ immediate: true }), 500);
-        }
-        if (typeof loadTasksView === 'function') loadTasksView();
-        else setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
+        console.error('[Tasks] File read error:', err);
         if (typeof toastError === 'function') toastError('Failed to read file: ' + err.message);
     }
 }
@@ -8687,48 +8724,77 @@ function deleteCustomProvider(providerId) {
 // =====================================================================
 let tasksLoaded = false;
 function loadTasksView() {
-    if (tasksLoaded) return;
+    // Always fetch fresh data — don't use cached tasksLoaded flag
     fetch('/api/scheduler').then(r => r.json()).then(data => {
         if (data.status !== 'success') return;
         const emptyEl = document.getElementById('tasks-empty');
         const listEl = document.getElementById('tasks-list');
         const allTasks = data.tasks || [];
-        // Only show active (enabled) tasks
-        const tasks = allTasks.filter(t => t.enabled !== false);
-        if (tasks.length === 0) {
-            emptyEl.querySelector('p').textContent = 'No scheduled tasks';
+        if (allTasks.length === 0) {
+            if (emptyEl) {
+                emptyEl.classList.remove('hidden');
+                const p = emptyEl.querySelector('p');
+                if (p) p.textContent = 'No scheduled tasks. Say "remind me at 7am" in chat to create one.';
+            }
+            if (listEl) listEl.classList.add('hidden');
             return;
         }
-        emptyEl.classList.add('hidden');
-        listEl.classList.remove('hidden');
-        listEl.innerHTML = '';
+        if (emptyEl) emptyEl.classList.add('hidden');
+        if (listEl) {
+            listEl.classList.remove('hidden');
+            listEl.innerHTML = '';
+        }
 
-        tasks.forEach(task => {
+        allTasks.forEach(task => {
+            const schedule = task.schedule || {};
+            const action = task.action || {};
             const card = document.createElement('div');
             card.className = 'bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-4';
-            const typeLabel = task.type === 'cron'
-                ? `<span class="text-xs font-mono text-slate-400">${escapeHtml(task.cron || '')}</span>`
-                : `<span class="text-xs text-slate-400">${escapeHtml(task.type || 'once')}</span>`;
+
+            // Build schedule description
+            let schedDesc = schedule.type || 'once';
+            if (schedule.type === 'cron') schedDesc = `Cron: ${schedule.expression || ''}`;
+            else if (schedule.type === 'interval') schedDesc = `Every ${schedule.seconds || 3600}s`;
+            else if (schedule.type === 'frequency_per_day') schedDesc = `${schedule.count || 1}x/day`;
+            else if (schedule.type === 'once') schedDesc = 'Once';
+
+            // Build next run display
             let nextRun = '--';
-            if (task.next_run_at) {
-                // next_run_at is an ISO string, not a Unix timestamp
-                const d = new Date(task.next_run_at);
+            if (task.next_run_at || task.next_run_display) {
+                const d = new Date(task.next_run_display || task.next_run_at);
                 if (!isNaN(d.getTime())) nextRun = d.toLocaleString();
             }
+
+            // Build task description
+            const taskDesc = action.content || action.task_description || action.task_description || '';
+
+            // Build status badge
+            const isEnabled = task.enabled !== false;
+            const statusBadge = isEnabled
+                ? '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">Enabled</span>'
+                : '<span class="text-xs px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-white/10 text-zinc-500">Disabled</span>';
+
+            // Build action type badge
+            const actionType = action.type === 'agent_task'
+                ? '<span class="text-xs px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">AI Task</span>'
+                : '<span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Message</span>';
+
             card.innerHTML = `
                 <div class="flex items-center gap-2 mb-2">
-                    <span class="w-2 h-2 rounded-full bg-primary-400"></span>
+                    <span class="w-2 h-2 rounded-full ${isEnabled ? 'bg-emerald-400' : 'bg-zinc-400'}"></span>
                     <span class="font-medium text-sm text-slate-700 dark:text-slate-200">${escapeHtml(task.name || task.id || '--')}</span>
                     <div class="flex-1"></div>
-                    ${typeLabel}
+                    ${statusBadge}
+                    ${actionType}
                 </div>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mb-2 line-clamp-2">${escapeHtml(task.prompt || task.description || '')}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-2 line-clamp-2">${escapeHtml(taskDesc.substring(0, 150))}</p>
                 <div class="flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
-                    <span><i class="fas fa-clock mr-1"></i>${'Next run'}: ${nextRun}</span>
+                    <span><i class="fas fa-clock mr-1"></i>${schedDesc}</span>
+                    <span><i class="fas fa-arrow-right mr-1"></i>Next: ${nextRun}</span>
+                    <span class="ml-auto font-mono text-[10px] text-slate-500">ID: ${escapeHtml(task.id || '')}</span>
                 </div>`;
-            listEl.appendChild(card);
+            if (listEl) listEl.appendChild(card);
         });
-        tasksLoaded = true;
     }).catch(() => {});
 }
 

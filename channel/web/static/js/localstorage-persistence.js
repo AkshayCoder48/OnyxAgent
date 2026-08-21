@@ -331,3 +331,14 @@ async function manualLoadFromLocalStorage() {
     if (typeof toastInfo === 'function') toastInfo('Restoring... Please wait.');
     await restoreFromLocalStorage(backup);
 }
+
+// Manual save button (Config → Backup & Restore → Save All to Storage)
+async function manualSaveToLocalStorage() {
+    if (typeof toastInfo === 'function') {
+        toastInfo('Saving all data to browser storage... Please wait.', { durationMs: 5000 });
+    }
+    await saveToLocalStorage({ immediate: true });
+    if (typeof toastSuccess === 'function') {
+        toastSuccess('All data saved to browser storage successfully');
+    }
+}
