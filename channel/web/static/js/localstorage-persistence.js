@@ -445,17 +445,164 @@ document.addEventListener('DOMContentLoaded', () => {
     // Request persistent storage so data won't be evicted
     _requestPersistentStorage();
 
-    // Auto-load from IndexedDB on first open (if server is empty)
-    // Delayed slightly to let the app initialise first.
-    // The sessionStorage guard ensures this only runs once per tab.
+    // DISABLED: Auto-load was causing infinite reload loops.
+    // Instead, we show a one-time banner if the server appears empty
+    // and IndexedDB has a backup. The user must click "Restore" to
+    // actually load the data — no automatic reloads.
     setTimeout(() => {
-        autoLoadFromLocalStorage().then((loaded) => {
-            if (!loaded) {
-                console.log('[IndexedDB] Auto-load skipped (already done, server has data, or no backup)');
-            }
-        });
+        _checkAndShowRestoreBanner();
     }, 3000);
 });
+
+/**
+ * Check if the server is empty + IndexedDB has a backup.
+ * If both true, show a non-intrusive banner at the top of the page
+ * with a "Restore" button. NO automatic reload — user must click.
+ */
+async function _checkAndShowRestoreBanner() {
+    // Only show once per browser tab session.
+    if (sessionStorage.getItem(AUTO_LOAD_FLAG)) return;
+
+    const backup = await loadFromLocalStorage();
+    if (!backup) return;
+
+    const serverEmpty = await _isServerEmpty();
+    if (!serverEmpty) return;
+
+    // Server is empty + we have a backup → show banner.
+    sessionStorage.setItem(AUTO_LOAD_FLAG, '1');
+
+    const banner = document.createElement('div');
+    banner.id = 'onyx-restore-banner';
+    banner.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+        background: #6366f1; color: white; padding: 12px 20px;
+        display: flex; align-items: center; justify-content: center; gap: 12px;
+        font-size: 14px; font-family: Inter, sans-serif;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    `;
+    banner.innerHTML = `
+        <i class="fas fa-database"></i>
+        <span>Backup found in browser storage from ${backup.saved_at ? new Date(backup.saved_at).toLocaleString() : 'earlier'}.</span>
+        <button id="onyx-restore-btn" style="
+            background: white; color: #6366f1; border: none; padding: 6px 16px;
+            border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;
+        ">Restore Now</button>
+        <button id="onyx-restore-dismiss" style="
+            background: transparent; color: white; border: 1px solid rgba(255,255,255,0.4);
+            padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
+        ">Dismiss</button>
+    `;
+    document.body.appendChild(banner);
+
+    // Adjust body padding so banner doesn't cover content.
+    document.body.style.paddingTop = '52px';
+
+    document.getElementById('onyx-restore-btn').addEventListener('click', async () => {
+        banner.remove();
+        document.body.style.paddingTop = '0';
+        if (typeof toastInfo === 'function') {
+            toastInfo('Restoring from browser storage... Please wait.');
+        }
+        await restoreFromLocalStorageNoReload(backup);
+    });
+
+    document.getElementById('onyx-restore-dismiss').addEventListener('click', () => {
+        banner.remove();
+        document.body.style.paddingTop = '0';
+    });
+}
+
+/**
+ * Restore all data WITHOUT reloading the page.
+ * Instead, shows a success toast and lets the user navigate manually.
+ */
+async function restoreFromLocalStorageNoReload(backup) {
+    if (!backup) return false;
+
+    let restored = 0;
+
+    // 1. Restore config
+    if (backup.config) {
+        const cfg = backup.config;
+        if (cfg.theme) setAppearance(cfg.theme);
+        if (cfg.accent) setAccentColor(cfg.accent);
+        if (cfg.timezone) {
+            const tzInput = document.getElementById('cfg-timezone');
+            if (tzInput) tzInput.value = cfg.timezone;
+        }
+        const updates = {};
+        if (cfg.timezone) updates.timezone = cfg.timezone;
+        if (cfg.agent_max_context_tokens) updates.agent_max_context_tokens = cfg.agent_max_context_tokens;
+        if (cfg.agent_max_context_turns) updates.agent_max_context_turns = cfg.agent_max_context_turns;
+        if (cfg.agent_max_steps) updates.agent_max_steps = cfg.agent_max_steps;
+        if (Object.keys(updates).length > 0) {
+            try {
+                await fetch('/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ updates }),
+                });
+                restored++;
+            } catch (e) { /* non-fatal */ }
+        }
+    }
+
+    // 2. Restore sessions + messages
+    if (backup.sessions && backup.sessions.length > 0) {
+        for (const session of backup.sessions) {
+            try {
+                const storeRes = await fetch('/api/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: session.session_id,
+                        title: session.title || 'Restored chat',
+                        channel_type: session.channel_type || 'web',
+                        messages: session.messages || [],
+                    }),
+                });
+                if (storeRes.ok) restored++;
+            } catch (e) {
+                console.warn(`[IndexedDB] Failed to restore session ${session.session_id}:`, e);
+            }
+        }
+    }
+
+    // 3. Restore scheduled tasks
+    if (backup.tasks && backup.tasks.length > 0) {
+        for (const task of backup.tasks) {
+            try {
+                await fetch('/api/scheduler/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: task.name,
+                        type: task.action?.type === 'agent_task' ? 'ai_task' : 'message',
+                        content: task.action?.content || task.action?.task_description || '',
+                        schedule_type: task.schedule?.type || 'once',
+                        schedule_value: task.schedule?.expression || task.schedule?.run_at || String(task.schedule?.seconds || 3600),
+                        receiver: task.action?.receiver || 'restored',
+                        channel_type: task.action?.channel_type || 'web',
+                    }),
+                });
+                restored++;
+            } catch (e) { /* non-fatal */ }
+        }
+    }
+
+    if (restored > 0) {
+        if (typeof toastSuccess === 'function') {
+            toastSuccess(`Restored ${restored} item(s). Refreshing page...`, { durationMs: 4000 });
+        }
+        // Single reload — the sessionStorage flag prevents auto-load from
+        // re-triggering. This is the ONLY reload in the entire flow.
+        setTimeout(() => window.location.reload(), 3000);
+    } else {
+        if (typeof toastInfo === 'function') toastInfo('No items needed restoration');
+    }
+    return restored > 0;
+}
 
 // Manual load button handler — this ALWAYS works regardless of
 // sessionStorage flag, because the user explicitly clicked the button.
@@ -472,8 +619,8 @@ async function manualLoadFromLocalStorage() {
     if (!confirm(`Restore from storage backup saved at ${backup.saved_at}? This will re-create sessions, config, and tasks on the server.`)) {
         return;
     }
-    // Clear the auto-load flag so the restore can proceed even if it
-    // was already set (user is manually forcing a reload).
-    sessionStorage.removeItem(AUTO_LOAD_FLAG);
-    await restoreFromLocalStorage(backup);
+    if (typeof toastInfo === 'function') {
+        toastInfo('Restoring from browser storage... Please wait.');
+    }
+    await restoreFromLocalStorageNoReload(backup);
 }
