@@ -2447,6 +2447,13 @@ class ConfigHandler:
         # (cached for 24h in ~/.onyx/tz_cache.json), then falls back to the
         # system local tz, then UTC.
         "timezone",
+        # Model parameter toggles — some models reject temperature, top_p,
+        # frequency_penalty, or presence_penalty (e.g. o1, GPT-5, some
+        # custom routes). When these are set to false in config, the
+        # corresponding parameter is NOT sent to the API at all.
+        "enable_temperature", "enable_top_p",
+        "enable_frequency_penalty", "enable_presence_penalty",
+        "enable_max_tokens",
     }
 
     @staticmethod
@@ -2562,6 +2569,13 @@ class ConfigHandler:
                 "timezone": configured_tz,
                 "detected_timezone": detected_tz,
                 "effective_timezone": effective_tz,
+                # Model parameter toggles (default: all true). When false,
+                # the corresponding parameter is not sent to the LLM API.
+                "enable_temperature": local_config.get("enable_temperature", True),
+                "enable_top_p": local_config.get("enable_top_p", True),
+                "enable_frequency_penalty": local_config.get("enable_frequency_penalty", True),
+                "enable_presence_penalty": local_config.get("enable_presence_penalty", True),
+                "enable_max_tokens": local_config.get("enable_max_tokens", True),
             }, ensure_ascii=False)
         except Exception as e:
             logger.error(f"Error getting config: {e}")

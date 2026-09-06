@@ -263,13 +263,18 @@ class DeepSeekBot(Bot, OpenAICompatibleBot):
                     request_body.pop(k, None)
                     kwargs.pop(k, None)
             else:
-                # Non-thinking path: forward standard sampling controls.
-                temperature = kwargs.pop("temperature", None)
-                if temperature is not None:
-                    request_body["temperature"] = temperature
-                top_p = kwargs.pop("top_p", None)
-                if top_p is not None:
-                    request_body["top_p"] = top_p
+                # Non-thinking path: forward standard sampling controls,
+                # but ONLY if the user hasn't disabled them via config.
+                from config import conf as _conf_func
+                _cfg = _conf_func()
+                if _cfg.get("enable_temperature", True) != False:
+                    temperature = kwargs.pop("temperature", None)
+                    if temperature is not None:
+                        request_body["temperature"] = temperature
+                if _cfg.get("enable_top_p", True) != False:
+                    top_p = kwargs.pop("top_p", None)
+                    if top_p is not None:
+                        request_body["top_p"] = top_p
 
             logger.debug(
                 f"[DEEPSEEK] API call: model={model}, "

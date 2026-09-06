@@ -4740,6 +4740,9 @@ function initConfigView(data) {
     // Refresh the running/not-running badge from the server's perspective.
     refreshTelegramStatus();
 
+    // ── Model parameter toggles ──
+    initModelParamsUI(data);
+
     // ── Timezone config ──
     initTimezoneConfig(data);
 }
@@ -5202,6 +5205,38 @@ function updateTelegramShowToolsUI(enabled) {
         const span = btn.querySelector('span');
         if (span) span.style.transform = 'translateX(2px)';
     }
+}
+
+// Model parameter toggles (temperature, top_p, etc.)
+function toggleModelParam(paramName) {
+    const btn = document.getElementById(`cfg-${paramName}-toggle`);
+    if (!btn) return;
+    const isOn = btn.classList.contains('param-on');
+    const newState = !isOn;
+    updateModelParamUI(paramName, newState);
+}
+
+function updateModelParamUI(paramName, enabled) {
+    const btn = document.getElementById(`cfg-${paramName}-toggle`);
+    if (!btn) return;
+    if (enabled) {
+        btn.classList.add('param-on');
+        btn.style.background = 'rgb(99, 102, 241)';
+        const span = btn.querySelector('span');
+        if (span) span.style.transform = 'translateX(16px)';
+    } else {
+        btn.classList.remove('param-on');
+        btn.style.background = '#d1d5db';
+        const span = btn.querySelector('span');
+        if (span) span.style.transform = 'translateX(2px)';
+    }
+}
+
+function initModelParamsUI(data) {
+    updateModelParamUI('enable_temperature', data.enable_temperature !== false);
+    updateModelParamUI('enable_top_p', data.enable_top_p !== false);
+    updateModelParamUI('enable_frequency_penalty', data.enable_frequency_penalty !== false);
+    updateModelParamUI('enable_presence_penalty', data.enable_presence_penalty !== false);
 }
 
 // PRD: Purge all scheduled tasks — used when the VPS was rebuilt/wiped and
@@ -5703,6 +5738,11 @@ function saveAgentConfig() {
         agent_max_steps: parseInt(document.getElementById('cfg-max-steps').value) || 20,
         enable_thinking: document.getElementById('cfg-enable-thinking').checked,
         self_evolution_enabled: document.getElementById('cfg-self-evolution').checked,
+        // Model parameter toggles
+        enable_temperature: document.getElementById('cfg-enable-temperature-toggle')?.classList.contains('param-on') !== false,
+        enable_top_p: document.getElementById('cfg-enable-top_p-toggle')?.classList.contains('param-on') !== false,
+        enable_frequency_penalty: document.getElementById('cfg-enable-frequency_penalty-toggle')?.classList.contains('param-on') !== false,
+        enable_presence_penalty: document.getElementById('cfg-enable-presence_penalty-toggle')?.classList.contains('param-on') !== false,
     };
 
     const btn = document.getElementById('cfg-agent-save');

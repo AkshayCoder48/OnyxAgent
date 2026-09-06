@@ -90,16 +90,34 @@ class OpenAICompatibleBot:
             
             # Build request parameters
             model_name = kwargs.get("model", api_config.get('model', 'gpt-5.4'))
+            from config import conf as _conf_func
+            _cfg = _conf_func()
+
             request_params = {
                 "model": model_name,
                 "messages": messages,
-                "temperature": kwargs.get("temperature", api_config.get('default_temperature', 0.9)),
-                "top_p": kwargs.get("top_p", api_config.get('default_top_p', 1.0)),
-                "frequency_penalty": kwargs.get("frequency_penalty", api_config.get('default_frequency_penalty', 0.0)),
-                "presence_penalty": kwargs.get("presence_penalty", api_config.get('default_presence_penalty', 0.0)),
                 "stream": stream
             }
-            # GPT-5 / GPT-5.5 / o1 series only accept default temperature/top_p and reject penalty params
+            # Only add temperature if the model supports it AND the user
+            # hasn't disabled it via config (enable_temperature: false).
+            if _cfg.get("enable_temperature", True) != False:
+                t = kwargs.get("temperature", api_config.get('default_temperature', 0.9))
+                if t is not None:
+                    request_params["temperature"] = t
+            if _cfg.get("enable_top_p", True) != False:
+                tp = kwargs.get("top_p", api_config.get('default_top_p', 1.0))
+                if tp is not None:
+                    request_params["top_p"] = tp
+            if _cfg.get("enable_frequency_penalty", True) != False:
+                fp = kwargs.get("frequency_penalty", api_config.get('default_frequency_penalty', 0.0))
+                if fp is not None:
+                    request_params["frequency_penalty"] = fp
+            if _cfg.get("enable_presence_penalty", True) != False:
+                pp = kwargs.get("presence_penalty", api_config.get('default_presence_penalty', 0.0))
+                if pp is not None:
+                    request_params["presence_penalty"] = pp
+
+            # GPT-5 / GPT-5.5 / o1 series always reject penalty params.
             if model_name in ("gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5.5", "o1", "o1-mini"):
                 for key in ("temperature", "top_p", "frequency_penalty", "presence_penalty"):
                     request_params.pop(key, None)
