@@ -33,6 +33,32 @@ from agent.tools.memory.memory_get import MemoryGetTool
 # Import self-evolution tools
 from agent.tools.evolution_undo.evolution_undo import EvolutionUndoTool
 
+# New tools from CowAgent:
+
+# Subagent tool — spawn parallel in-process sub-agents for complex tasks
+try:
+    from agent.tools.subagent.subagent import SubagentTool
+except ImportError as e:
+    pass
+except Exception as e:
+    pass
+
+# Agent delegate tool — delegate work to peer agents in a team
+try:
+    from agent.tools.agent_delegate.agent_delegate import AgentDelegateTool
+except ImportError as e:
+    pass
+except Exception as e:
+    pass
+
+# Search files tool — unified grep+find with multi-backend support
+try:
+    from agent.tools.search_files.search_files import SearchFiles
+except ImportError as e:
+    pass
+except Exception as e:
+    pass
+
 # Import tools with optional dependencies
 def _import_optional_tools():
     """Import tools that have optional dependencies"""
@@ -167,6 +193,9 @@ __all__ = [
     'Vision',
     'BrowserTool',
     'McpTool',
+    'SubagentTool',
+    'AgentDelegateTool',
+    'SearchFiles',
 ]
 
 """

@@ -28,3 +28,4 @@ playwright>=1.40.0
 playwright-extra>=4.0.0
 playwright-extra-plugin-stealth>=0.1.0
 
+regex>=2024.0.0  # for search_files tool
