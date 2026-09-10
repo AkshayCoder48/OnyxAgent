@@ -5528,29 +5528,44 @@ class AgentsHandler:
         _require_auth()
         web.header('Content-Type', 'application/json; charset=utf-8')
         try:
-            from agent.registry import AgentRegistry
-            from agent.team import load_team
-            team = load_team()
+            from config import conf
+            from agent.team import read as read_team
+
+            settings = conf()
+            roster = read_team(settings)
+            raw_agents = roster.get("agents", [])
+
             agents = []
-            for member in team.members:
-                agents.append({
-                    "id": member.id,
-                    "name": member.name or member.id,
-                    "workspace": str(member.workspace) if member.workspace else "",
-                    "enabled": True,
-                })
             # Always include the default agent
-            if not any(a["id"] == "default" for a in agents):
-                agents.insert(0, {
-                    "id": "default",
-                    "name": "OnyxAgent",
-                    "workspace": "",
-                    "enabled": True,
-                })
+            default_id = roster.get("default_agent_id", "default")
+            agents.append({
+                "id": default_id,
+                "name": "OnyxAgent",
+                "workspace": "",
+                "enabled": True,
+            })
+
+            for raw in raw_agents:
+                aid = str(raw.get("id", ""))
+                if aid == default_id:
+                    # Update the default entry with real data
+                    agents[0] = {
+                        "id": aid,
+                        "name": raw.get("name", "OnyxAgent"),
+                        "workspace": str(raw.get("workspace", "")),
+                        "enabled": raw.get("enabled", True),
+                    }
+                else:
+                    agents.append({
+                        "id": aid,
+                        "name": raw.get("name", aid),
+                        "workspace": str(raw.get("workspace", "")),
+                        "enabled": raw.get("enabled", True),
+                    })
+
             return json.dumps({"status": "success", "agents": agents}, ensure_ascii=False)
         except Exception as e:
             logger.error(f"[AgentsHandler] error: {e}", exc_info=True)
-            # Fallback: return just the default agent
             return json.dumps({"status": "success", "agents": [
                 {"id": "default", "name": "OnyxAgent", "workspace": "", "enabled": True}
             ]}, ensure_ascii=False)
@@ -5568,13 +5583,26 @@ class AgentCreateHandler:
             if not agent_id:
                 return json.dumps({"status": "error", "message": "id is required"})
 
-            from agent.team import load_team, save_team, TeamMember
-            team = load_team()
-            if any(m.id == agent_id for m in team.members):
+            from config import conf
+            from agent.team import read as read_team, write as write_team
+
+            settings = conf()
+            roster = read_team(settings)
+            agents = roster.get("agents", [])
+
+            if any(str(a.get("id")) == agent_id for a in agents):
                 return json.dumps({"status": "error", "message": f"Agent '{agent_id}' already exists"})
 
-            team.members.append(TeamMember(id=agent_id, name=agent_name or agent_id))
-            save_team(team)
+            agents.append({
+                "id": agent_id,
+                "name": agent_name or agent_id,
+                "enabled": True,
+            })
+            roster["agents"] = agents
+            if not roster.get("default_agent_id"):
+                roster["default_agent_id"] = "default"
+
+            write_team(settings, roster)
             logger.info(f"[AgentsUI] Created agent: {agent_id}")
             return json.dumps({"status": "success", "agent_id": agent_id})
         except Exception as e:
@@ -5591,7 +5619,26 @@ class AgentToggleHandler:
             body = json.loads(web.data() or "{}")
             agent_id = str(body.get("id", "")).strip()
             enabled = bool(body.get("enabled", True))
-            # For now just return success — the registry handles this at runtime
+
+            from config import conf
+            from agent.team import read as read_team, write as write_team
+
+            settings = conf()
+            roster = read_team(settings)
+            agents = roster.get("agents", [])
+
+            found = False
+            for a in agents:
+                if str(a.get("id")) == agent_id:
+                    a["enabled"] = enabled
+                    found = True
+                    break
+
+            if not found:
+                return json.dumps({"status": "error", "message": f"Agent '{agent_id}' not found"})
+
+            roster["agents"] = agents
+            write_team(settings, roster)
             return json.dumps({"status": "success"})
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
@@ -5608,10 +5655,19 @@ class AgentDeleteHandler:
             if agent_id == "default":
                 return json.dumps({"status": "error", "message": "Cannot delete the default agent"})
 
-            from agent.team import load_team, save_team
-            team = load_team()
-            team.members = [m for m in team.members if m.id != agent_id]
-            save_team(team)
+            from config import conf
+            from agent.team import read as read_team, write as write_team
+
+            settings = conf()
+            roster = read_team(settings)
+            agents = roster.get("agents", [])
+            new_agents = [a for a in agents if str(a.get("id")) != agent_id]
+
+            if len(new_agents) == len(agents):
+                return json.dumps({"status": "error", "message": f"Agent '{agent_id}' not found"})
+
+            roster["agents"] = new_agents
+            write_team(settings, roster)
             logger.info(f"[AgentsUI] Deleted agent: {agent_id}")
             return json.dumps({"status": "success"})
         except Exception as e:
