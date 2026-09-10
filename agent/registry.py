@@ -1,7 +1,7 @@
 """Agent profile registry.
 
 The registry is deliberately small: an agent is identified by a stable ID and
-one complete CowAgent workspace. Runtime, routing, and persistence layers build
+one complete OnyxAgent workspace. Runtime, routing, and persistence layers build
 on this module without changing the existing single-agent configuration path.
 """
 
@@ -25,7 +25,7 @@ class AgentRegistryError(ValueError):
 
 @dataclass(frozen=True)
 class AgentProfile:
-    """Configuration for one complete CowAgent workspace."""
+    """Configuration for one complete OnyxAgent workspace."""
 
     id: str
     name: str
@@ -192,7 +192,7 @@ class AgentRegistry:
 
         raw_agents = settings.get("agents")
         if raw_agents is None or raw_agents == []:
-            profile = AgentProfile(id="default", name="CowAgent", workspace=instance_root)
+            profile = AgentProfile(id="default", name="OnyxAgent", workspace=instance_root)
             return cls([profile], "default")
 
         if not isinstance(raw_agents, list):

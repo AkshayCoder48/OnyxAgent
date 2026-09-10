@@ -208,6 +208,6 @@ All kinds of contributions are welcome — new features, bug fixes, performance 
 
 ## 📌 Project Renaming Notice
 
-This project is a rebranded fork of `CowAgent` (previously `chatgpt-on-wechat`) and is now officially **OnyxAgent**. All CLI commands use the `onyx` prefix, and the primary color scheme has been changed from green to rose/red.
+This project is a rebranded fork of `OnyxAgent` (previously `chatgpt-on-wechat`) and is now officially **OnyxAgent**. All CLI commands use the `onyx` prefix, and the primary color scheme has been changed from green to rose/red.
 
 Clone URL: `https://github.com/AkshayCoder48/OnyxAgent.git`

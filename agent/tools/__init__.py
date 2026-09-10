@@ -33,7 +33,7 @@ from agent.tools.memory.memory_get import MemoryGetTool
 # Import self-evolution tools
 from agent.tools.evolution_undo.evolution_undo import EvolutionUndoTool
 
-# New tools from CowAgent:
+# New tools from OnyxAgent:
 
 # Subagent tool — spawn parallel in-process sub-agents for complex tasks
 try:

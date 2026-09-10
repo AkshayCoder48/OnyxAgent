@@ -247,6 +247,9 @@ def _build_tooling_section(tools: List[Any], language: str) -> List[str]:
             "ask": "ask the user a question (single-select, multi-select, text, or confirm) and wait for their answer — use this instead of outputting raw JSON when you need input",
             "todo": "manage todo lists (create, add, complete, edit, delete items)",
             "workflow": "create and manage reusable AI workflows",
+            "search_files": "search file contents (grep) or find files by name (find) — unified search tool with multi-backend support",
+            "subagent": "spawn parallel sub-agents for complex multi-step tasks — each sub-agent runs independently and reports back",
+            "agent_delegate": "delegate work to peer agents in a team",
         }
     else:
         core_summaries = {
@@ -274,12 +277,12 @@ def _build_tooling_section(tools: List[Any], language: str) -> List[str]:
 
     # Preferred display order
     tool_order = [
-        "read", "write", "edit", "ls", "grep", "find",
+        "read", "write", "edit", "ls", "search_files", "grep", "find",
         "bash", "terminal",
         "web_search", "web_fetch", "browser",
         "memory_search", "memory_get",
         "env_config", "scheduler", "send", "vision",
-        "ask", "todo", "workflow",
+        "ask", "todo", "workflow", "subagent", "agent_delegate",
     ]
 
     # Build name -> summary mapping for available tools
