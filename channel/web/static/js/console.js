@@ -669,6 +669,7 @@ const VIEW_META = {
     config:   { group: 'nav_manage',  page: 'menu_config' },
     models:   { group: 'nav_manage',  page: 'menu_models' },
     skills:   { group: 'nav_manage',  page: 'menu_skills' },
+    agents:   { group: 'nav_manage',  page: 'menu_agents' },
     workflows:{ group: 'nav_manage',  page: 'menu_workflows' },
     security: { group: 'nav_manage',  page: 'menu_security' },
     memory:   { group: 'nav_manage',  page: 'menu_memory' },
@@ -8804,6 +8805,131 @@ function deleteCustomProvider(providerId) {
 }
 
 // =====================================================================
+// Agents View
+// =====================================================================
+let agentsLoaded = false;
+function loadAgentsView() {
+    fetch('/api/agents').then(r => r.json()).then(data => {
+        const emptyEl = document.getElementById('agents-empty');
+        const listEl = document.getElementById('agents-list');
+        if (!emptyEl || !listEl) return;
+
+        const agents = data.agents || [];
+        if (agents.length === 0) {
+            emptyEl.classList.remove('hidden');
+            emptyEl.querySelector('p').textContent = 'No agents yet. Click "Add Agent" to create one.';
+            listEl.classList.add('hidden');
+            return;
+        }
+        emptyEl.classList.add('hidden');
+        listEl.classList.remove('hidden');
+        listEl.innerHTML = '';
+
+        agents.forEach(agent => {
+            const card = document.createElement('div');
+            card.className = 'bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-4';
+            const isDefault = agent.id === 'default';
+            const badge = isDefault
+                ? '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">Default</span>'
+                : '<span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Custom</span>';
+            const enabled = agent.enabled !== false;
+            const statusDot = enabled
+                ? '<span class="w-2 h-2 rounded-full bg-emerald-400"></span>'
+                : '<span class="w-2 h-2 rounded-full bg-zinc-400"></span>';
+
+            card.innerHTML = `
+                <div class="flex items-center gap-2 mb-2">
+                    ${statusDot}
+                    <span class="font-medium text-sm text-slate-700 dark:text-slate-200">${escapeHtml(agent.name || agent.id)}</span>
+                    <div class="flex-1"></div>
+                    ${badge}
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">ID: <span class="font-mono">${escapeHtml(agent.id)}</span></p>
+                ${agent.workspace ? `<p class="text-xs text-slate-400 dark:text-slate-500 mb-2"><i class="fas fa-folder mr-1"></i>${escapeHtml(agent.workspace)}</p>` : ''}
+                <div class="flex items-center gap-2 mt-3">
+                    ${!isDefault ? `<button onclick="toggleAgent('${escapeHtml(agent.id)}', ${!enabled})" class="text-xs px-2 py-1 rounded border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors">${enabled ? 'Disable' : 'Enable'}</button>` : ''}
+                    ${!isDefault ? `<button onclick="deleteAgent('${escapeHtml(agent.id)}')" class="text-xs px-2 py-1 rounded border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer transition-colors">Delete</button>` : ''}
+                </div>`;
+            listEl.appendChild(card);
+        });
+        agentsLoaded = true;
+    }).catch(err => {
+        const emptyEl = document.getElementById('agents-empty');
+        if (emptyEl) {
+            emptyEl.querySelector('p').textContent = 'Failed to load agents: ' + err.message;
+        }
+    });
+}
+
+function addAgent() {
+    const name = prompt('Enter agent name (e.g. "Research Agent"):');
+    if (!name || !name.trim()) return;
+    const agentId = name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (!agentId) {
+        if (typeof toastError === 'function') toastError('Invalid agent name');
+        return;
+    }
+    fetch('/api/agents/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: agentId, name: name.trim() }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (typeof toastSuccess === 'function') toastSuccess(`Agent "${name}" created`);
+            loadAgentsView();
+        } else {
+            if (typeof toastError === 'function') toastError(data.message || 'Failed to create agent');
+        }
+    })
+    .catch(err => {
+        if (typeof toastError === 'function') toastError(err.message);
+    });
+}
+
+function toggleAgent(agentId, enable) {
+    fetch('/api/agents/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: agentId, enabled: enable }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (typeof toastSuccess === 'function') toastSuccess(`Agent ${enable ? 'enabled' : 'disabled'}`);
+            loadAgentsView();
+        } else {
+            if (typeof toastError === 'function') toastError(data.message || 'Failed');
+        }
+    })
+    .catch(err => {
+        if (typeof toastError === 'function') toastError(err.message);
+    });
+}
+
+function deleteAgent(agentId) {
+    if (!confirm(`Delete agent "${agentId}"? This will remove its workspace and memory.`)) return;
+    fetch('/api/agents/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: agentId }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (typeof toastSuccess === 'function') toastSuccess('Agent deleted');
+            loadAgentsView();
+        } else {
+            if (typeof toastError === 'function') toastError(data.message || 'Failed');
+        }
+    })
+    .catch(err => {
+        if (typeof toastError === 'function') toastError(err.message);
+    });
+}
+
+// =====================================================================
 // Scheduler View
 // =====================================================================
 let tasksLoaded = false;
@@ -8980,6 +9106,7 @@ navigateTo = function(viewId) {
     if (viewId === 'config') loadConfigView();
     else if (viewId === 'models') loadModelsView();
     else if (viewId === 'skills') loadSkillsView();
+    else if (viewId === 'agents') loadAgentsView();
     else if (viewId === 'memory') {
         document.getElementById('memory-panel-viewer').classList.add('hidden');
         document.getElementById('memory-panel-list').classList.remove('hidden');

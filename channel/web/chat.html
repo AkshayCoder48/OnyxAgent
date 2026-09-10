@@ -188,15 +188,6 @@
                             <i class="fas fa-message item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_chat">Chat</span>
                         </a>
-                        <!-- Agent Mode toggle in sidebar -->
-                        <div class="flex items-center justify-between px-3 py-2 rounded-lg text-[14px] text-neutral-400 hover:bg-white/5 cursor-pointer transition-all duration-150"
-                             onclick="toggleAgentMode()">
-                            <div class="flex items-center gap-3">
-                                <i class="fas fa-robot item-icon text-xs w-5 text-center"></i>
-                                <span>Agent Mode</span>
-                            </div>
-                            <span id="sidebar-agent-indicator" class="w-2 h-2 rounded-full bg-zinc-600 transition-colors"></span>
-                        </div>
                     </div>
                 </div>
 
@@ -221,6 +212,11 @@
                            data-view="skills">
                             <i class="fas fa-bolt item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_skills">Skills</span>
+                        </a>
+                        <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
+                           data-view="agents">
+                            <i class="fas fa-users item-icon text-xs w-5 text-center"></i>
+                            <span>Agents</span>
                         </a>
                         <a class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-white/5 hover:text-neutral-200 text-[14px]"
                            data-view="workflows">
@@ -1482,6 +1478,34 @@
                                     class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer" data-i18n="cancel">Cancel</button>
                             <button onclick="confirmDeleteSkill()"
                                     class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors cursor-pointer" data-i18n="ok">Delete</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- VIEW: Agents                                            -->
+                <!-- ====================================================== -->
+                <div id="view-agents" class="view">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">Agents</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage team agents — each with its own workspace, memory, and identity</p>
+                                </div>
+                                <button onclick="addAgent()"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-primary-500 hover:bg-primary-600 transition-colors cursor-pointer flex items-center gap-1.5">
+                                    <i class="fas fa-plus text-[10px]"></i>
+                                    Add Agent
+                                </button>
+                            </div>
+                            <div id="agents-empty" class="flex flex-col items-center justify-center py-20">
+                                <div class="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center mb-4">
+                                    <i class="fas fa-users text-indigo-400 text-xl"></i>
+                                </div>
+                                <p class="text-slate-500 dark:text-slate-400 font-medium">Loading agents...</p>
+                            </div>
+                            <div id="agents-list" class="grid gap-4 hidden"></div>
                         </div>
                     </div>
                 </div>

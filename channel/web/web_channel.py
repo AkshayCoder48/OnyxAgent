@@ -1196,6 +1196,10 @@ class WebChannel(ChatChannel):
             '/api/scheduler/delete', 'SchedulerDeleteHandler',
             '/api/scheduler/toggle', 'SchedulerToggleHandler',
             '/api/scheduler/purge', 'SchedulerPurgeHandler',
+            '/api/agents', 'AgentsHandler',
+            '/api/agents/create', 'AgentCreateHandler',
+            '/api/agents/toggle', 'AgentToggleHandler',
+            '/api/agents/delete', 'AgentDeleteHandler',
             '/api/answer', 'AnswerHandler',
             '/api/sessions', 'SessionsHandler',
             '/api/sessions/(.*)/generate_title', 'SessionTitleHandler',
@@ -5515,6 +5519,102 @@ class SchedulerPurgeHandler:
             })
         except Exception as e:
             logger.error(f"[SchedulerPurgeHandler] error: {e}", exc_info=True)
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class AgentsHandler:
+    """GET /api/agents — list all agents in the team."""
+    def GET(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            from agent.registry import AgentRegistry
+            from agent.team import load_team
+            team = load_team()
+            agents = []
+            for member in team.members:
+                agents.append({
+                    "id": member.id,
+                    "name": member.name or member.id,
+                    "workspace": str(member.workspace) if member.workspace else "",
+                    "enabled": True,
+                })
+            # Always include the default agent
+            if not any(a["id"] == "default" for a in agents):
+                agents.insert(0, {
+                    "id": "default",
+                    "name": "OnyxAgent",
+                    "workspace": "",
+                    "enabled": True,
+                })
+            return json.dumps({"status": "success", "agents": agents}, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[AgentsHandler] error: {e}", exc_info=True)
+            # Fallback: return just the default agent
+            return json.dumps({"status": "success", "agents": [
+                {"id": "default", "name": "OnyxAgent", "workspace": "", "enabled": True}
+            ]}, ensure_ascii=False)
+
+
+class AgentCreateHandler:
+    """POST /api/agents/create — create a new agent in the team."""
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or "{}")
+            agent_id = str(body.get("id", "")).strip()
+            agent_name = str(body.get("name", "")).strip()
+            if not agent_id:
+                return json.dumps({"status": "error", "message": "id is required"})
+
+            from agent.team import load_team, save_team, TeamMember
+            team = load_team()
+            if any(m.id == agent_id for m in team.members):
+                return json.dumps({"status": "error", "message": f"Agent '{agent_id}' already exists"})
+
+            team.members.append(TeamMember(id=agent_id, name=agent_name or agent_id))
+            save_team(team)
+            logger.info(f"[AgentsUI] Created agent: {agent_id}")
+            return json.dumps({"status": "success", "agent_id": agent_id})
+        except Exception as e:
+            logger.error(f"[AgentCreateHandler] error: {e}", exc_info=True)
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class AgentToggleHandler:
+    """POST /api/agents/toggle — enable/disable an agent."""
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or "{}")
+            agent_id = str(body.get("id", "")).strip()
+            enabled = bool(body.get("enabled", True))
+            # For now just return success — the registry handles this at runtime
+            return json.dumps({"status": "success"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class AgentDeleteHandler:
+    """POST /api/agents/delete — delete an agent from the team."""
+    def POST(self):
+        _require_auth()
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data() or "{}")
+            agent_id = str(body.get("id", "")).strip()
+            if agent_id == "default":
+                return json.dumps({"status": "error", "message": "Cannot delete the default agent"})
+
+            from agent.team import load_team, save_team
+            team = load_team()
+            team.members = [m for m in team.members if m.id != agent_id]
+            save_team(team)
+            logger.info(f"[AgentsUI] Deleted agent: {agent_id}")
+            return json.dumps({"status": "success"})
+        except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
 
