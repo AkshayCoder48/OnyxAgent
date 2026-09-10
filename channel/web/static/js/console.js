@@ -370,6 +370,50 @@ function installCfgTipPortal() {
 let currentTheme = localStorage.getItem('onyx_theme') || 'system';
 let _systemThemeMql = null;  // matchMedia listener handle
 
+// Agent mode toggle — switches between simple chat mode and full agent mode
+// (with tools, file access, browser control, etc.)
+async function toggleAgentMode() {
+    const indicator = document.getElementById('sidebar-agent-indicator');
+    if (!indicator) return;
+
+    // Determine current state from the indicator color
+    const isCurrentlyOn = indicator.classList.contains('bg-emerald-400');
+    const newState = !isCurrentlyOn;
+
+    try {
+        const res = await fetch('/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ updates: { agent: newState } }),
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            updateAgentModeUI(newState);
+            if (typeof showToast === 'function') {
+                showToast(`Agent mode ${newState ? 'enabled' : 'disabled'}. ${newState ? 'AI can now use tools, browse files, and run code.' : 'Simple chat mode.'}`, 'info', { durationMs: 4000 });
+            }
+            // Reload after a short delay so the backend picks up the config change
+            setTimeout(() => window.location.reload(), 2000);
+        } else {
+            if (typeof toastError === 'function') toastError('Failed to toggle agent mode');
+        }
+    } catch (err) {
+        if (typeof toastError === 'function') toastError(err.message);
+    }
+}
+
+function updateAgentModeUI(enabled) {
+    const indicator = document.getElementById('sidebar-agent-indicator');
+    if (!indicator) return;
+    if (enabled) {
+        indicator.className = 'w-2 h-2 rounded-full bg-emerald-400 transition-colors';
+        indicator.title = 'Agent mode is ON — AI can use tools';
+    } else {
+        indicator.className = 'w-2 h-2 rounded-full bg-zinc-600 transition-colors';
+        indicator.title = 'Agent mode is OFF — simple chat only';
+    }
+}
+
 function _isSystemDark() {
     return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
 }
@@ -9927,6 +9971,12 @@ document.addEventListener('click', function(e) {
 applyTheme();
 _initSystemThemeListener();  // PRD §32 — live-follow OS theme changes
 _initToastContainer();        // PRD §29 — toast notification system
+// Set agent mode indicator from server config
+fetch('/config').then(r => r.json()).then(data => {
+    if (data.status === 'success') {
+        updateAgentModeUI(data.use_agent === true);
+    }
+}).catch(() => {});
 applyI18n();
 
 fetch('/auth/check').then(r => r.json()).then(data => {

@@ -2416,7 +2416,7 @@ class ConfigHandler:
 
     EDITABLE_KEYS = {
         "onyx_lang",
-        "model", "bot_type", "use_linkai",
+        "model", "bot_type", "use_linkai", "agent",
         "open_ai_api_base", "deepseek_api_base", "qianfan_api_base", "claude_api_base", "gemini_api_base",
         "zhipu_ai_api_base", "moonshot_base_url", "ark_base_url", "custom_api_base", "mimo_api_base",
         "open_ai_api_key", "deepseek_api_key", "qianfan_api_key", "claude_api_key", "gemini_api_key",

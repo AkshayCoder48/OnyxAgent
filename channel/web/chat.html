@@ -188,6 +188,15 @@
                             <i class="fas fa-message item-icon text-xs w-5 text-center"></i>
                             <span data-i18n="menu_chat">Chat</span>
                         </a>
+                        <!-- Agent Mode toggle in sidebar -->
+                        <div class="flex items-center justify-between px-3 py-2 rounded-lg text-[14px] text-neutral-400 hover:bg-white/5 cursor-pointer transition-all duration-150"
+                             onclick="toggleAgentMode()">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-robot item-icon text-xs w-5 text-center"></i>
+                                <span>Agent Mode</span>
+                            </div>
+                            <span id="sidebar-agent-indicator" class="w-2 h-2 rounded-full bg-zinc-600 transition-colors"></span>
+                        </div>
                     </div>
                 </div>
 
